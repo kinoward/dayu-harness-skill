@@ -85,3 +85,9 @@ Skill 存在时，通过以下方式激活：
 - **隐式**：自然语言描述意图，如「删除提交校验」「检查项目完整性」
 
 Skill 删除后，AI 读取项目中的 `doc-maintenance.md` 自行处理上述意图。
+
+## 参考引用
+
+- [agentsmd/agents.md](https://github.com/agentsmd/agents.md) — AGENTS.md 开放格式规范，本项目的文档体系根节点遵循此标准
+- [microsoft/skills](https://github.com/microsoft/skills) — 微软官方的 Skills、MCP servers、Agents.md 集合
+- [agent-sh/agnix](https://github.com/agent-sh/agnix) — AGENTS.md / CLAUDE.md / SKILL.md 的 linter 和 LSP，与诊断功能互补
