@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.github.com/en/rest/repos/rules#create-a-repository-ruleset",
+  "$description": "Protect version tags (v*) from deletion and overwrite. Prevents accidental loss of release history and ensures semantic versioning integrity. Apply this ruleset via gh api or the GitHub UI under Settings > Rules > Rulesets.",
+  "name": "protect-tags",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/tags/v*"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# commit-msg hook: Conventional Commits + CJK 检测
+# 安装路径: .husky/commit-msg
+
+COMMIT_MSG_FILE="$1"
+
+# 1. Conventional Commits 格式校验（由 commitlint 处理）
+# 如果项目安装了 commitlint，此步骤自动执行
+if command -v npx &> /dev/null && [ -f "commitlint.config.cjs" ]; then
+    npx --no-install commitlint --edit "$COMMIT_MSG_FILE" 2>/dev/null || {
+        echo ""
+        echo "ERROR: commit message does not follow Conventional Commits format."
+        echo "Format: type(scope): description"
+        echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+        exit 1
+    }
+fi
+
+# 2. CJK 字符检测
+if grep -nP '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}]' "$COMMIT_MSG_FILE" > /tmp/cjk_detected.txt 2>/dev/null; then
+    echo ""
+    echo "ERROR: commit message contains CJK characters."
+    echo "Commit messages must be in English. See docs/practices/git-language-policy.md"
+    echo ""
+    echo "Offending lines:"
+    cat /tmp/cjk_detected.txt
+    rm -f /tmp/cjk_detected.txt
+    exit 1
+fi
+
+rm -f /tmp/cjk_detected.txt

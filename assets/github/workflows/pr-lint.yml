@@ -1,0 +1,42 @@
+name: PR Lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  pr-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PR title for CJK characters
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}]'; then
+            echo "ERROR: PR title contains CJK characters. Use English."
+            exit 1
+          fi
+
+      - name: Check PR body for CJK characters
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          if echo "$BODY" | grep -P '[\x{4e00}-\x{9fff}]'; then
+            echo "ERROR: PR body contains CJK characters. Use English."
+            exit 1
+          fi
+
+      - name: Check PR body structure
+        run: |
+          BODY="${{ github.event.pull_request.body }}"
+          if ! echo "$BODY" | grep -q '## Summary'; then
+            echo "ERROR: PR body missing '## Summary' section."
+            exit 1
+          fi
+          if ! echo "$BODY" | grep -q '## Test plan'; then
+            echo "ERROR: PR body missing '## Test plan' section."
+            exit 1
+          fi
+          if ! echo "$BODY" | grep -q 'Closes #'; then
+            echo "WARNING: PR body missing 'Closes #N' trailer."
+          fi

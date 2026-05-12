@@ -1,0 +1,32 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Publish step: runs only when a release is created.
+      # Uncomment and customize for your project:
+      #
+      # - uses: actions/checkout@v4
+      #   if: ${{ steps.release.outputs.release_created }}
+      # - name: Publish
+      #   if: ${{ steps.release.outputs.release_created }}
+      #   run: |
+      #     echo "Release ${{ steps.release.outputs.tag_name }} created"
+      #     # Add your publish steps here

@@ -1,0 +1,17 @@
+name: Issue Lint
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  issue-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check issue for CJK characters
+        run: |
+          TITLE="${{ github.event.issue.title }}"
+          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}]'; then
+            echo "ERROR: Issue title contains CJK characters. Use English."
+            exit 1
+          fi

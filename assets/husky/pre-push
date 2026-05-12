@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# pre-push hook：保护 main 分支和 release 标签
+# 通用版本——阻止对 main/master 分支和 v* 标签的危险操作
+
+set -e
+
+# 读取 pre-push 的输入：<local ref> <local sha1> <remote ref> <remote sha1>
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # 提取分支/标签名
+    ref_name=$(echo "$remote_ref" | sed 's|refs/heads/||' | sed 's|refs/tags/||')
+
+    # 保护 main 和 master 分支
+    if [ "$remote_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/master" ]; then
+        # 阻止删除
+        if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "❌ 禁止删除 $ref_name 分支。"
+            echo "   如需删除，请在 GitHub 仓库设置中操作。"
+            exit 1
+        fi
+
+        # 阻止非 fast-forward 推送
+        if [ "$remote_sha" != "0000000000000000000000000000000000000000" ]; then
+            # 检查本地提交是否包含远程提交（fast-forward 检查）
+            if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+                echo "❌ 禁止非 fast-forward 推送到 $ref_name 分支。"
+                echo "   请使用 feature branch + PR 的工作流程。"
+                exit 1
+            fi
+        fi
+    fi
+
+    # 保护 v* release 标签
+    if echo "$remote_ref" | grep -q 'refs/tags/v'; then
+        # 阻止删除
+        if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "❌ 禁止删除 release 标签 $ref_name。"
+            echo "   Release 标签应在 GitHub 仓库设置中管理。"
+            exit 1
+        fi
+
+        # 阻止覆盖已有的标签
+        if [ "$remote_sha" != "0000000000000000000000000000000000000000" ]; then
+            echo "❌ 禁止覆盖已有的 release 标签 $ref_name。"
+            echo "   请使用新的版本号创建新标签。"
+            exit 1
+        fi
+    fi
+done
+
+exit 0
