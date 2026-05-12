@@ -40,7 +40,7 @@ done
 if [ -z "$TARGET" ]; then
     echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--only <category>] [--enable cat1,cat2,...]" >&2
     echo "" >&2
-    echo "Categories: docs, husky, commitlint, workflows, eslint, prettier, lint-staged, gitignore, all" >&2
+    echo "Categories: docs, husky, commitlint, workflows, eslint, prettier, lint-staged, gitignore, release-please, all" >&2
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
@@ -74,6 +74,7 @@ json_escape() {
 # Q13 (版本化研究院)       → docs (research/)
 # Q14 (项目专属文档)       → docs (project/)
 # Q15 (历史归档)           → docs (archive/)
+# Q16 (release-please)    → release-please (release-please.yml, config, manifest)
 # gitignore                → gitignore (always offered)
 # ============================================================
 
@@ -92,6 +93,7 @@ get_docs_files() {
     # Practices
     echo "templates/docs/practices/AGENTS.md|docs/practices/AGENTS.md"
     echo "templates/docs/practices/ai-collaboration.md|docs/practices/ai-collaboration.md"
+    echo "templates/docs/practices/code-review-checklist.md|docs/practices/code-review-checklist.md"
     echo "templates/docs/practices/branch-and-release.md|docs/practices/branch-and-release.md"
     echo "templates/docs/practices/commit-guidelines.md|docs/practices/commit-guidelines.md"
     echo "templates/docs/practices/dev-hygiene.md|docs/practices/dev-hygiene.md"
@@ -157,6 +159,12 @@ get_gitignore_files() {
     echo "assets/gitignore/universal.gitignore|.gitignore"
 }
 
+get_release_please_files() {
+    echo "assets/github/workflows/release-please.yml|.github/workflows/release-please.yml"
+    echo "assets/github/release-please-config.json|release-please-config.json"
+    echo "assets/github/.release-please-manifest.json|.release-please-manifest.json"
+}
+
 # Get descriptions for each category
 get_category_description() {
     local cat="$1"
@@ -165,7 +173,7 @@ get_category_description() {
             echo "Documentation templates — AGENTS.md, CLAUDE.md, docs/ hierarchy (practices, decisions, troubleshooting, research, project, archive), and maintenance scripts (audit.sh, validate.sh, diff-helper.sh, check-consistency.sh)"
             ;;
         husky)
-            echo "Husky git hooks — commit-msg (Conventional Commits + CJK detection), pre-commit (lint-staged), pre-push (branch protection)"
+            echo "Husky git hooks — commit-msg (Conventional Commits + CJK detection + AI trailer stripping + issue ref rejection), pre-commit (lint-staged), pre-push (branch protection)"
             ;;
         commitlint)
             echo "Commitlint configuration — commitlint.config.cjs with @commitlint/config-conventional rules"
@@ -185,6 +193,9 @@ get_category_description() {
         gitignore)
             echo "Gitignore — universal.gitignore (with language-specific variants auto-detected during install)"
             ;;
+        release-please)
+            echo "Release-please — automated changelog + version bump + release PR workflow (release-please.yml, release-please-config.json, .release-please-manifest.json)"
+            ;;
     esac
 }
 
@@ -194,7 +205,7 @@ resolve_categories() {
     if [ -n "$ENABLED_CATEGORIES" ]; then
         cats="$ENABLED_CATEGORIES"
     elif [ "$ONLY_CATEGORY" = "all" ]; then
-        cats="docs,husky,commitlint,workflows,eslint,prettier,lint-staged,gitignore"
+        cats="docs,husky,commitlint,workflows,eslint,prettier,lint-staged,gitignore,release-please"
     else
         cats="$ONLY_CATEGORY"
     fi
@@ -213,6 +224,7 @@ count_category_files() {
         prettier) get_prettier_files | wc -l | tr -d ' ' ;;
         lint-staged) get_lintstaged_files | wc -l | tr -d ' ' ;;
         gitignore) get_gitignore_files | wc -l | tr -d ' ' ;;
+        release-please) get_release_please_files | wc -l | tr -d ' ' ;;
         *) echo "0" ;;
     esac
 }
@@ -229,6 +241,7 @@ get_category_files() {
         prettier) get_prettier_files ;;
         lint-staged) get_lintstaged_files ;;
         gitignore) get_gitignore_files ;;
+        release-please) get_release_please_files ;;
     esac
 }
 
@@ -328,6 +341,29 @@ do_apply() {
     for cat in $categories; do
         # For asset categories with dedicated install scripts, delegate
         case "$cat" in
+            release-please)
+                # Handle release-please directly
+                while IFS='|' read -r src_rel dst_rel; do
+                    [ -z "$src_rel" ] && continue
+                    local src_path="$SKILL_DIR/$src_rel"
+                    local dst_path="$TARGET/$dst_rel"
+
+                    if [ ! -f "$src_path" ]; then
+                        ERRORS="${ERRORS}${dst_rel}: source not found; "
+                        continue
+                    fi
+
+                    mkdir -p "$(dirname "$dst_path")"
+                    if [ -f "$dst_path" ]; then
+                        SKIPPED="${SKIPPED}${dst_rel} "
+                        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                    else
+                        cp "$src_path" "$dst_path"
+                        APPLIED="${APPLIED}${dst_rel} "
+                        APPLIED_COUNT=$((APPLIED_COUNT + 1))
+                    fi
+                done < <(get_release_please_files)
+                ;;
             husky|commitlint|workflows|eslint|prettier|lint-staged|gitignore)
                 local script_name="install-${cat}.sh"
                 # Map category name to script name (handle lint-staged → lint_staged, workflows → github-workflows)
