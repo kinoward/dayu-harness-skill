@@ -101,7 +101,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ## Q&A 决策参考
 
-以下 15 项治理约束覆盖了完整的工程约束体系。AI 可根据此参考在初始化新项目或扩展已有项目时重现决策流程。
+以下 16 项治理约束覆盖了完整的工程约束体系。AI 可根据此参考在初始化新项目或扩展已有项目时重现决策流程。
 
 ### Git 相关
 
@@ -146,9 +146,10 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | #4 分支与发布管理 | rulesets JSON + pre-push hook | GitHub rulesets（远程）+ pre-push hook（本地）双重保护 |
 | #5 代码风格与质量 | ESLint + Prettier + lint-staged | `install-eslint.sh` + `install-prettier.sh` + `install-lint-staged.sh` |
 | #7 开发环境纪律 | validate.sh | — |
+| #16 release-please | release-please.yml + config + manifest | 仅 GitHub 项目；依赖 #1（Conventional Commits）+ #3（PR 规范）；需要 PAT |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
-> #6、#8、#9-#13 为纯文档约束，无联动脚本。
+> #6、#8、#9-#15 为纯文档约束，无联动脚本。
 
 ## 兼容化处理参考
 

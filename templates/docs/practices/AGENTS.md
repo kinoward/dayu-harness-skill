@@ -9,5 +9,6 @@
 - [branch-and-release.md](branch-and-release.md) — 分支与发布管理（~110行，含分支策略决策树、版本号规范、保护规则）
 - [testing-strategy.md](testing-strategy.md) — 测试策略（~60行）
 - [dev-hygiene.md](dev-hygiene.md) — 开发与测试纪律（~80行）
-- [ai-collaboration.md](ai-collaboration.md) — AI 协作风格规约（~160行，含 Auto-Retry 约定、结构化输出消费模式、通用 review 自检）
+- [code-review-checklist.md](code-review-checklist.md) — 代码 Review 自检清单（~30行）
+- [ai-collaboration.md](ai-collaboration.md) — AI 协作风格规约（~130行，含 Auto-Retry 约定、结构化输出消费模式）
 - [git-language-policy.md](git-language-policy.md) — Git 与远程仓库语言规约（~110行，含 CJK 检测原理、双重校验、例外处理）

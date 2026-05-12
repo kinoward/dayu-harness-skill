@@ -38,8 +38,9 @@ Q5: 「PR 工作流规范」— PR 标题、正文模板、Test plan 格式约�
     说明：文档部分在任何远程托管项目中适用；CI 自动校验仅在 GitHub 项目中有
 
 Q6: 「分支与发布管理」— 分支命名、合并策略、版本发布流程
-    实施：文档约定（通用）+ GitHub rulesets（仅 Q2=[1] 时联动安装）
-    说明：文档部分在任何远程托管项目中适用；rulesets 配置仅在 GitHub 项目中有
+    实施：文档约定 + pre-push hook（本地实时拦截 delete/force push main + delete/override v* 标签）
+         + GitHub rulesets（仅 Q2=[1] 时联动安装，远程层双重保障）
+    说明：pre-push hook 随 husky 安装始终部署；GitHub rulesets 作为远程层双重保障
 
 Q7: 「代码风格与质量」— ESLint + Prettier + lint-staged
     实施：本地 lint + pre-commit hook
@@ -64,6 +65,13 @@ Q14: 「项目专属文档」— 项目特有的内容文档目录
 
 Q15: 「历史归档」— 废弃项目内容的归档目录
 
+Q16: 「自动发版 (release-please)」— 自动生成 CHANGELOG、版本号、release PR
+     （仅 Q2=[1] GitHub 项目时）
+     实施：GitHub Actions workflow（release-please-action@v4）+ release-please-config.json + .release-please-manifest.json
+     说明：需要仓库设置 `secrets.RELEASE_TOKEN`（PAT）。纯 docs/ci/chore 等非用户可见变更默认不在 changelog 显示。
+          依赖于 Q3（Conventional Commits）和 Q5（PR 规范）的已部署。
+          合并策略必须为 merge commit，PR 标题使用自然语言。
+
 —— 确认汇总 ——
 
 展示：启用的约束、对应的文档+脚本、跳过的项及原因
@@ -77,12 +85,13 @@ Q15: 「历史归档」— 废弃项目内容的归档目录
 | Q3 提交信息格式校验 | husky + commitlint | `install-husky.sh` + `install-commitlint.sh` |
 | Q4 Git 内容语言规范 | commit-msg 中 CJK 检测 | 必须依赖 Q3 的 husky hook 载体；若 Q3 跳过，仅 CI 层可用 |
 | Q5 PR 工作流规范 | pr-lint.yml | 仅 GitHub 项目联动 CI（`install-github-workflows.sh`），文档部分不受影响 |
-| Q6 分支与发布管理 | rulesets JSON + pre-push hook | 仅 GitHub 项目联动 CI；本地有 `pre-push` hook 保护 |
+| Q6 分支与发布管理 | rulesets JSON + pre-push hook | pre-push hook 本地始终部署（随 husky）；GitHub rulesets（远程）双重保护。详见 branch-and-release.md「保护规则」章节 |
 | Q7 代码风格与质量 | ESLint + Prettier + lint-staged | `install-eslint.sh` + `install-prettier.sh` + `install-lint-staged.sh` |
 | Q8 测试策略 | — | 纯文档，无联动脚本 |
 | Q9 开发环境纪律 | validate.sh | — |
 | Q10 AI 协作风格 | — | 纯文档（核心模块） |
 | Q11-15 知识管理 | — | 纯文档，初始化时在 templates/docs/ 下创建对应目录结构 |
+| Q16 release-please | release-please.yml + config + manifest | 仅 GitHub 项目可用；依赖 Q3（Conventional Commits）+ Q5（PR 规范）；需要 PAT |
 
 ### Q&A 答案到安装脚本的映射
 
@@ -91,9 +100,10 @@ Q15: 「历史归档」— 废弃项目内容的归档目录
 | Q3 启用 | `install-husky.sh` → `install-commitlint.sh` |
 | Q4 启用（依赖 Q3） | CJK 检测已在 commit-msg hook 中，随 husky 安装 |
 | Q5 启用 + GitHub | `install-github-workflows.sh`（pr-lint.yml + issue-lint.yml） |
-| Q6 启用 + GitHub | 部署 `assets/github/rulesets/` + 安装 `pre-push` hook |
+| Q6 启用 + GitHub | 部署 `assets/github/rulesets/` + 安装 `pre-push` hook（本地始终安装，远程双重保障） |
 | Q7 启用 | `install-eslint.sh` → `install-prettier.sh` → `install-lint-staged.sh` |
-| Q11-15 启用 | `scaffold.sh` 创建对应 docs/ 子目录和模板
+| Q11-15 启用 | `scaffold.sh` 创建对应 docs/ 子目录和模板 |
+| Q16 启用 + GitHub | `scaffold.sh --only release-please`（部署 release-please.yml + config + manifest） |
 
 ## 融合模式额外提问
 

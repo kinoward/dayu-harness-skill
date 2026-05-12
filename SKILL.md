@@ -118,7 +118,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 Skill 目录中的其他文件按需加载：
 
 - **[AGENTS.md](AGENTS.md)**：Skill 自身渐进式披露入口，路由到各模块。
-- **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，包含 15 项治理约束描述、联动规则、融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
+- **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，包含 16 项治理约束描述（含 release-please 可选资产）、联动规则、融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），按用户选择部署到项目对应位置。
 - **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + 7 个 install-*.sh），由各模式按需调用。

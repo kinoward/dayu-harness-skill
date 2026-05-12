@@ -80,11 +80,15 @@ pre-release 和 build metadata 按 SemVer 规范附加。
 - release-please-action 自动检测 conventional commit，生成版本号和 CHANGELOG
 - 自动创建 release PR，required status check 通过后 GitHub 平台自动合并
 - 合并后自动创建 tag 和 Release notes
+- 配置文件：`release-please-config.json`（changelog sections、版本策略、hidden types）
+- Manifest 文件：`.release-please-manifest.json`（当前版本号追踪）
+- Workflow 文件：`.github/workflows/release-please.yml`（release-please-action@v4）
 
 前置设置：
 - 仓库需开启 `allow_auto_merge: true`
-- release-please 使用 PAT（`RELEASE_TOKEN`）而非 GITHUB_TOKEN
-- 配置路径过滤以避免纯 docs/CI/scripts 变更触发不必要的发版
+- release-please 使用 PAT（`secrets.RELEASE_TOKEN`）而非 `GITHUB_TOKEN`，因为 release-please 创建的 PR 需要触发后续 CI checks
+- 纯 docs/ci/scripts/config 变更的类型（docs/build/ci/chore/style/test/refactor）默认不在 changelog 中显示（`hidden: true`），避免 changelog 被非用户可见的变更污染
+- 因 commit-msg hook 已拦截 issue 引用（Closes #N 仅允许在 PR body），changelog 条目不会出现重复的 issue 引用
 
 ### 场景 C：语义发布（semantic-release）
 
