@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# commit-msg hook — Conventional Commits via commitlint
+npx --no -- commitlint --edit "$1"

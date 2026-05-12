@@ -1,0 +1,15 @@
+{
+  "name": "has-full-config-project",
+  "private": true,
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "lint-staged": "^15.0.0"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}
