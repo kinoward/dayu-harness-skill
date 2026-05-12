@@ -10,33 +10,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check PR body structure
+        id: pr-body-structure
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/pr_body_structure.py
+
       - name: Check PR title for CJK characters
+        id: pr-title-cjk
+        continue-on-error: true
         run: |
           TITLE="${{ github.event.pull_request.title }}"
-          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}]'; then
+          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}]'; then
             echo "ERROR: PR title contains CJK characters. Use English."
+            echo "See docs/practices/git-language-policy.md"
             exit 1
           fi
 
       - name: Check PR body for CJK characters
+        id: pr-body-cjk
+        continue-on-error: true
         run: |
           BODY="${{ github.event.pull_request.body }}"
-          if echo "$BODY" | grep -P '[\x{4e00}-\x{9fff}]'; then
+          if echo "$BODY" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}]'; then
             echo "ERROR: PR body contains CJK characters. Use English."
+            echo "See docs/practices/git-language-policy.md"
             exit 1
           fi
 
-      - name: Check PR body structure
+      - name: Aggregate lint results
+        if: always()
         run: |
-          BODY="${{ github.event.pull_request.body }}"
-          if ! echo "$BODY" | grep -q '## Summary'; then
-            echo "ERROR: PR body missing '## Summary' section."
-            exit 1
+          FAILED=""
+          if [ "${{ steps.pr-body-structure.outcome }}" != "success" ]; then
+            FAILED="$FAILED pr-body-structure"
           fi
-          if ! echo "$BODY" | grep -q '## Test plan'; then
-            echo "ERROR: PR body missing '## Test plan' section."
-            exit 1
+          if [ "${{ steps.pr-title-cjk.outcome }}" != "success" ]; then
+            FAILED="$FAILED pr-title-cjk"
           fi
-          if ! echo "$BODY" | grep -q 'Closes #'; then
-            echo "WARNING: PR body missing 'Closes #N' trailer."
+          if [ "${{ steps.pr-body-cjk.outcome }}" != "success" ]; then
+            FAILED="$FAILED pr-body-cjk"
+          fi
+          if [ -n "$FAILED" ]; then
+            echo "::error::The following PR lint checks failed:$FAILED"
+            exit 1
           fi
