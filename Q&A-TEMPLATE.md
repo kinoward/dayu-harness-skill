@@ -33,7 +33,7 @@ Q: 是否使用 GitHub 远程托管？
 | `github.pr` | 是否启用 GitHub-native PR 规范、PR/issue lint、PR body 结构检查 | GitHub 项目；PR body 使用 `Summary / Implementation notes / Test plan` |
 | `github.branch-release` | 是否启用分支/标签保护规则与本地 pre-push 保护 | GitHub 项目；依赖 `git.commit` |
 | `quality.tooling` | 是否启用 ESLint、Prettier、lint-staged、`.gitignore` | 含代码项目；复杂配置默认 `manual_required` |
-| `ai.collaboration` | 是否部署 AI 协作实践文档 | 推荐 AI 经常参与实现的项目启用 |
+| `ai.collaboration` | 是否部署 AI 协作实践文档，并将项目文档作为长期记忆权威源 | 推荐 AI 经常参与实现的项目启用 |
 | `knowledge.adr` | 是否建立 ADR 决策记录目录 | 通用 |
 | `knowledge.troubleshooting` | 是否建立排障知识库 | 通用 |
 | `knowledge.research` | 是否建立版本化研究目录 | 有持续调研需求时启用 |

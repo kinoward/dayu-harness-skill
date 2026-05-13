@@ -1,7 +1,7 @@
 {
   "id": "ai.collaboration",
   "description": "AI collaboration execution practices",
-  "description_nl": "Deploy the AI collaboration practice document without enabling repository hooks.",
+  "description_nl": "Deploy the AI collaboration practice document and project-memory boundaries without enabling repository hooks.",
   "default": false,
   "dependencies": ["core"],
   "template_files": [
@@ -10,7 +10,8 @@
   "asset_files": [],
   "installer": null,
   "acceptance": [
-    "AI collaboration practice document exists"
+    "AI collaboration practice document exists",
+    "Project memory boundaries are documented in ai-collaboration.md"
   ],
-  "suggested_when": "Enable when AI agents regularly implement or maintain project work."
+  "suggested_when": "Enable when AI agents regularly implement or maintain project work, especially when reusable decisions and troubleshooting knowledge should become repository-owned memory."
 }
