@@ -17,104 +17,74 @@
 - **自动化约束资产**：按需部署 AI 署名剥离、issue 引用拦截、Conventional Commits 校验等 hooks/CI
 - **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
-## 项目结构
+## 目录结构
+
+### Skill 包结构
+
+本结构描述 `docs-governance/` Skill 自身。它是部署来源，不会整体复制到目标项目。
 
 ```
 docs-governance/
-  README.md                 # 本文件
-  SKILL.md                  # Skill 行为定义
-  AGENTS.md                 # Skill 自身渐进式披露入口
-  Q&A-TEMPLATE.md           # Q&A 参考模板
-  agents/
-    openai.yaml             # Codex UI 与触发策略元数据
-  references/
-    agent-compatibility.md  # Claude / Codex / 通用 Agent Skills 兼容说明
-  capabilities/             # 治理能力 manifest（单一事实源）
-
-  docs/                     # Skill 自身文档
-    plan.md                 # 设计计划
-    AGENTS.md               # Skill 文档入口
-    optimization-2026-05.md # 2026-05 优化记录
-
-  templates/                # 文档模板（部署到目标项目）
-    CLAUDE.md
-    AGENTS.md
-    docs/
-      AGENTS.md
-      doc-maintenance.md
-      practices/            # 工程规范索引；具体文档按能力模块部署
-        AGENTS.md
-        ai-collaboration.md
-        branch-and-release.md
-        code-review-checklist.md
-        commit-guidelines.md
-        dev-hygiene.md
-        git-language-policy.md
-        pr-guidelines.md
-        testing-strategy.md
-      decisions/            # ADR 决策记录
-        AGENTS.md
-        adr-template.md
-      troubleshooting/      # 排障知识库
-        AGENTS.md
-      research/             # 版本化研究院
-        AGENTS.md
-      project/              # 项目专属内容
-        AGENTS.md
-      archive/              # 历史归档
-        AGENTS.md
-        project/
-          AGENTS.md
-      scripts/              # 维护脚本
-        audit.sh
-        check-consistency.sh
-        diff-helper.sh
-        validate.sh
-
-  assets/                   # 脚本和配置资产（按用户选择部署）
-    husky/                  # Git hooks（commit-msg + pre-commit + pre-push）
-      commit-msg
-      pre-commit
-      pre-push
-    commitlint/             # Commitlint 配置
-      commitlint.config.cjs
-    github/                 # GitHub workflows + rulesets + CI 脚本
-      workflows/
-        issue-lint.yml
-        pr-lint.yml
-        release-please.yml
-      rulesets/
-        protect-main.json
-        protect-tags.json
-      release-please-config.json
-      .release-please-manifest.json
-      scripts/
-        pr_body_structure.py
-    eslint/                 # ESLint 配置
-      eslint.config.js
-    prettier/               # Prettier 配置
-      .prettierrc
-    lint-staged/            # lint-staged 配置
-      .lintstagedrc.json
-    gitignore/              # .gitignore 模板
-      node.gitignore
-      python.gitignore
-      universal.gitignore
-
-  scripts/                  # 初始化脚本（仅 Skill 内部使用）
-    scaffold.sh
-    install-commitlint.sh
-    install-eslint.sh
-    install-github-workflows.sh
-    install-gitignore.sh
-    install-husky.sh
-    install-lint-staged.sh
-    install-prettier.sh
-
-  tests/                    # Skill 自身测试
-    unit/                   # bats 单元测试
-    fixtures/               # 5 个测试夹具项目
+├── README.md                 # 本文件，人类阅读入口
+├── SKILL.md                  # Skill 行为定义，保持精简
+├── AGENTS.md                 # Skill 自身渐进式披露入口
+├── Q&A-TEMPLATE.md           # Q&A 参考模板
+├── agents/                   # Codex UI 与触发策略元数据
+├── references/               # Claude / Codex / 通用 Agent Skills 兼容说明
+├── capabilities/             # 治理能力 manifest，部署清单单一事实源
+├── docs/                     # Skill 自身设计与优化记录
+├── templates/                # 部署到目标项目的文档模板来源
+├── assets/                   # 按能力部署的 hook、CI、配置资产来源
+├── scripts/                  # Skill 内部初始化和安装脚本
+└── tests/                    # Skill 自身 bats 测试与 fixture 项目
 ```
+
+维护 Skill 自身目录、模板或能力清单时，必须同步更新本结构图和根 [AGENTS.md](AGENTS.md) 中对应的 `## 目录结构` 区块。
+
+### 部署到目标项目后的结构
+
+目标项目只接收 `capabilities/*.json` 选中的模板和资产。`core` 始终部署；其它目录和文件按 capability 启用。
+
+```
+<target-project>/
+├── CLAUDE.md                         # core：仅 @AGENTS.md
+├── AGENTS.md                         # core：项目级任务路由入口
+├── docs/
+│   ├── AGENTS.md                     # core：docs 目录索引
+│   ├── doc-maintenance.md            # core：文档体系维护规范
+│   ├── practices/                    # core 索引 + 可选实践文档
+│   │   ├── AGENTS.md
+│   │   ├── commit-guidelines.md      # git.commit
+│   │   ├── git-language-policy.md    # git.language
+│   │   ├── pr-guidelines.md          # github.pr
+│   │   ├── code-review-checklist.md  # github.pr
+│   │   ├── branch-and-release.md     # github.branch-release
+│   │   ├── dev-hygiene.md            # quality.tooling
+│   │   ├── testing-strategy.md       # quality.tooling
+│   │   └── ai-collaboration.md       # ai.collaboration
+│   ├── scripts/                      # core：维护脚本
+│   │   ├── AGENTS.md
+│   │   ├── audit.sh
+│   │   ├── check-consistency.sh
+│   │   ├── diff-helper.sh
+│   │   └── validate.sh
+│   ├── decisions/                    # knowledge.adr
+│   ├── troubleshooting/              # knowledge.troubleshooting
+│   ├── research/                     # knowledge.research
+│   ├── project/                      # project.docs
+│   └── archive/                      # archive.project
+├── .husky/                           # git.commit 通过安装脚本合并部署
+├── .github/                          # github.pr / github.branch-release / github.release-please
+├── commitlint.config.cjs             # git.commit
+├── eslint.config.js                  # quality.tooling
+├── .prettierrc                       # quality.tooling
+├── .lintstagedrc.json                # quality.tooling
+├── .gitignore                        # quality.tooling
+├── release-please-config.json        # github.release-please
+└── .release-please-manifest.json     # github.release-please
+```
+
+能力清单、部署模板或目标项目治理骨架变化时，必须同步更新本结构图和 `templates/` 下对应 `AGENTS.md` 的 `## 目录结构` 区块。
 
 ## 依赖与测试（维护者）
 

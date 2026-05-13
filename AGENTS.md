@@ -2,6 +2,26 @@
 
 Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进式披露文档体系。
 
+## 目录结构
+
+```
+docs-governance/
+├── AGENTS.md                 # Skill 自身入口
+├── SKILL.md                  # Skill 行为定义
+├── README.md                 # 人类阅读概述
+├── Q&A-TEMPLATE.md           # 初始化与融合问答参考
+├── agents/                   # Codex UI 与触发策略元数据
+├── references/               # 跨 Agent 兼容说明等参考资料
+├── capabilities/             # 治理能力 manifest，部署清单单一事实源
+├── templates/                # 会部署到目标项目的文档模板
+├── assets/                   # 会按能力部署的 hook、CI、配置资产
+├── scripts/                  # Skill 内部初始化与安装脚本
+├── docs/                     # Skill 自身设计文档
+└── tests/                    # Skill 自身测试和 fixture 项目
+```
+
+目录、文件或能力部署清单变化导致结构变化时，必须同步更新本区块与 [README.md](README.md) 中对应的 `## 目录结构` 描述。
+
 ## 理解 Skill
 
 > 触发时机：需要理解 Skill 的定位、行为和模式时读取

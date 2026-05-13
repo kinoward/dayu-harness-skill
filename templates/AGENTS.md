@@ -5,6 +5,29 @@
 > **聚焦**: Git / GitHub / 文档治理
 > **规则**: 以本文件与 `docs/` 规则为准
 
+## 目录结构
+
+```
+<project>/
+├── CLAUDE.md                  # core：仅引用 @AGENTS.md
+├── AGENTS.md                  # core：项目级任务路由入口
+├── docs/
+│   ├── AGENTS.md              # core：docs 目录索引
+│   ├── doc-maintenance.md     # core：文档体系维护规范
+│   ├── practices/             # core 索引 + 可选工程实践文档
+│   ├── scripts/               # core：诊断、验证、差异、一致性脚本
+│   ├── decisions/             # 可选：ADR 决策记录
+│   ├── troubleshooting/       # 可选：排障知识库
+│   ├── research/              # 可选：版本化研究
+│   ├── project/               # 可选：项目专属内容
+│   └── archive/               # 可选：历史归档
+├── .husky/                    # 可选：本地 Git hooks
+├── .github/                   # 可选：GitHub workflows、rulesets、辅助脚本
+└── *                          # 可选：commitlint、ESLint、Prettier、release-please 等配置
+```
+
+目录结构变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+
 ## 使用顺序
 
 - 项目总入口：本文件
