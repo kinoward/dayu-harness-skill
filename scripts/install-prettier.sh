@@ -19,11 +19,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$TARGET" ]; then
-    echo '{"status":"error","error":"usage: install-prettier.sh <target-root> [--check|--apply merge|replace|skip]"}' >&2
+    echo '{"status":"error","error":"usage: install-prettier.sh <target-root> [--check|--apply merge|replace|skip]","description_nl":"Usage requires target root path."}' >&2
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
-    echo '{"status":"error","error":"target not found"}' >&2
+    echo '{"status":"error","error":"target not found","description_nl":"Unable to resolve target path."}'
     exit 2
 }
 
@@ -38,7 +38,7 @@ json_escape() {
 }
 
 INCOMING_PATH="$SKILL_DIR/assets/prettier/.prettierrc"
-PRETTIER_CANDIDATES=(".prettierrc" ".prettierrc.json" ".prettierrc.js" "prettier.config.js")
+PRETTIER_CANDIDATES=(".prettierrc" ".prettierrc.json" ".prettierrc.js" ".prettierrc.json5" "prettier.config.js" "prettier.config.cjs")
 
 # Find existing prettier config
 find_existing() {
@@ -60,35 +60,41 @@ if [ "$MODE" = "check" ]; then
     fi
 
     EXISTING_FILE=$(find_existing) || true
+    ITEMS=""
+    TOP_STATUS="clean"
 
     if [ -n "$EXISTING_FILE" ]; then
         EXISTING_FULL="$TARGET/$EXISTING_FILE"
-        plan_json=$("$DIFF_HELPER" merge-plan "$EXISTING_FULL" "$INCOMING_PATH" 2>/dev/null) || {
+        PLAN_JSON=$("$DIFF_HELPER" merge-plan "$EXISTING_FULL" "$INCOMING_PATH" 2>/dev/null) || {
             echo '{"status":"error","error":"merge-plan failed","items":[],"summary":"Error running diff analysis.","description_nl":"Failed to compare existing and incoming Prettier config files."}'
             exit 0
         }
-
-        cat <<JSONEOF
-{
-  "status": "conflict",
-  "items": [{"file":"$EXISTING_FILE","existing_also_found_at":"$EXISTING_FILE",$(echo "$plan_json" | sed 's/^{//')],
-  "summary": "Existing Prettier config found: $EXISTING_FILE. Review merge plan.",
-  "description_nl": "The project already has a Prettier configuration file ($EXISTING_FILE). The Skill provides a .prettierrc with standard formatting options. You can merge, replace, or skip."
-}
-JSONEOF
+        ITEMS="{\"file\":\"$EXISTING_FILE\",$(echo "$PLAN_JSON" | sed 's/^{//')"
+        if echo "$PLAN_JSON" | grep -q '"status":"manual_required"'; then
+            TOP_STATUS="manual_required"
+        else
+            TOP_STATUS="conflict"
+        fi
+        SUMMARY="Existing Prettier config found: $EXISTING_FILE. Review merge plan."
+        DESC_NL="The project already has a Prettier configuration file ($EXISTING_FILE). Complex config formats are not automatically merged."
     else
-        plan_json=$("$DIFF_HELPER" merge-plan "/nonexistent/.prettierrc" "$INCOMING_PATH" 2>/dev/null) || {
-            plan_json="{\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"lines\":$(wc -l < "$INCOMING_PATH" | tr -d ' ')},\"description_nl\":\"No Prettier config found. Ready for clean install.\"}"
+        PLAN_JSON=$("$DIFF_HELPER" merge-plan "/nonexistent/.prettierrc" "$INCOMING_PATH" 2>/dev/null) || {
+            PLAN_JSON='{"status":"clean","existing":{"path":"/nonexistent/.prettierrc","exists":false,"lines":0},"incoming":{"path":"'"$INCOMING_PATH"'","lines":'$(wc -l < "$INCOMING_PATH" | tr -d ' ')'},"diff":{"added":0,"removed":0},"recommendation":"merge","strategies":["merge","replace","skip"],"description_nl":"No Prettier config found. Ready for clean install."}'
         }
-        cat <<JSONEOF
+        ITEMS="{\"file\":\".prettierrc\",$(echo "$PLAN_JSON" | sed 's/^{//')"
+        TOP_STATUS="clean"
+        SUMMARY="No existing Prettier config found. Ready for clean install."
+        DESC_NL="No Prettier configuration found in the project. The Skill can install .prettierrc with standard formatting options."
+    fi
+
+    cat <<JSONEOF
 {
-  "status": "clean",
-  "items": [{"file":".prettierrc",$(echo "$plan_json" | sed 's/^{//')],
-  "summary": "No existing Prettier config found. Ready for clean install.",
-  "description_nl": "No Prettier configuration found in the project. The Skill can install .prettierrc with standard formatting options."
+  "status": "$TOP_STATUS",
+  "items": [$ITEMS],
+  "summary": "$(json_escape "$SUMMARY")",
+  "description_nl": "$(json_escape "$DESC_NL")"
 }
 JSONEOF
-    fi
     exit 0
 fi
 
@@ -97,35 +103,36 @@ if [ "$MODE" = "apply" ]; then
     case "$STRATEGY" in
         merge|replace|skip) ;;
         *)
-            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip"}' >&2
+            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip","description_nl":"Choose one of merge, replace, or skip."}' >&2
             exit 2
             ;;
     esac
 
     if [ "$STRATEGY" = "skip" ]; then
-        echo '{"status":"ok","action":"skip","detail":"Prettier config skipped per user request."}'
+        echo '{"status":"ok","action":"skip","detail":"Prettier config skipped per user request.","description_nl":"No changes were made because skip was requested."}'
         exit 0
     fi
 
     if [ ! -f "$INCOMING_PATH" ]; then
-        echo '{"status":"error","error":"Skill asset not found: assets/prettier/.prettierrc"}'
+        echo '{"status":"error","error":"Skill asset not found: assets/prettier/.prettierrc","description_nl":"Skill asset file is missing."}'
         exit 1
     fi
 
     DST_PATH="$TARGET/.prettierrc"
+    EXISTING_FILE=$(find_existing) || true
 
     case "$STRATEGY" in
         merge)
-            if [ -f "$DST_PATH" ]; then
-                echo '{"status":"ok","action":"merge","detail":".prettierrc already exists — merge not implemented for JSON configs. Existing file preserved."}'
-            else
-                cp "$INCOMING_PATH" "$DST_PATH"
-                echo '{"status":"ok","action":"merge","detail":".prettierrc created (no existing file to merge)."}'
+            if [ -n "$EXISTING_FILE" ]; then
+                echo '{"status":"manual_required","action":"merge","detail":"Prettier configuration exists. Automatic merge is unsafe for JSON/CJS config variants.","description_nl":"A configuration exists. Use replace to overwrite or skip to keep existing."}'
+                exit 0
             fi
+            cp "$INCOMING_PATH" "$DST_PATH"
+            echo '{"status":"ok","action":"merge","detail":".prettierrc created (no existing file to merge).","description_nl":"No existing Prettier config found, so merge copied the Skill template."}'
             ;;
         replace)
             cp "$INCOMING_PATH" "$DST_PATH"
-            echo '{"status":"ok","action":"replace","detail":".prettierrc written."}'
+            echo '{"status":"ok","action":"replace","detail":".prettierrc written.","description_nl":"Prettier configuration was replaced with the Skill template."}'
             ;;
     esac
     exit 0

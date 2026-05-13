@@ -4,7 +4,6 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DIFF_HELPER="${SKILL_DIR}/templates/docs/scripts/diff-helper.sh"
 
 # Parse mode
 MODE="default"
@@ -59,7 +58,6 @@ detect_project_types() {
 find_missing_patterns() {
     local template="$1"
     local existing="$2"
-    local missing=""
 
     if [ ! -f "$existing" ]; then
         # All patterns are missing
@@ -95,7 +93,7 @@ if [ "$MODE" = "check" ]; then
         if [ ! -f "$template" ]; then
             ERROR_COUNT=$((ERROR_COUNT + 1))
             [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{\"type\":\"$type\",\"status\":\"error\",\"error\":\"Template not found\"}"
+            ITEMS+="{\"file\":\".gitignore\",\"type\":\"$type\",\"status\":\"error\",\"strategies\":[\"skip\"],\"error\":\"Template not found\",\"description_nl\":\"Missing template for $type gitignore assets.\"}"
             continue
         fi
 
@@ -110,12 +108,12 @@ if [ "$MODE" = "check" ]; then
             missing_sample_json=$(json_escape "$missing_sample")
 
             [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{\"type\":\"$type\",\"status\":\"conflict\",\"missing_count\":$missing_count,\"missing_sample\":\"$missing_sample_json\",\"description_nl\":\"$missing_count pattern(s) from $type.gitignore are missing from existing .gitignore.\"}"
+            ITEMS+="{\"file\":\".gitignore\",\"type\":\"$type\",\"status\":\"conflict\",\"strategies\":[\"merge\",\"replace\",\"skip\"],\"missing_count\":$missing_count,\"missing_sample\":\"$missing_sample_json\",\"description_nl\":\"$missing_count pattern(s) from $type.gitignore are missing from existing .gitignore.\"}"
         else
             # No existing .gitignore
             lines=$(wc -l < "$template" | tr -d ' ')
             [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{\"type\":\"$type\",\"status\":\"clean\",\"incoming_lines\":$lines,\"description_nl\":\"No existing .gitignore. All $lines patterns from $type.gitignore ready for install.\"}"
+            ITEMS+="{\"file\":\".gitignore\",\"type\":\"$type\",\"status\":\"clean\",\"strategies\":[\"merge\",\"replace\",\"skip\"],\"incoming_lines\":$lines,\"description_nl\":\"No existing .gitignore. All $lines patterns from $type.gitignore ready for install.\"}"
         fi
     done
 
@@ -224,12 +222,17 @@ if [ "$MODE" = "apply" ]; then
                         *) continue ;;
                     esac
                     if [ -f "$template" ]; then
+                        missing_patterns="$(find_missing_patterns "$template" "$GITIGNORE_PATH")"
+                        if [ -z "$missing_patterns" ]; then
+                            continue
+                        fi
+                        missing_count="$(printf '%s\n' "$missing_patterns" | wc -l | tr -d ' ')"
                         {
                             echo ""
                             echo "# === Added by docs-governance: $type.gitignore ==="
-                            find_missing_patterns "$template" "$GITIGNORE_PATH"
+                            printf '%s\n' "$missing_patterns"
                         } >> "$GITIGNORE_PATH"
-                        added_count=$((added_count + $(find_missing_patterns "$template" "$GITIGNORE_PATH" | wc -l | tr -d ' ')))
+                        added_count=$((added_count + missing_count))
                     fi
                 done
                 echo "{\"status\":\"ok\",\"action\":\"merge\",\"detail\":\"Appended $added_count missing pattern(s) to .gitignore.\"}"

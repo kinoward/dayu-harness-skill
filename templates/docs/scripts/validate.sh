@@ -240,8 +240,8 @@ if [ -f "$PROJECT_ROOT/.gitignore" ]; then
     record_check ".gitignore" "pass" ".gitignore 存在"
     log_text "  ✓ .gitignore 存在"
 else
-    record_check ".gitignore" "fail" ".gitignore 不存在"
-    log_text "  ✗ .gitignore 不存在"
+    record_check ".gitignore" "skip" ".gitignore 不存在（可能未启用）"
+    log_text "  - .gitignore 不存在（可能未启用）"
 fi
 
 # 7. 生成 description_nl

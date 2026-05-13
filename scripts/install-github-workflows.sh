@@ -19,11 +19,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$TARGET" ]; then
-    echo '{"status":"error","error":"usage: install-github-workflows.sh <target-root> [--check|--apply merge|replace|skip]"}' >&2
+    echo '{"status":"error","error":"usage: install-github-workflows.sh <target-root> [--check|--apply merge|replace|skip]","description_nl":"Usage requires target-root and optional strategy."}'
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
-    echo '{"status":"error","error":"target not found"}' >&2
+    echo '{"status":"error","error":"target not found","description_nl":"Unable to resolve target path."}'
     exit 2
 }
 
@@ -35,6 +35,19 @@ json_escape() {
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
+}
+
+append_plan_item() {
+    local file="$1"
+    local existing="$2"
+    local incoming="$3"
+
+    local plan_json
+    plan_json=$("$DIFF_HELPER" merge-plan "$existing" "$incoming" 2>/dev/null) || return 1
+
+    local plan_body="${plan_json#\{}"
+    [ -n "$ITEMS" ] && ITEMS+=","
+    ITEMS+="{\"file\":\"$file\",$plan_body"
 }
 
 WF_SRC_DIR="$SKILL_DIR/assets/github/workflows"
@@ -52,24 +65,21 @@ if [ "$MODE" = "check" ]; then
     NEW_COUNT=0
     EXISTING_COUNT=0
 
-    # Check workflow files
+    # Check workflow files (YAML)
     if [ -d "$WF_SRC_DIR" ]; then
         for wf_src in "$WF_SRC_DIR"/*.yml; do
             [ -f "$wf_src" ] || continue
             wf_name=$(basename "$wf_src")
             wf_dst="$WF_DST_DIR/$wf_name"
 
-            plan_json=$("$DIFF_HELPER" merge-plan "$wf_dst" "$wf_src" 2>/dev/null) || {
+            if ! append_plan_item ".github/workflows/$wf_name" "$wf_dst" "$wf_src"; then
                 ERROR_COUNT=$((ERROR_COUNT + 1))
                 [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".github/workflows/$wf_name\",\"status\":\"error\",\"error\":\"merge-plan failed\"}"
+                ITEMS+="{\"file\":\".github/workflows/$wf_name\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Unable to compute merge plan for this workflow.\"}"
                 continue
-            }
+            fi
 
-            [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{\"file\":\".github/workflows/$wf_name\",$(echo "$plan_json" | sed 's/^{//')"
-
-            if echo "$plan_json" | grep -q '"exists": true'; then
+            if [ -f "$wf_dst" ]; then
                 ANY_CONFLICT="true"
                 EXISTING_COUNT=$((EXISTING_COUNT + 1))
             else
@@ -78,27 +88,26 @@ if [ "$MODE" = "check" ]; then
         done
     fi
 
-    # Check scripts
+    # Check scripts (cannot safely merge deterministic script wrappers in this step)
     if [ -d "$SCRIPTS_SRC" ]; then
         for scr_src in "$SCRIPTS_SRC"/*; do
             [ -f "$scr_src" ] || continue
             scr_name=$(basename "$scr_src")
             scr_dst="$SCRIPTS_DST/$scr_name"
-
             if [ -f "$scr_dst" ]; then
                 ANY_CONFLICT="true"
                 EXISTING_COUNT=$((EXISTING_COUNT + 1))
                 [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".github/scripts/$scr_name\",\"status\":\"conflict\",\"existing\":{\"exists\":true},\"incoming\":{\"lines\":$(wc -l < "$scr_src" | tr -d ' ')},\"description_nl\":\"Existing script found. Review before replacing.\"}"
+                ITEMS+="{\"file\":\".github/scripts/$scr_name\",\"status\":\"manual_required\",\"existing\":{\"exists\":true},\"incoming\":{\"path\":\"$(json_escape "$scr_src")\",\"lines\":$(wc -l < "$scr_src" | tr -d ' ')},\"diff\":{\"added\":0,\"removed\":0},\"recommendation\":\"manual_required\",\"strategies\":[\"replace\",\"skip\"],\"description_nl\":\"Existing script found. Merge is not implemented safely; replace or skip.\"}"
             else
                 NEW_COUNT=$((NEW_COUNT + 1))
                 [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".github/scripts/$scr_name\",\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"lines\":$(wc -l < "$scr_src" | tr -d ' ')},\"description_nl\":\"New script ready for install.\"}"
+                ITEMS+="{\"file\":\".github/scripts/$scr_name\",\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"path\":\"$(json_escape "$scr_src")\",\"lines\":$(wc -l < "$scr_src" | tr -d ' ')},\"diff\":{\"added\":0,\"removed\":0},\"recommendation\":\"merge\",\"strategies\":[\"merge\",\"replace\",\"skip\"],\"description_nl\":\"New workflow helper script ready for install.\"}"
             fi
         done
     fi
 
-    # Check rulesets
+    # Check rulesets (JSON)
     if [ -d "$RULESETS_SRC" ]; then
         for rs_src in "$RULESETS_SRC"/*.json; do
             [ -f "$rs_src" ] || continue
@@ -106,14 +115,22 @@ if [ "$MODE" = "check" ]; then
             rs_dst="$RULESETS_DST/$rs_name"
 
             if [ -f "$rs_dst" ]; then
+                if ! append_plan_item ".github/rulesets/$rs_name" "$rs_dst" "$rs_src"; then
+                    ERROR_COUNT=$((ERROR_COUNT + 1))
+                    [ -n "$ITEMS" ] && ITEMS+=","
+                    ITEMS+="{\"file\":\".github/rulesets/$rs_name\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Unable to compute merge plan for this ruleset.\"}"
+                    continue
+                fi
                 ANY_CONFLICT="true"
                 EXISTING_COUNT=$((EXISTING_COUNT + 1))
-                [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".github/rulesets/$rs_name\",\"status\":\"conflict\",\"existing\":{\"exists\":true},\"incoming\":{\"lines\":$(wc -l < "$rs_src" | tr -d ' ')},\"description_nl\":\"Existing ruleset found. Review before replacing.\"}"
             else
+                if ! append_plan_item ".github/rulesets/$rs_name" "$rs_dst" "$rs_src"; then
+                    ERROR_COUNT=$((ERROR_COUNT + 1))
+                    [ -n "$ITEMS" ] && ITEMS+=","
+                    ITEMS+="{\"file\":\".github/rulesets/$rs_name\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Unable to compute merge plan for this ruleset.\"}"
+                    continue
+                fi
                 NEW_COUNT=$((NEW_COUNT + 1))
-                [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".github/rulesets/$rs_name\",\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"lines\":$(wc -l < "$rs_src" | tr -d ' ')},\"description_nl\":\"New ruleset ready for install.\"}"
             fi
         done
     fi
@@ -128,14 +145,14 @@ if [ "$MODE" = "check" ]; then
     fi
 
     if [ "$TOP_STATUS" = "clean" ]; then
-        SUMMARY="No existing GitHub workflow files found. ${NEW_COUNT} item(s) ready for clean install."
-        DESC_NL="The project has no GitHub workflows, scripts, or rulesets currently installed. All items from the Skill are ready for a clean install with no conflicts."
+        SUMMARY="No existing GitHub workflow assets found. ${NEW_COUNT} item(s) ready for clean install."
+        DESC_NL="The project has no GitHub workflows, scripts, or rulesets currently installed. All items from the Skill are ready for a clean install."
     elif [ "$TOP_STATUS" = "conflict" ]; then
-        SUMMARY="Found ${EXISTING_COUNT} existing item(s), ${NEW_COUNT} new item(s). Review each item's merge plan."
-        DESC_NL="Some GitHub workflow files, scripts, or rulesets already exist in the project. Each conflicting item is shown with details. Choose merge (keep both), replace (use Skill version), or skip (keep existing) per item."
+        SUMMARY="Found ${EXISTING_COUNT} existing item(s), ${NEW_COUNT} new item(s). Review merge plan."
+        DESC_NL="Some GitHub workflow files, scripts, or rulesets already exist. Existing items use manual merge requirements or safe replacement only."
     else
         SUMMARY="Errors encountered during check."
-        DESC_NL="Errors occurred while checking GitHub workflow files. Please verify Skill assets are intact."
+        DESC_NL="Errors occurred while checking GitHub workflow files. Please verify Skill assets and existing files."
     fi
 
     cat <<JSONEOF
@@ -154,14 +171,62 @@ if [ "$MODE" = "apply" ]; then
     case "$STRATEGY" in
         merge|replace|skip) ;;
         *)
-            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip"}' >&2
+            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip","description_nl":"Choose one of merge, replace, or skip."}' >&2
             exit 2
             ;;
     esac
 
     if [ "$STRATEGY" = "skip" ]; then
-        echo '{"status":"ok","action":"skip","detail":"GitHub workflows skipped per user request."}'
+        echo '{"status":"ok","action":"skip","detail":"GitHub workflows skipped per user request.","description_nl":"No changes were made because skip was requested."}'
         exit 0
+    fi
+
+    # Merge mode is conservative: only copy incoming files that do not already exist.
+    if [ "$STRATEGY" = "merge" ]; then
+        UNSAFE=false
+        # Workflows (YAML) require manual merge; any existing file blocks merge.
+        if [ -d "$WF_SRC_DIR" ]; then
+            for wf_src in "$WF_SRC_DIR"/*.yml; do
+                [ -f "$wf_src" ] || continue
+                wf_name=$(basename "$wf_src")
+                wf_dst="$WF_DST_DIR/$wf_name"
+                if [ -f "$wf_dst" ]; then
+                    UNSAFE=true
+                    break
+                fi
+            done
+        fi
+
+        # Scripts are not safely merged in this installer.
+        if [ -d "$SCRIPTS_SRC" ] && ! $UNSAFE; then
+            for scr_src in "$SCRIPTS_SRC"/*; do
+                [ -f "$scr_src" ] || continue
+                scr_name=$(basename "$scr_src")
+                scr_dst="$SCRIPTS_DST/$scr_name"
+                if [ -f "$scr_dst" ]; then
+                    UNSAFE=true
+                    break
+                fi
+            done
+        fi
+
+        # Rulesets JSON should not be auto-merged.
+        if [ -d "$RULESETS_SRC" ] && ! $UNSAFE; then
+            for rs_src in "$RULESETS_SRC"/*.json; do
+                [ -f "$rs_src" ] || continue
+                rs_name=$(basename "$rs_src")
+                rs_dst="$RULESETS_DST/$rs_name"
+                if [ -f "$rs_dst" ]; then
+                    UNSAFE=true
+                    break
+                fi
+            done
+        fi
+
+        if [ "$UNSAFE" = "true" ]; then
+            echo '{"status":"manual_required","action":"merge","detail":"Merge blocked for safety because existing GitHub config files were detected.","description_nl":"Automatic merge is not implemented for existing workflows, scripts, or rulesets. Please use replace for a full overwrite or skip."}'
+            exit 0
+        fi
     fi
 
     APPLIED=""
@@ -175,21 +240,11 @@ if [ "$MODE" = "apply" ]; then
             wf_name=$(basename "$wf_src")
             wf_dst="$WF_DST_DIR/$wf_name"
 
-            case "$STRATEGY" in
-                merge)
-                    if [ -f "$wf_dst" ]; then
-                        # For YAML files, merge is not trivial; skip existing
-                        APPLIED="${APPLIED}(skipped existing) .github/workflows/$wf_name "
-                    else
-                        cp "$wf_src" "$wf_dst"
-                        APPLIED="${APPLIED}.github/workflows/$wf_name "
-                    fi
-                    ;;
-                replace)
-                    cp "$wf_src" "$wf_dst"
-                    APPLIED="${APPLIED}.github/workflows/$wf_name "
-                    ;;
-            esac
+            if [ "$STRATEGY" = "merge" ] && [ -f "$wf_dst" ]; then
+                continue
+            fi
+            cp "$wf_src" "$wf_dst"
+            APPLIED="${APPLIED}.github/workflows/$wf_name "
         done
     fi
 
@@ -202,11 +257,10 @@ if [ "$MODE" = "apply" ]; then
             scr_dst="$SCRIPTS_DST/$scr_name"
 
             if [ "$STRATEGY" = "merge" ] && [ -f "$scr_dst" ]; then
-                APPLIED="${APPLIED}(skipped existing) .github/scripts/$scr_name "
-            else
-                cp "$scr_src" "$scr_dst"
-                APPLIED="${APPLIED}.github/scripts/$scr_name "
+                continue
             fi
+            cp "$scr_src" "$scr_dst"
+            APPLIED="${APPLIED}.github/scripts/$scr_name "
         done
     fi
 
@@ -219,19 +273,18 @@ if [ "$MODE" = "apply" ]; then
             rs_dst="$RULESETS_DST/$rs_name"
 
             if [ "$STRATEGY" = "merge" ] && [ -f "$rs_dst" ]; then
-                APPLIED="${APPLIED}(skipped existing) .github/rulesets/$rs_name "
-            else
-                cp "$rs_src" "$rs_dst"
-                APPLIED="${APPLIED}.github/rulesets/$rs_name "
+                continue
             fi
+            cp "$rs_src" "$rs_dst"
+            APPLIED="${APPLIED}.github/rulesets/$rs_name "
         done
     fi
 
     APPLIED=$(echo "$APPLIED" | xargs 2>/dev/null || true)
     if [ -n "$ERRORS" ]; then
-        echo "{\"status\":\"partial\",\"applied\":\"$(json_escape "$APPLIED")\",\"errors\":\"$(json_escape "$ERRORS")\"}"
+        echo "{\"status\":\"partial\",\"applied\":\"$(json_escape "$APPLIED")\",\"errors\":\"$(json_escape "$ERRORS")\",\"description_nl\":\"Some items failed during apply.\"}"
     else
-        echo "{\"status\":\"ok\",\"applied\":\"$(json_escape "$APPLIED")\"}"
+        echo "{\"status\":\"ok\",\"applied\":\"$(json_escape "$APPLIED")\",\"description_nl\":\"Applied GitHub workflow assets using strategy '$STRATEGY'.\"}"
     fi
     exit 0
 fi

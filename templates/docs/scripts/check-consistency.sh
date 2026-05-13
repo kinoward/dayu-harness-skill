@@ -52,14 +52,32 @@ PROJECT_ROOT="$(cd "$_input_root" 2>/dev/null && pwd)" || {
 # ---------------------------------------------------------------------------
 # 临时文件（用于跨函数共享数据）
 # ---------------------------------------------------------------------------
-C1_ISSUES_FILE=$(mktemp) || exit 2
-C2_ISSUES_FILE=$(mktemp) || exit 2
-C3_ISSUES_FILE=$(mktemp) || exit 2
-C4_ISSUES_FILE=$(mktemp) || exit 2
-REFERENCED_FILE=$(mktemp) || exit 2
+TMP_WORKDIR=""
+if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
+    TMP_WORKDIR="$(mktemp -d "${TMPDIR%/}/docs-governance.XXXXXX" 2>/dev/null || true)"
+fi
+if [ -z "$TMP_WORKDIR" ]; then
+    TMP_WORKDIR="$PROJECT_ROOT/.docs-governance-tmp.$$"
+    mkdir -p "$TMP_WORKDIR" || {
+        echo "错误: 无法创建临时目录 '$TMP_WORKDIR'" >&2
+        exit 2
+    }
+fi
+
+C1_ISSUES_FILE="$TMP_WORKDIR/c1-issues.txt"
+C2_ISSUES_FILE="$TMP_WORKDIR/c2-issues.txt"
+C3_ISSUES_FILE="$TMP_WORKDIR/c3-issues.txt"
+C4_ISSUES_FILE="$TMP_WORKDIR/c4-issues.txt"
+REFERENCED_FILE="$TMP_WORKDIR/referenced.txt"
+: > "$C1_ISSUES_FILE"
+: > "$C2_ISSUES_FILE"
+: > "$C3_ISSUES_FILE"
+: > "$C4_ISSUES_FILE"
+: > "$REFERENCED_FILE"
 
 cleanup() {
     rm -f "$C1_ISSUES_FILE" "$C2_ISSUES_FILE" "$C3_ISSUES_FILE" "$C4_ISSUES_FILE" "$REFERENCED_FILE"
+    rmdir "$TMP_WORKDIR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -177,7 +195,7 @@ find_agents_files() {
     [ -f "$PROJECT_ROOT/AGENTS.md" ] && echo "AGENTS.md"
     if [ -d "$PROJECT_ROOT/docs" ]; then
         find "$PROJECT_ROOT/docs" -name "AGENTS.md" -type f 2>/dev/null | while IFS= read -r f; do
-            echo "${f#$PROJECT_ROOT/}"
+            echo "${f#"$PROJECT_ROOT"/}"
         done
     fi
 }
@@ -326,7 +344,7 @@ run_c3() {
     # 收集 docs/ 下的所有 .md 文件
     find "$PROJECT_ROOT/docs" -name "*.md" -type f 2>/dev/null | while IFS= read -r md_file; do
         [ -z "$md_file" ] && continue
-        rel_path="${md_file#$PROJECT_ROOT/}"
+        rel_path="${md_file#"$PROJECT_ROOT"/}"
 
         # 检查是否被引用
         if ! grep -Fqx "$rel_path" "$REFERENCED_FILE" 2>/dev/null; then
@@ -354,7 +372,7 @@ run_c4() {
     : > "$C4_ISSUES_FILE"
 
     # 收集所有被引用的脚本/配置文件路径
-    refs_file=$(mktemp) || exit 2
+    refs_file="$TMP_WORKDIR/c4-refs.txt"
     : > "$refs_file"
 
     # 从所有 AGENTS.md 中提取引用
@@ -379,7 +397,7 @@ run_c4() {
     if [ -d "$PROJECT_ROOT/docs/practices" ]; then
         find "$PROJECT_ROOT/docs/practices" -name "*.md" -type f 2>/dev/null | while IFS= read -r practice_file; do
             [ -f "$practice_file" ] || continue
-            rel="${practice_file#$PROJECT_ROOT/}"
+            rel="${practice_file#"$PROJECT_ROOT"/}"
             dir="$(dirname "$rel")"
             extract_markdown_links "$practice_file" | while IFS= read -r link; do
                 [ -z "$link" ] && continue
@@ -403,7 +421,7 @@ run_c4() {
         [ -z "$ref" ] && continue
 
         case "$ref" in
-            *.sh|*.bash|.husky/*|commitlint.config.*|*.config.*|.prettierrc*|.eslintrc*|eslint.config.*)
+            *.sh|*.bash|.husky/*|commitlint.config.*|*.config.*|.prettierrc*|.eslintrc*)
                 ;;
             *) continue ;;
         esac

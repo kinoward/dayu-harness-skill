@@ -19,11 +19,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$TARGET" ]; then
-    echo '{"status":"error","error":"usage: install-commitlint.sh <target-root> [--check|--apply merge|replace|skip]"}' >&2
+    echo '{"status":"error","error":"usage: install-commitlint.sh <target-root> [--check|--apply merge|replace|skip]","description_nl":"Usage requires target root path."}' >&2
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
-    echo '{"status":"error","error":"target not found"}' >&2
+    echo '{"status":"error","error":"target not found","description_nl":"Unable to resolve target path."}'
     exit 2
 }
 
@@ -48,19 +48,25 @@ if [ "$MODE" = "check" ]; then
         exit 0
     fi
 
-    plan_json=$("$DIFF_HELPER" merge-plan "$EXISTING_PATH" "$INCOMING_PATH" 2>/dev/null) || {
-        echo '{"status":"error","error":"merge-plan failed","items":[],"summary":"Error running diff analysis.","description_nl":"Failed to compare existing and incoming commitlint config files."}'
-        exit 0
-    }
-
-    plan_with_file="\"file\":\"$CONFIG_FILE\",$(echo "$plan_json" | sed 's/^{//' )"
-    item="{$plan_with_file"
-
-    if echo "$plan_json" | grep -q '"exists": true'; then
-        TOP_STATUS="conflict"
-        SUMMARY="Existing commitlint.config.cjs found. Review merge plan."
-        DESC_NL="The project already has a commitlint configuration. The Skill provides an alternative configuration with potentially different rules. You can merge (combine both), replace (use Skill version), or skip (keep existing)."
+    if [ -f "$EXISTING_PATH" ]; then
+        PLAN_JSON=$("$DIFF_HELPER" merge-plan "$EXISTING_PATH" "$INCOMING_PATH" 2>/dev/null) || {
+            echo '{"status":"error","error":"merge-plan failed","items":[],"summary":"Error running diff analysis.","description_nl":"Failed to compare existing and incoming commitlint config files."}'
+            exit 0
+        }
+        ITEMS="{\"file\":\"$CONFIG_FILE\",$(echo "$PLAN_JSON" | sed 's/^{//')"
+        TOP_STATUS="manual_required"
+        if echo "$PLAN_JSON" | grep -q '"status":"manual_required"'; then
+            TOP_STATUS="manual_required"
+        else
+            TOP_STATUS="conflict"
+        fi
+        SUMMARY="Existing commitlint.config.cjs found: review required."
+        DESC_NL="The project already has commitlint config. Complex config formats are not automatically merged."
     else
+        PLAN_JSON=$("$DIFF_HELPER" merge-plan "/nonexistent/$CONFIG_FILE" "$INCOMING_PATH" 2>/dev/null) || {
+            PLAN_JSON='{"status":"clean","existing":{"path":"/nonexistent/'"$CONFIG_FILE"'","exists":false,"lines":0},"incoming":{"path":"'"$INCOMING_PATH"'","lines":'$(wc -l < "$INCOMING_PATH" | tr -d ' ')'},"diff":{"added":0,"removed":0},"recommendation":"merge","strategies":["merge","replace","skip"],"description_nl":"No commitlint config found. Ready for clean install."}'
+        }
+        ITEMS="{\"file\":\"$CONFIG_FILE\",$(echo "$PLAN_JSON" | sed 's/^{//')"
         TOP_STATUS="clean"
         SUMMARY="No existing commitlint.config.cjs. Ready for clean install."
         DESC_NL="No commitlint configuration found in the project. The Skill can install a standard commitlint.config.cjs with conventional commit rules."
@@ -69,7 +75,7 @@ if [ "$MODE" = "check" ]; then
     cat <<JSONEOF
 {
   "status": "$TOP_STATUS",
-  "items": [$item],
+  "items": [$ITEMS],
   "summary": "$(json_escape "$SUMMARY")",
   "description_nl": "$(json_escape "$DESC_NL")"
 }
@@ -82,33 +88,33 @@ if [ "$MODE" = "apply" ]; then
     case "$STRATEGY" in
         merge|replace|skip) ;;
         *)
-            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip"}' >&2
+            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip","description_nl":"Choose one of merge, replace, or skip."}' >&2
             exit 2
             ;;
     esac
 
     if [ "$STRATEGY" = "skip" ]; then
-        echo '{"status":"ok","action":"skip","detail":"commitlint config skipped per user request."}'
+        echo '{"status":"ok","action":"skip","detail":"commitlint config skipped per user request.","description_nl":"No changes were made because skip was requested."}'
         exit 0
     fi
 
     if [ ! -f "$INCOMING_PATH" ]; then
-        echo '{"status":"error","error":"Skill asset not found: assets/commitlint/commitlint.config.cjs"}'
+        echo '{"status":"error","error":"Skill asset not found: assets/commitlint/commitlint.config.cjs","description_nl":"Skill asset file is missing."}'
         exit 1
     fi
 
     case "$STRATEGY" in
         merge)
             if [ -f "$EXISTING_PATH" ]; then
-                echo '{"status":"ok","action":"merge","detail":"commitlint.config.cjs already exists — merge not implemented (manual merge recommended for JS configs). Existing file preserved."}'
-            else
-                cp "$INCOMING_PATH" "$EXISTING_PATH"
-                echo '{"status":"ok","action":"merge","detail":"commitlint.config.cjs created (no existing file to merge)."}'
+                echo '{"status":"manual_required","action":"merge","detail":"commitlint.config.cjs already exists. Automatic merge is unsafe for CJS configs.","description_nl":"A commitlint configuration exists. Use replace to overwrite or skip to keep existing."}'
+                exit 0
             fi
+            cp "$INCOMING_PATH" "$EXISTING_PATH"
+            echo '{"status":"ok","action":"merge","detail":"commitlint.config.cjs created (no existing file to merge).","description_nl":"No existing commitlint config found, so merge copied the Skill template."}'
             ;;
         replace)
             cp "$INCOMING_PATH" "$EXISTING_PATH"
-            echo '{"status":"ok","action":"replace","detail":"commitlint.config.cjs written."}'
+            echo '{"status":"ok","action":"replace","detail":"commitlint.config.cjs written.","description_nl":"commitlint configuration was replaced by the Skill template."}'
             ;;
     esac
     exit 0

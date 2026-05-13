@@ -89,15 +89,14 @@ if [ "$MODE" = "check" ]; then
             if [ ! -f "$local_incoming" ]; then
                 ERROR_COUNT=$((ERROR_COUNT + 1))
                 [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"error\":\"Skill asset not found: assets/husky/$hook\"}"
+                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Skill asset missing: assets/husky/$hook\"}"
                 continue
             fi
 
-            plan_json
             plan_json=$("$DIFF_HELPER" merge-plan "$local_existing" "$local_incoming" 2>/dev/null) || {
                 ERROR_COUNT=$((ERROR_COUNT + 1))
                 [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"error\":\"merge-plan failed\"}"
+                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Unable to compute merge plan for this husky hook.\"}"
                 continue
             }
 
@@ -123,7 +122,7 @@ if [ "$MODE" = "check" ]; then
                 lines=$(wc -l < "$local_incoming" | tr -d ' ')
                 TOTAL_NEW=$((TOTAL_NEW + 1))
                 plan_json=$("$DIFF_HELPER" merge-plan "/nonexistent/.husky/$hook" "$local_incoming" 2>/dev/null) || {
-                    plan_json="{\"status\":\"clean\",\"diff\":{\"added\":$lines,\"removed\":0},\"incoming\":{\"lines\":$lines}}"
+                    plan_json="{\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"path\":\"$local_incoming\",\"lines\":$lines},\"diff\":{\"added\":$lines,\"removed\":0},\"recommendation\":\"merge\",\"strategies\":[\"merge\",\"replace\",\"skip\"],\"description_nl\":\"New hook file not yet present. Merge may write this file directly.\"}"
                 }
                 [ -n "$ITEMS" ] && ITEMS+=","
                 ITEMS+="{\"file\":\".husky/$hook\",$(echo "$plan_json" | sed 's/^{//')"

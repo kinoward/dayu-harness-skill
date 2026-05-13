@@ -124,8 +124,9 @@ if [ -f "$PROJECT_ROOT/AGENTS.md" ]; then
 
     # 使用 POSIX 兼容正则提取 docs/ 开头的链接（macOS 兼容，不用 grep -P）
     # 将提取的链接保存到临时文件以避免 bash 数组在 set -u 下的兼容性问题
-    _links_file=$(mktemp -t audit_links.XXXXXX)
-    trap "rm -f '$_links_file'" EXIT
+    _links_file="$PROJECT_ROOT/.docs-governance-audit-links.$$"
+    : > "$_links_file"
+    trap 'rm -f "$_links_file"' EXIT
     grep -oE '\[[^]]+\]\(docs/[^)]+\)' "$PROJECT_ROOT/AGENTS.md" 2>/dev/null | \
         sed 's/.*](\(docs\/[^)]*\)).*/\1/' > "$_links_file" || true
 

@@ -19,11 +19,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$TARGET" ]; then
-    echo '{"status":"error","error":"usage: install-lint-staged.sh <target-root> [--check|--apply merge|replace|skip]"}' >&2
+    echo '{"status":"error","error":"usage: install-lint-staged.sh <target-root> [--check|--apply merge|replace|skip]","description_nl":"Usage requires target-root and optional strategy."}' >&2
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
-    echo '{"status":"error","error":"target not found"}' >&2
+    echo '{"status":"error","error":"target not found","description_nl":"Unable to resolve target path."}'
     exit 2
 }
 
@@ -69,47 +69,47 @@ if [ "$MODE" = "check" ]; then
     fi
 
     EXISTING_FILE=$(find_existing) || true
+    ITEMS=""
+    TOP_STATUS="clean"
 
     if [ -n "$EXISTING_FILE" ]; then
-        # If config is in package.json, we can't easily diff it
         if echo "$EXISTING_FILE" | grep -q "package.json"; then
-            cat <<JSONEOF
-{
-  "status": "conflict",
-  "items": [{"file":"package.json","location":"lint-staged key","status":"conflict","existing":{"exists":true},"incoming":{"lines":$(wc -l < "$INCOMING_PATH" | tr -d ' ')","path":"$INCOMING_PATH"},"description_nl":"lint-staged config found in package.json. The Skill provides .lintstagedrc.json as a separate file. Manual review required."}],
-  "summary": "Existing lint-staged config found in package.json. Manual review required.",
-  "description_nl": "The project has lint-staged configuration inside package.json. The Skill provides a standalone .lintstagedrc.json file. You may want to extract the config from package.json into the standalone file, or skip."
-}
-JSONEOF
+            ITEMS="{\"file\":\"package.json\",\"location\":\"lint-staged key\",\"status\":\"manual_required\",\"existing\":{\"path\":\"package.json\",\"exists\":true},\"incoming\":{\"path\":\".lintstagedrc.json\",\"lines\":$(wc -l < "$INCOMING_PATH" | tr -d ' ')},\"diff\":{\"added\":0,\"removed\":0},\"recommendation\":\"manual_required\",\"strategies\":[\"replace\",\"skip\"],\"description_nl\":\"lint-staged 配置位于 package.json，建议手动迁移到独立配置文件后再使用 replace。\"}"
+            TOP_STATUS="manual_required"
         else
             EXISTING_FULL="$TARGET/$EXISTING_FILE"
-            plan_json=$("$DIFF_HELPER" merge-plan "$EXISTING_FULL" "$INCOMING_PATH" 2>/dev/null) || {
+            PLAN_JSON=$("$DIFF_HELPER" merge-plan "$EXISTING_FULL" "$INCOMING_PATH" 2>/dev/null) || {
                 echo '{"status":"error","error":"merge-plan failed","items":[],"summary":"Error running diff analysis.","description_nl":"Failed to compare existing and incoming lint-staged config files."}'
                 exit 0
             }
-
-            cat <<JSONEOF
-{
-  "status": "conflict",
-  "items": [{"file":"$EXISTING_FILE","existing_also_found_at":"$EXISTING_FILE",$(echo "$plan_json" | sed 's/^{//')],
-  "summary": "Existing lint-staged config found: $EXISTING_FILE. Review merge plan.",
-  "description_nl": "The project already has a lint-staged configuration file ($EXISTING_FILE). The Skill provides .lintstagedrc.json with pre-commit formatting and linting commands. You can merge, replace, or skip."
-}
-JSONEOF
+            ITEMS="{\"file\":\"$EXISTING_FILE\",$(echo "$PLAN_JSON" | sed 's/^{//')"
+            if echo "$PLAN_JSON" | grep -q '"recommendation":"manual_required"'; then
+                TOP_STATUS="manual_required"
+            else
+                TOP_STATUS="conflict"
+            fi
+        fi
+        SUMMARY="Existing lint-staged config found: $EXISTING_FILE. Review merge plan."
+        DESC_NL="The project already has a lint-staged configuration. The Skill provides a standalone .lintstagedrc.json and only replace/skip are allowed for existing complex configs."
+        if [ "$TOP_STATUS" = "conflict" ]; then
+            DESC_NL="The project already has a lint-staged configuration. You can replace it with the Skill version or skip for now."
         fi
     else
-        plan_json=$("$DIFF_HELPER" merge-plan "/nonexistent/.lintstagedrc.json" "$INCOMING_PATH" 2>/dev/null) || {
-            plan_json="{\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"lines\":$(wc -l < "$INCOMING_PATH" | tr -d ' ')},\"description_nl\":\"No lint-staged config found. Ready for clean install.\"}"
-        }
-        cat <<JSONEOF
+        PLAN_JSON=$("$DIFF_HELPER" merge-plan "/nonexistent/.lintstagedrc.json" "$INCOMING_PATH" 2>/dev/null) || PLAN_JSON='{"status":"clean","existing":{"path":"/nonexistent/.lintstagedrc.json","exists":false,"lines":0},"incoming":{"path":"'"$INCOMING_PATH"'","lines":'$(wc -l < "$INCOMING_PATH" | tr -d ' ')'},"diff":{"added":0,"removed":0},"recommendation":"merge","strategies":["merge","replace","skip"],"description_nl":"No lint-staged config found. Ready for clean install."}'
+        ITEMS="{\"file\":\".lintstagedrc.json\",$(echo "$PLAN_JSON" | sed 's/^{//')"
+        SUMMARY="No existing lint-staged config found. Ready for clean install."
+        DESC_NL="No lint-staged configuration found in the project. The Skill can install .lintstagedrc.json with pre-commit formatting and linting commands."
+        TOP_STATUS="clean"
+    fi
+
+    cat <<JSONEOF
 {
-  "status": "clean",
-  "items": [{"file":".lintstagedrc.json",$(echo "$plan_json" | sed 's/^{//')],
-  "summary": "No existing lint-staged config found. Ready for clean install.",
-  "description_nl": "No lint-staged configuration found in the project. The Skill can install .lintstagedrc.json with pre-commit formatting and linting commands."
+  "status": "$TOP_STATUS",
+  "items": [$ITEMS],
+  "summary": "$(json_escape "$SUMMARY")",
+  "description_nl": "$(json_escape "$DESC_NL")"
 }
 JSONEOF
-    fi
     exit 0
 fi
 
@@ -118,35 +118,36 @@ if [ "$MODE" = "apply" ]; then
     case "$STRATEGY" in
         merge|replace|skip) ;;
         *)
-            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip"}' >&2
+            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip","description_nl":"Choose one of merge, replace, or skip."}' >&2
             exit 2
             ;;
     esac
 
     if [ "$STRATEGY" = "skip" ]; then
-        echo '{"status":"ok","action":"skip","detail":"lint-staged config skipped per user request."}'
+        echo '{"status":"ok","action":"skip","detail":"lint-staged config skipped per user request.","description_nl":"No changes were made because skip was requested."}'
         exit 0
     fi
 
     if [ ! -f "$INCOMING_PATH" ]; then
-        echo '{"status":"error","error":"Skill asset not found: assets/lint-staged/.lintstagedrc.json"}'
+        echo '{"status":"error","error":"Skill asset not found: assets/lint-staged/.lintstagedrc.json","description_nl":"Skill asset file is missing."}'
         exit 1
     fi
 
+    EXISTING_FILE=$(find_existing) || true
     DST_PATH="$TARGET/.lintstagedrc.json"
 
     case "$STRATEGY" in
         merge)
-            if [ -f "$DST_PATH" ]; then
-                echo '{"status":"ok","action":"merge","detail":".lintstagedrc.json already exists — merge not implemented for JSON configs. Existing file preserved."}'
-            else
-                cp "$INCOMING_PATH" "$DST_PATH"
-                echo '{"status":"ok","action":"merge","detail":".lintstagedrc.json created (no existing file to merge)."}'
+            if [ -n "$EXISTING_FILE" ]; then
+                echo '{"status":"manual_required","action":"merge","detail":"lint-staged configuration already exists in a complex/unsupported format. Merge is not safe; use replace or skip.","description_nl":"An existing lint-staged configuration was detected. Automatic merge is unsafe, so the request was blocked."}'
+                exit 0
             fi
+            cp "$INCOMING_PATH" "$DST_PATH"
+            echo '{"status":"ok","action":"merge","detail":"Created .lintstagedrc.json (clean install).","description_nl":"No existing lint-staged config found, so merge copied the Skill template."}'
             ;;
         replace)
             cp "$INCOMING_PATH" "$DST_PATH"
-            echo '{"status":"ok","action":"replace","detail":".lintstagedrc.json written."}'
+            echo '{"status":"ok","action":"replace","detail":".lintstagedrc.json written.","description_nl":"Existing or missing lint-staged configuration was replaced with the Skill template."}'
             ;;
     esac
     exit 0
