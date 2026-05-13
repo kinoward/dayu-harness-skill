@@ -129,7 +129,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `quality.tooling` | 代码风格、质量与测试策略 | ESLint + Prettier + lint-staged + 文档指引 | eslint config + prettier config + lint-staged config | 含代码项目 |
+| `quality.tooling` | 代码风格、质量与测试策略 | ESLint + Prettier + lint-staged + 文档指引 | eslint config + prettier config + lint-staged config + .gitignore | 含代码项目 |
 
 ### 开发规范
 
@@ -156,7 +156,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `git.language` | commit-msg 中 CJK 检测 | 必须依赖 `git.commit` 的 husky hook 载体 |
 | `github.pr` | PR 本体化检查（pr-lint.yml + pr_body_structure.py） | 仅 GitHub 项目联动 CI |
 | `github.branch-release` | rulesets JSON + pre-push hook | GitHub rulesets（远程）+ pre-push hook（本地）双重保护 |
-| `quality.tooling` | ESLint + Prettier + lint-staged + validate.sh | 复杂配置默认人工确认 |
+| `quality.tooling` | ESLint + Prettier + lint-staged + .gitignore + validate.sh | 复杂配置默认人工确认 |
 | `github.release-please` | release-please.yml + config + manifest | 仅 GitHub 项目；依赖 `git.commit` + `github.pr`；需要 PAT |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
