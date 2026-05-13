@@ -1,52 +1,79 @@
 #!/usr/bin/env bash
-# scaffold.sh — 主脚手架：复制模板文档 + 安装选定资产
+# scaffold.sh — 按能力清单进行项目初始化
 # 用法:
-#   scaffold.sh <target-root> [--dry-run] [--apply] [--only <category>]
-#   scaffold.sh <target-root>                          # default: dry-run + prompt
-#   scaffold.sh <target-root> --dry-run                # JSON preview
-#   scaffold.sh <target-root> --apply                  # execute + validate
-#   scaffold.sh <target-root> --apply --only docs     # docs only
-#   scaffold.sh <target-root> --apply --only husky    # husky only
-set -euo pipefail
+#   scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only legacy-category] [--strategy merge|replace|skip]
+set -eo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TEMPLATES_DIR="$SKILL_DIR/templates"
-ASSETS_DIR="$SKILL_DIR/assets"
+MANIFEST_DIR="$SKILL_DIR/capabilities"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
-VALIDATE_SCRIPT="$TEMPLATES_DIR/docs/scripts/validate.sh"
+VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/scripts/validate.sh"
 
-# Parse args
-MODE="prompt"  # prompt | dry-run | apply
-ONLY_CATEGORY="all"
-ENABLED_CATEGORIES=""
+MODE="prompt"
 TARGET=""
+ENABLED_CATEGORIES=""
+ONLY_CATEGORY="all"
+ONLY_EXPLICIT="false"
+STRATEGY=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --dry-run) MODE="dry-run"; shift ;;
-        --apply) MODE="apply"; shift ;;
-        --only)
-            ONLY_CATEGORY="${2:-}"
-            shift 2
+        --dry-run)
+            MODE="dry-run"
+            shift
+            ;;
+        --apply)
+            MODE="apply"
+            shift
             ;;
         --enable)
             ENABLED_CATEGORIES="${2:-}"
             shift 2
             ;;
-        *) TARGET="$1"; shift ;;
+        --only)
+            ONLY_CATEGORY="${2:-}"
+            ONLY_EXPLICIT="true"
+            shift 2
+            ;;
+        --strategy)
+            STRATEGY="${2:-}"
+            shift 2
+            ;;
+        --help|-h)
+            MODE="help"
+            shift
+            ;;
+        *)
+            TARGET="${1:-}"
+            shift
+            ;;
     esac
 done
 
-if [ -z "$TARGET" ]; then
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--only <category>] [--enable cat1,cat2,...]" >&2
-    echo "" >&2
-    echo "Categories: docs, husky, commitlint, workflows, eslint, prettier, lint-staged, gitignore, release-please, all" >&2
+usage() {
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|skip]"
+    echo "说明:"
+    echo "  - 无 --enable 时默认仅部署核心能力 core"
+    echo "  - --enable 与 --only 支持逗号分隔"
+    echo "  - --only 兼容历史分类: docs/husky/commitlint/workflows/eslint/prettier/lint-staged/gitignore/release-please"
+    echo "  - --only all 表示部署全部能力（兼容历史行为）"
+    echo "  - --apply 默认不替换已存在文件；安装器能力需通过 --strategy 声明安全策略"
+}
+
+if [ "$MODE" = "help" ] || [ -z "${TARGET:-}" ]; then
+    usage >&2
     exit 2
 fi
+
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
     echo '{"status":"error","error":"target not found"}' >&2
     exit 2
 }
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo '{"status":"error","error":"jq is required for capability manifests"}' >&2
+    exit 2
+fi
 
 json_escape() {
     local s="$1"
@@ -58,408 +85,768 @@ json_escape() {
     printf '%s' "$s"
 }
 
-# ============================================================
-# Q&A answer to category mapping
-# ============================================================
-# Q3 (提交信息格式校验)    → husky, commitlint
-# Q4 (Git 内容语言规范)    → bundled in husky commit-msg hook
-# Q5 (PR 工作流规范)       → workflows (pr-lint.yml, issue-lint.yml)
-# Q6 (分支与发布管理)      → workflows (rulesets, pre-push hook bundled in husky)
-# Q7 (代码风格与质量)      → eslint, prettier, lint-staged
-# Q8 (测试策略)            → docs (practices/testing-strategy.md)
-# Q9 (开发环境纪律)        → docs (practices/dev-hygiene.md, scripts/)
-# Q10 (AI 协作风格)        → docs (practices/ai-collaboration.md)
-# Q11 (决策记录 ADR)       → docs (decisions/)
-# Q12 (排障知识库)         → docs (troubleshooting/)
-# Q13 (版本化研究院)       → docs (research/)
-# Q14 (项目专属文档)       → docs (project/)
-# Q15 (历史归档)           → docs (archive/)
-# Q16 (release-please)    → release-please (release-please.yml, config, manifest)
-# gitignore                → gitignore (always offered)
-# ============================================================
-
-# Define all deployable files per category
-# Format: "src_relative_to_SKILL_DIR|dst_relative_to_TARGET"
-
-get_docs_files() {
-    # Core entry files
-    echo "templates/CLAUDE.md|CLAUDE.md"
-    echo "templates/AGENTS.md|AGENTS.md"
-
-    # docs/ hierarchy
-    echo "templates/docs/AGENTS.md|docs/AGENTS.md"
-    echo "templates/docs/doc-maintenance.md|docs/doc-maintenance.md"
-
-    # Practices
-    echo "templates/docs/practices/AGENTS.md|docs/practices/AGENTS.md"
-    echo "templates/docs/practices/ai-collaboration.md|docs/practices/ai-collaboration.md"
-    echo "templates/docs/practices/code-review-checklist.md|docs/practices/code-review-checklist.md"
-    echo "templates/docs/practices/branch-and-release.md|docs/practices/branch-and-release.md"
-    echo "templates/docs/practices/commit-guidelines.md|docs/practices/commit-guidelines.md"
-    echo "templates/docs/practices/dev-hygiene.md|docs/practices/dev-hygiene.md"
-    echo "templates/docs/practices/git-language-policy.md|docs/practices/git-language-policy.md"
-    echo "templates/docs/practices/pr-guidelines.md|docs/practices/pr-guidelines.md"
-    echo "templates/docs/practices/testing-strategy.md|docs/practices/testing-strategy.md"
-
-    # Decisions
-    echo "templates/docs/decisions/AGENTS.md|docs/decisions/AGENTS.md"
-    echo "templates/docs/decisions/adr-template.md|docs/decisions/adr-template.md"
-
-    # Troubleshooting
-    echo "templates/docs/troubleshooting/AGENTS.md|docs/troubleshooting/AGENTS.md"
-
-    # Research
-    echo "templates/docs/research/AGENTS.md|docs/research/AGENTS.md"
-
-    # Project
-    echo "templates/docs/project/AGENTS.md|docs/project/AGENTS.md"
-
-    # Archive
-    echo "templates/docs/archive/AGENTS.md|docs/archive/AGENTS.md"
-    echo "templates/docs/archive/project/AGENTS.md|docs/archive/project/AGENTS.md"
-
-    # Scripts (always deployed)
-    echo "templates/docs/scripts/audit.sh|docs/scripts/audit.sh"
-    echo "templates/docs/scripts/validate.sh|docs/scripts/validate.sh"
-    echo "templates/docs/scripts/diff-helper.sh|docs/scripts/diff-helper.sh"
-    echo "templates/docs/scripts/check-consistency.sh|docs/scripts/check-consistency.sh"
+join_json() {
+    local out=""
+    for item in "$@"; do
+        if [ -z "$item" ]; then
+            continue
+        fi
+        if [ -z "$out" ]; then
+            out="$item"
+        else
+            out="${out},${item}"
+        fi
+    done
+    printf '%s' "$out"
 }
 
-get_husky_files() {
-    echo "assets/husky/commit-msg|.husky/commit-msg"
-    echo "assets/husky/pre-commit|.husky/pre-commit"
-    echo "assets/husky/pre-push|.husky/pre-push"
+trim() {
+    printf '%s' "$(echo "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 }
 
-get_commitlint_files() {
-    echo "assets/commitlint/commitlint.config.cjs|commitlint.config.cjs"
+contains_item() {
+    local needle="$1"
+    shift
+    local item
+    for item in "$@"; do
+        [ "$item" = "$needle" ] && return 0
+    done
+    return 1
 }
 
-get_workflows_files() {
-    echo "assets/github/workflows/pr-lint.yml|.github/workflows/pr-lint.yml"
-    echo "assets/github/workflows/issue-lint.yml|.github/workflows/issue-lint.yml"
-    echo "assets/github/scripts/pr_body_structure.py|.github/scripts/pr_body_structure.py"
-    echo "assets/github/rulesets/protect-main.json|.github/rulesets/protect-main.json"
-    echo "assets/github/rulesets/protect-tags.json|.github/rulesets/protect-tags.json"
+# ------------------------------------------------------------
+# Manifest loading
+# ------------------------------------------------------------
+MANIFEST_IDS=()
+MANIFEST_PATHS=()
+DEFAULT_IDS=()
+
+for manifest_path in "$MANIFEST_DIR"/*.json; do
+    [ -f "$manifest_path" ] || continue
+    manifest_id="$(jq -r '.id // empty' "$manifest_path")"
+    [ -z "$manifest_id" ] && continue
+    MANIFEST_IDS+=( "$manifest_id" )
+    MANIFEST_PATHS+=( "$manifest_path" )
+    if jq -e '.default == true' "$manifest_path" >/dev/null 2>&1; then
+        DEFAULT_IDS+=( "$manifest_id" )
+    fi
+done
+
+if [ "${#MANIFEST_IDS[@]}" -eq 0 ]; then
+    echo '{"status":"error","error":"No capability manifests found."}' >&2
+    exit 2
+fi
+
+manifest_path_for_id() {
+    local id="$1"
+    local idx
+    for idx in "${!MANIFEST_IDS[@]}"; do
+        if [ "${MANIFEST_IDS[$idx]}" = "$id" ]; then
+            echo "${MANIFEST_PATHS[$idx]}"
+            return 0
+        fi
+    done
+    return 1
 }
 
-get_eslint_files() {
-    echo "assets/eslint/eslint.config.js|eslint.config.js"
+all_manifest_ids() {
+    printf '%s\n' "${MANIFEST_IDS[@]}"
 }
 
-get_prettier_files() {
-    echo "assets/prettier/.prettierrc|.prettierrc"
+default_manifest_ids() {
+    printf '%s\n' "${DEFAULT_IDS[@]}"
 }
 
-get_lintstaged_files() {
-    echo "assets/lint-staged/.lintstagedrc.json|.lintstagedrc.json"
-}
-
-get_gitignore_files() {
-    echo "assets/gitignore/universal.gitignore|.gitignore"
-}
-
-get_release_please_files() {
-    echo "assets/github/workflows/release-please.yml|.github/workflows/release-please.yml"
-    echo "assets/github/release-please-config.json|release-please-config.json"
-    echo "assets/github/.release-please-manifest.json|.release-please-manifest.json"
-}
-
-# Get descriptions for each category
-get_category_description() {
-    local cat="$1"
-    case "$cat" in
+# ------------------------------------------------------------
+# Compatibility mapping (legacy category -> capability id)
+# ------------------------------------------------------------
+map_legacy_category() {
+    case "$1" in
         docs)
-            echo "Documentation templates — AGENTS.md, CLAUDE.md, docs/ hierarchy (practices, decisions, troubleshooting, research, project, archive), and maintenance scripts (audit.sh, validate.sh, diff-helper.sh, check-consistency.sh)"
+            echo "core"
             ;;
-        husky)
-            echo "Husky git hooks — commit-msg (Conventional Commits + CJK detection + AI trailer stripping + issue ref rejection), pre-commit (lint-staged), pre-push (branch protection)"
-            ;;
-        commitlint)
-            echo "Commitlint configuration — commitlint.config.cjs with @commitlint/config-conventional rules"
+        husky|commitlint)
+            echo "git.commit"
             ;;
         workflows)
-            echo "GitHub CI — pr-lint.yml, issue-lint.yml workflows, pr_body_structure.py script, branch/tag rulesets"
+            echo "github.pr"
             ;;
-        eslint)
-            echo "ESLint configuration — eslint.config.js (flat config) with recommended rules"
-            ;;
-        prettier)
-            echo "Prettier configuration — .prettierrc with standard formatting options"
-            ;;
-        lint-staged)
-            echo "lint-staged configuration — .lintstagedrc.json with pre-commit formatting and linting"
-            ;;
-        gitignore)
-            echo "Gitignore — universal.gitignore (with language-specific variants auto-detected during install)"
+        eslint|prettier|lint-staged|lint_staged|gitignore)
+            echo "quality.tooling"
             ;;
         release-please)
-            echo "Release-please — automated changelog + version bump + release PR workflow (release-please.yml, release-please-config.json, .release-please-manifest.json)"
+            echo "github.release-please"
+            ;;
+        *)
+            echo "$1"
             ;;
     esac
 }
 
-# Resolve which categories to process
-resolve_categories() {
-    local cats=""
+resolve_request_ids() {
+    local raw_ids=()
+    local token
+    local token_trimmed
+    local mapped
+
     if [ -n "$ENABLED_CATEGORIES" ]; then
-        cats="$ENABLED_CATEGORIES"
-    elif [ "$ONLY_CATEGORY" = "all" ]; then
-        cats="docs,husky,commitlint,workflows,eslint,prettier,lint-staged,gitignore,release-please"
-    else
-        cats="$ONLY_CATEGORY"
-    fi
-    echo "$cats" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$'
-}
-
-# Count files in a category
-count_category_files() {
-    local cat="$1"
-    case "$cat" in
-        docs) get_docs_files | wc -l | tr -d ' ' ;;
-        husky) get_husky_files | wc -l | tr -d ' ' ;;
-        commitlint) get_commitlint_files | wc -l | tr -d ' ' ;;
-        workflows) get_workflows_files | wc -l | tr -d ' ' ;;
-        eslint) get_eslint_files | wc -l | tr -d ' ' ;;
-        prettier) get_prettier_files | wc -l | tr -d ' ' ;;
-        lint-staged) get_lintstaged_files | wc -l | tr -d ' ' ;;
-        gitignore) get_gitignore_files | wc -l | tr -d ' ' ;;
-        release-please) get_release_please_files | wc -l | tr -d ' ' ;;
-        *) echo "0" ;;
-    esac
-}
-
-# Get files for a category
-get_category_files() {
-    local cat="$1"
-    case "$cat" in
-        docs) get_docs_files ;;
-        husky) get_husky_files ;;
-        commitlint) get_commitlint_files ;;
-        workflows) get_workflows_files ;;
-        eslint) get_eslint_files ;;
-        prettier) get_prettier_files ;;
-        lint-staged) get_lintstaged_files ;;
-        gitignore) get_gitignore_files ;;
-        release-please) get_release_please_files ;;
-    esac
-}
-
-# ===================== --dry-run mode =====================
-do_dry_run() {
-    local categories
-    categories=$(resolve_categories)
-
-    local ITEMS=""
-    local CATEGORY_SUMMARIES=""
-    local TOTAL_FILES=0
-    local TOTAL_EXISTING=0
-    local TOTAL_NEW=0
-    local ALL_CLEAN="true"
-
-    for cat in $categories; do
-        local cat_file_count=$(count_category_files "$cat")
-        local cat_new=0
-        local cat_existing=0
-        local cat_items=""
-
-        while IFS='|' read -r src_rel dst_rel; do
-            [ -z "$src_rel" ] && continue
-            local src_path="$SKILL_DIR/$src_rel"
-            local dst_path="$TARGET/$dst_rel"
-
-            if [ ! -f "$src_path" ]; then
-                [ -n "$cat_items" ] && cat_items+=","
-                cat_items+="{\"src\":\"$src_rel\",\"dst\":\"$dst_rel\",\"exists_in_target\":false,\"available\":false,\"description_nl\":\"Source template not found: $src_rel\"}"
-                continue
-            fi
-
-            local src_lines=$(wc -l < "$src_path" | tr -d ' ')
-
-            if [ -f "$dst_path" ]; then
-                cat_existing=$((cat_existing + 1))
-                ALL_CLEAN="false"
-                local dst_lines=$(wc -l < "$dst_path" | tr -d ' ')
-                [ -n "$cat_items" ] && cat_items+=","
-                cat_items+="{\"src\":\"$src_rel\",\"dst\":\"$dst_rel\",\"exists_in_target\":true,\"target_lines\":$dst_lines,\"source_lines\":$src_lines,\"description_nl\":\"Existing file found ($dst_lines lines). Skill version has $src_lines lines. Review diff before replacing.\"}"
+        IFS=',' read -r -a token_list <<< "$ENABLED_CATEGORIES"
+        for token in "${token_list[@]}"; do
+            token_trimmed="$(trim "$token")"
+            [ -z "$token_trimmed" ] && continue
+            if [ "$token_trimmed" = "all" ]; then
+                while IFS= read -r id; do
+                    raw_ids+=( "$id" )
+                done < <(all_manifest_ids)
             else
-                cat_new=$((cat_new + 1))
-                [ -n "$cat_items" ] && cat_items+=","
-                cat_items+="{\"src\":\"$src_rel\",\"dst\":\"$dst_rel\",\"exists_in_target\":false,\"source_lines\":$src_lines,\"description_nl\":\"New file ($src_lines lines). Ready for clean install.\"}"
+                mapped="$(map_legacy_category "$token_trimmed")"
+                if [ -n "$mapped" ]; then
+                    IFS=' ' read -r -a mapped_ids <<< "$mapped"
+                    for id in "${mapped_ids[@]}"; do
+                        raw_ids+=( "$id" )
+                    done
+                fi
             fi
-        done < <(get_category_files "$cat")
-
-        TOTAL_FILES=$((TOTAL_FILES + cat_file_count))
-        TOTAL_NEW=$((TOTAL_NEW + cat_new))
-        TOTAL_EXISTING=$((TOTAL_EXISTING + cat_existing))
-
-        local cat_desc=$(get_category_description "$cat")
-        [ -n "$CATEGORY_SUMMARIES" ] && CATEGORY_SUMMARIES+=","
-        CATEGORY_SUMMARIES+="{\"category\":\"$cat\",\"files_total\":$cat_file_count,\"files_new\":$cat_new,\"files_existing\":$cat_existing,\"description\":\"$(json_escape "$cat_desc")\",\"items\":[$cat_items]}"
-    done
-
-    local TOP_STATUS="clean"
-    [ "$ALL_CLEAN" != "true" ] && TOP_STATUS="conflict"
-
-    local SUMMARY="Preview of ${TOTAL_FILES} file(s) across $(echo "$categories" | wc -l | tr -d ' ') categories."
-    [ "$TOTAL_EXISTING" -gt 0 ] && SUMMARY="$SUMMARY ${TOTAL_EXISTING} file(s) already exist and may create conflicts."
-
-    local DESC_NL
-    if [ "$TOP_STATUS" = "clean" ]; then
-        DESC_NL="All ${TOTAL_FILES} files are new — no existing files would be overwritten. Safe to apply."
+        done
+    elif [ "$ONLY_EXPLICIT" = "true" ]; then
+        if [ "$ONLY_CATEGORY" = "all" ]; then
+            while IFS= read -r id; do
+                raw_ids+=( "$id" )
+            done < <(all_manifest_ids)
+        else
+            IFS=',' read -r -a token_list <<< "$ONLY_CATEGORY"
+            for token in "${token_list[@]}"; do
+                token_trimmed="$(trim "$token")"
+                [ -z "$token_trimmed" ] && continue
+                mapped="$(map_legacy_category "$token_trimmed")"
+                if [ -n "$mapped" ]; then
+                    IFS=' ' read -r -a mapped_ids <<< "$mapped"
+                    for id in "${mapped_ids[@]}"; do
+                        raw_ids+=( "$id" )
+                    done
+                fi
+            done
+        fi
     else
-        DESC_NL="${TOTAL_NEW} new file(s) will be created, ${TOTAL_EXISTING} existing file(s) will be replaced or merged. Review each item's status before applying."
+        while IFS= read -r id; do
+            raw_ids+=( "$id" )
+        done < <(default_manifest_ids)
     fi
 
-    cat <<JSONEOF
-{
-  "mode": "dry-run",
-  "target": "$(json_escape "$TARGET")",
-  "status": "$TOP_STATUS",
-  "categories": [$CATEGORY_SUMMARIES],
-  "summary": "$(json_escape "$SUMMARY")",
-  "total_files": $TOTAL_FILES,
-  "files_new": $TOTAL_NEW,
-  "files_existing": $TOTAL_EXISTING,
-  "description_nl": "$(json_escape "$DESC_NL")"
-}
-JSONEOF
-}
-
-# ===================== --apply mode =====================
-do_apply() {
-    local categories
-    categories=$(resolve_categories)
-
-    local APPLIED=""
-    local SKIPPED=""
-    local ERRORS=""
-    local APPLIED_COUNT=0
-    local SKIPPED_COUNT=0
-
-    # Install selected categories
-    for cat in $categories; do
-        # For asset categories with dedicated install scripts, delegate
-        case "$cat" in
-            release-please)
-                # Handle release-please directly
-                while IFS='|' read -r src_rel dst_rel; do
-                    [ -z "$src_rel" ] && continue
-                    local src_path="$SKILL_DIR/$src_rel"
-                    local dst_path="$TARGET/$dst_rel"
-
-                    if [ ! -f "$src_path" ]; then
-                        ERRORS="${ERRORS}${dst_rel}: source not found; "
-                        continue
-                    fi
-
-                    mkdir -p "$(dirname "$dst_path")"
-                    if [ -f "$dst_path" ]; then
-                        SKIPPED="${SKIPPED}${dst_rel} "
-                        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-                    else
-                        cp "$src_path" "$dst_path"
-                        APPLIED="${APPLIED}${dst_rel} "
-                        APPLIED_COUNT=$((APPLIED_COUNT + 1))
-                    fi
-                done < <(get_release_please_files)
-                ;;
-            husky|commitlint|workflows|eslint|prettier|lint-staged|gitignore)
-                local script_name="install-${cat}.sh"
-                # Map category name to script name (handle lint-staged → lint_staged, workflows → github-workflows)
-                case "$cat" in
-                    lint-staged) script_name="install-lint-staged.sh" ;;
-                    workflows) script_name="install-github-workflows.sh" ;;
-                    gitignore) script_name="install-gitignore.sh" ;;
-                esac
-
-                local installer="$SCRIPTS_DIR/$script_name"
-                if [ -x "$installer" ]; then
-                    local result
-                    result=$("$installer" "$TARGET" --apply replace 2>/dev/null) || true
-                    if echo "$result" | grep -q '"status":"ok"'; then
-                        local detail
-                        detail=$(echo "$result" | grep -o '"detail":"[^"]*"' | head -1 | sed 's/"detail":"//;s/"//' || echo "installed")
-                        APPLIED="${APPLIED}${cat} "
-                        APPLIED_COUNT=$((APPLIED_COUNT + 1))
-                    elif echo "$result" | grep -q '"status":"partial"'; then
-                        APPLIED="${APPLIED}${cat}(partial) "
-                        APPLIED_COUNT=$((APPLIED_COUNT + 1))
-                    else
-                        local err_detail=$(echo "$result" | grep -o '"error":"[^"]*"' | head -1 | sed 's/"error":"//;s/"//' || echo "unknown error")
-                        ERRORS="${ERRORS}${cat}: ${err_detail}; "
-                    fi
-                else
-                    ERRORS="${ERRORS}${cat}: installer not found or not executable; "
-                fi
-                ;;
-            docs)
-                # Handle docs directly
-                while IFS='|' read -r src_rel dst_rel; do
-                    [ -z "$src_rel" ] && continue
-                    local src_path="$SKILL_DIR/$src_rel"
-                    local dst_path="$TARGET/$dst_rel"
-
-                    if [ ! -f "$src_path" ]; then
-                        ERRORS="${ERRORS}${dst_rel}: source not found; "
-                        continue
-                    fi
-
-                    mkdir -p "$(dirname "$dst_path")"
-                    if [ -f "$dst_path" ]; then
-                        SKIPPED="${SKIPPED}${dst_rel} "
-                        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-                    else
-                        cp "$src_path" "$dst_path"
-                        APPLIED="${APPLIED}${dst_rel} "
-                        APPLIED_COUNT=$((APPLIED_COUNT + 1))
-                    fi
-
-                    # Make scripts executable
-                    if echo "$dst_rel" | grep -q '^docs/scripts/'; then
-                        chmod +x "$dst_path"
-                    fi
-                done < <(get_docs_files)
-                ;;
-        esac
+    local resolved=()
+    local id
+    for id in "${raw_ids[@]}"; do
+        [ -z "$id" ] && continue
+        if ! manifest_path_for_id "$id" >/dev/null; then
+            echo "error: unknown capability '$id'" >&2
+            exit 2
+        fi
+        if ! contains_item "$id" "${resolved[@]}"; then
+            resolved+=( "$id" )
+        fi
     done
+    printf '%s\n' "${resolved[@]}"
+}
 
-    APPLIED=$(echo "$APPLIED" | xargs 2>/dev/null || true)
-    SKIPPED=$(echo "$SKIPPED" | xargs 2>/dev/null || true)
-    ERRORS=$(echo "$ERRORS" | sed 's/; $//' 2>/dev/null || true)
+RESOLVE_SEEN=()
+RESOLVE_ORDER=()
 
-    local OVERALL="ok"
-    [ -n "$ERRORS" ] && OVERALL="error"
+resolve_recursive() {
+    local cap_id="$1"
+    if contains_item "$cap_id" "${RESOLVE_SEEN[@]}"; then
+        return 0
+    fi
+    RESOLVE_SEEN+=( "$cap_id" )
 
-    echo '{}' >/dev/null  # no-op, JSON output below
+    local manifest_path
+    manifest_path="$(manifest_path_for_id "$cap_id")" || {
+        echo "error: unknown capability '$cap_id'" >&2
+        exit 2
+    }
 
-    # Run validate.sh if available
-    local VALIDATION_RESULT="skipped"
-    if [ -f "$VALIDATE_SCRIPT" ] && [ -x "$VALIDATE_SCRIPT" ]; then
-        if bash "$VALIDATE_SCRIPT" --json "$TARGET" 2>/dev/null; then
-            VALIDATION_RESULT="passed"
+    local dep_id
+    while IFS= read -r dep_id; do
+        dep_id="$(trim "$dep_id")"
+        [ -z "$dep_id" ] && continue
+        if ! manifest_path_for_id "$dep_id" >/dev/null; then
+            echo "error: unknown dependency '$dep_id' in '$cap_id'" >&2
+            exit 2
+        fi
+        resolve_recursive "$dep_id"
+    done < <(jq -r '.dependencies[]? // empty' "$manifest_path")
+
+    RESOLVE_ORDER+=( "$cap_id" )
+}
+
+resolve_with_dependencies() {
+    RESOLVE_SEEN=()
+    RESOLVE_ORDER=()
+    for cap_id in "$@"; do
+        resolve_recursive "$cap_id"
+    done
+    printf '%s\n' "${RESOLVE_ORDER[@]}"
+}
+
+# ------------------------------------------------------------
+# Collectors
+# ------------------------------------------------------------
+DRY_ITEMS=()
+APPLY_ITEMS=()
+
+collect_file_entries() {
+    local manifest_path="$1"
+    local kind="$2"
+    local mode="$3"
+    while IFS= read -r item_json; do
+        [ -z "$item_json" ] && continue
+
+        local src_rel dst_rel executable
+        src_rel="$(echo "$item_json" | jq -r '.src // empty')"
+        dst_rel="$(echo "$item_json" | jq -r '.dst // empty')"
+        executable="$(echo "$item_json" | jq -r '(.executable // false) | tostring')"
+        [ -z "$src_rel" ] && continue
+
+        local src_path="$SKILL_DIR/$src_rel"
+        local dst_path="$TARGET/$dst_rel"
+        local status="new"
+        local needs_strategy="false"
+        local exists_in_target="false"
+        local source_lines=""
+        local target_lines=""
+        local description=""
+
+        if [ "$mode" = "dry" ]; then
+            if [ ! -f "$src_path" ]; then
+                status="missing_source"
+                DRY_MISSING=$((DRY_MISSING + 1))
+                description="Source file missing: $src_rel"
+            else
+                source_lines="$(wc -l < "$src_path" | tr -d ' ')"
+                DRY_FILES=$((DRY_FILES + 1))
+                if [ -f "$dst_path" ]; then
+                    status="existing"
+                    exists_in_target="true"
+                    DRY_EXISTING=$((DRY_EXISTING + 1))
+                    target_lines="$(wc -l < "$dst_path" | tr -d ' ')"
+                    description="File exists and will be skipped by default in apply."
+                else
+                    status="new"
+                    DRY_NEW=$((DRY_NEW + 1))
+                    description="New file ready for copy."
+                fi
+            fi
         else
-            VALIDATION_RESULT="failed (exit code $?)"
+            if [ ! -f "$src_path" ]; then
+                status="missing_source"
+                APPLY_MISSING=$((APPLY_MISSING + 1))
+                APPLY_ERROR=$((APPLY_ERROR + 1))
+                description="Source file missing: $src_rel"
+            else
+                source_lines="$(wc -l < "$src_path" | tr -d ' ')"
+                APPLY_FILES=$((APPLY_FILES + 1))
+                if [ -f "$dst_path" ]; then
+                    status="skipped_existing"
+                    needs_strategy="true"
+                    exists_in_target="true"
+                    target_lines="$(wc -l < "$dst_path" | tr -d ' ')"
+                    APPLY_EXISTING=$((APPLY_EXISTING + 1))
+                    APPLY_SKIPPED=$((APPLY_SKIPPED + 1))
+                    description="Target file exists; skipped by default."
+                else
+                    mkdir -p "$(dirname "$dst_path")"
+                    if cp "$src_path" "$dst_path"; then
+                        if [ "$executable" = "true" ]; then
+                            chmod +x "$dst_path"
+                        fi
+                        status="copied"
+                        APPLY_NEW=$((APPLY_NEW + 1))
+                        description="Copied source file."
+                    else
+                        status="error"
+                        APPLY_ERROR=$((APPLY_ERROR + 1))
+                        description="Failed to copy source file."
+                    fi
+                fi
+            fi
+        fi
+
+        local item
+        item="{\"kind\":\"$kind\",\"src\":\"$(json_escape "$src_rel")\",\"dst\":\"$(json_escape "$dst_rel")\",\"executable\":$executable,\"exists_in_target\":$exists_in_target,\"status\":\"$(json_escape "$status")\",\"needs_strategy\":$needs_strategy,\"description_nl\":\"$(json_escape "$description")\""
+        if [ -n "$source_lines" ]; then
+            item+=",\"source_lines\":$source_lines"
+        fi
+        if [ -n "$target_lines" ]; then
+            item+=",\"target_lines\":$target_lines"
+        fi
+        item+="}"
+
+        if [ "$mode" = "dry" ]; then
+            DRY_ITEMS+=( "$item" )
+        else
+            APPLY_ITEMS+=( "$item" )
+        fi
+    done < <(jq -c ".${kind}_files[]?" "$manifest_path")
+}
+
+collect_file_entries_blocked() {
+    local manifest_path="$1"
+    local kind="$2"
+    local status="$3"
+    local description="$4"
+
+    while IFS= read -r item_json; do
+        [ -z "$item_json" ] && continue
+
+        local src_rel dst_rel executable src_path dst_path exists_in_target source_lines target_lines item_status
+        src_rel="$(echo "$item_json" | jq -r '.src // empty')"
+        dst_rel="$(echo "$item_json" | jq -r '.dst // empty')"
+        executable="$(echo "$item_json" | jq -r '(.executable // false) | tostring')"
+        [ -z "$src_rel" ] && continue
+
+        src_path="$SKILL_DIR/$src_rel"
+        dst_path="$TARGET/$dst_rel"
+        exists_in_target="false"
+        source_lines=""
+        target_lines=""
+        item_status="$status"
+
+        APPLY_FILES=$((APPLY_FILES + 1))
+        if [ -f "$src_path" ]; then
+            source_lines="$(wc -l < "$src_path" | tr -d ' ')"
+        else
+            item_status="missing_source"
+            APPLY_MISSING=$((APPLY_MISSING + 1))
+            APPLY_ERROR=$((APPLY_ERROR + 1))
+        fi
+        if [ -f "$dst_path" ]; then
+            exists_in_target="true"
+            APPLY_EXISTING=$((APPLY_EXISTING + 1))
+            target_lines="$(wc -l < "$dst_path" | tr -d ' ')"
+        fi
+        if [ "$item_status" = "needs_strategy" ]; then
+            APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
+        fi
+
+        local item
+        item="{\"kind\":\"$kind\",\"src\":\"$(json_escape "$src_rel")\",\"dst\":\"$(json_escape "$dst_rel")\",\"executable\":$executable,\"exists_in_target\":$exists_in_target,\"status\":\"$(json_escape "$item_status")\",\"needs_strategy\":true,\"description_nl\":\"$(json_escape "$description")\""
+        if [ -n "$source_lines" ]; then
+            item+=",\"source_lines\":$source_lines"
+        fi
+        if [ -n "$target_lines" ]; then
+            item+=",\"target_lines\":$target_lines"
+        fi
+        item+="}"
+        APPLY_ITEMS+=( "$item" )
+    done < <(jq -c ".${kind}_files[]?" "$manifest_path")
+}
+
+collect_installer_entry_dry() {
+    local manifest_path="$1"
+    local installer_script safe_strategies status description
+    installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
+    [ -z "$installer_script" ] && return 0
+
+    safe_strategies="$(jq -c '.installer.safe_strategies // ["merge","skip"]' "$manifest_path")"
+    local installer_path="$SCRIPTS_DIR/$installer_script"
+    status="ready"
+    if [ ! -f "$installer_path" ]; then
+        status="missing"
+        DRY_INST_MISSING=$((DRY_INST_MISSING + 1))
+        description="Installer missing: $installer_script"
+    elif [ ! -x "$installer_path" ]; then
+        status="not_executable"
+        DRY_INST_MISSING=$((DRY_INST_MISSING + 1))
+        description="Installer not executable: $installer_script"
+    else
+        description="Installer available."
+    fi
+
+    DRY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":$safe_strategies,\"needs_strategy\":false,\"description_nl\":\"$(json_escape "$description")\"}" )
+}
+
+collect_installer_entry_apply() {
+    local manifest_path="$1"
+    local installer_script safe_strategies status description needs_strategy action installer_result
+    installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
+    [ -z "$installer_script" ] && return 0
+
+    safe_strategies="$(jq -r '.installer.safe_strategies[]? // "merge" | @sh' "$manifest_path" | tr '\n' ' ')"
+    if [ -z "$safe_strategies" ]; then
+        safe_strategies="merge skip"
+    fi
+
+    local installer_path="$SCRIPTS_DIR/$installer_script"
+    status="ready"
+    needs_strategy="false"
+    action=""
+    installer_result="ok"
+
+    local safe_array_json
+    safe_array_json="["
+    local sep=""
+    for strategy in $safe_strategies; do
+        strategy="$(echo "$strategy" | sed "s/^'//;s/'$//")"
+        safe_array_json="${safe_array_json}${sep}\"$(json_escape "$strategy")\""
+        sep=","
+    done
+    if [ -z "$sep" ]; then
+        safe_array_json='["merge","skip"]'
+    else
+        safe_array_json="${safe_array_json}]"
+    fi
+
+    if [ ! -f "$installer_path" ] || [ ! -x "$installer_path" ]; then
+        status="missing"
+        description="Installer missing or not executable: $installer_script"
+        APPLY_ERROR=$((APPLY_ERROR + 1))
+        installer_result="error"
+    elif [ -z "$STRATEGY" ]; then
+        status="needs_strategy"
+        needs_strategy="true"
+        description="Strategy required for installer-backed capability. Use --strategy merge|skip."
+        APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
+        installer_result="needs_strategy"
+    else
+        local allowed="false"
+        for strategy in $safe_strategies; do
+            strategy="$(echo "$strategy" | sed "s/^'//;s/'$//")"
+            if [ "$STRATEGY" = "$strategy" ]; then
+                allowed="true"
+                break
+            fi
+        done
+
+        if [ "$allowed" != "true" ]; then
+            status="needs_strategy"
+            needs_strategy="true"
+            description="Unsafe strategy '$STRATEGY'. Allowed: ${safe_strategies}"
+            APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
+            installer_result="needs_strategy"
+        else
+            local installer_output installer_rc
+            set +e
+            installer_output="$("$installer_path" "$TARGET" --apply "$STRATEGY" 2>&1)"
+            installer_rc=$?
+            set -e
+
+            if [ "$installer_rc" -ne 0 ]; then
+                status="error"
+                description="Installer failed with code $installer_rc."
+                APPLY_ERROR=$((APPLY_ERROR + 1))
+                installer_result="error"
+            else
+                status="$(echo "$installer_output" | jq -r '.status // "ok"' 2>/dev/null || echo "ok")"
+                action="$(echo "$installer_output" | jq -r '.action // ""' 2>/dev/null || echo "")"
+                description="$(echo "$installer_output" | jq -r '.description_nl // .detail // "installer completed"' 2>/dev/null || echo "$installer_output")"
+                if [ "$status" = "partial" ]; then
+                    APPLY_PARTIAL=$((APPLY_PARTIAL + 1))
+                    installer_result="partial"
+                elif [ "$status" = "ok" ] || [ "$status" = "needs_strategy" ] || [ "$status" = "skip" ] || [ "$status" = "clean" ]; then
+                    if [ "$status" = "needs_strategy" ]; then
+                        APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
+                    else
+                        APPLY_INSTALLED=$((APPLY_INSTALLED + 1))
+                    fi
+                    installer_result="$status"
+                else
+                    status="error"
+                    APPLY_ERROR=$((APPLY_ERROR + 1))
+                    installer_result="error"
+                fi
+            fi
         fi
     fi
 
+    APPLY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":${safe_array_json},\"action\":\"$(json_escape "$action")\",\"needs_strategy\":${needs_strategy},\"installer_result\":\"$(json_escape "$installer_result")\",\"description_nl\":\"$(json_escape "$description")\"}" )
+}
+
+build_selected_list_summary() {
+    local arr=("$@")
+    local out=""
+    local i
+    for i in "${arr[@]}"; do
+        if [ -z "$out" ]; then
+            out="$i"
+        else
+            out="$out, $i"
+        fi
+    done
+    echo "$out"
+}
+
+do_dry_run() {
+    local requested_ids=()
+    local capability_ids=()
+    local capability_jsons=()
+
+    for id in $(resolve_request_ids); do
+        requested_ids+=( "$id" )
+    done
+    if [ "${#requested_ids[@]}" -eq 0 ]; then
+        echo "error: no capabilities requested" >&2
+        exit 2
+    fi
+
+    for id in $(resolve_with_dependencies "${requested_ids[@]}"); do
+        capability_ids+=( "$id" )
+    done
+    if [ "${#capability_ids[@]}" -eq 0 ]; then
+        echo "error: no capabilities resolved" >&2
+        exit 2
+    fi
+
+    DRY_FILES=0
+    DRY_NEW=0
+    DRY_EXISTING=0
+    DRY_MISSING=0
+    DRY_INST_MISSING=0
+
+    local cap_id
+    for cap_id in "${capability_ids[@]}"; do
+        local manifest_path
+        manifest_path="$(manifest_path_for_id "$cap_id")"
+
+        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json
+        cap_desc="$(json_escape "$(jq -r '.description // empty' "$manifest_path")")"
+        cap_desc_nl="$(json_escape "$(jq -r '.description_nl // empty' "$manifest_path")")"
+        cap_default="$(jq -r '.default // false' "$manifest_path")"
+        dependencies_json="$(jq -c '.dependencies // []' "$manifest_path")"
+        acceptance_json="$(jq -c '.acceptance // []' "$manifest_path")"
+        installer_json="$(jq -c '.installer // null' "$manifest_path")"
+
+        local pre_new=$DRY_NEW
+        local pre_existing=$DRY_EXISTING
+        local pre_missing=$DRY_MISSING
+        local pre_inst_missing=$DRY_INST_MISSING
+
+        DRY_ITEMS=()
+        collect_file_entries "$manifest_path" "template" "dry"
+        collect_file_entries "$manifest_path" "asset" "dry"
+        collect_installer_entry_dry "$manifest_path"
+
+        local cap_new=$((DRY_NEW - pre_new))
+        local cap_existing=$((DRY_EXISTING - pre_existing))
+        local cap_missing=$((DRY_MISSING - pre_missing))
+        local cap_inst_missing=$((DRY_INST_MISSING - pre_inst_missing))
+
+        local status="clean"
+        if [ "$cap_missing" -gt 0 ] || [ "$cap_inst_missing" -gt 0 ]; then
+            status="error"
+        elif [ "$cap_existing" -gt 0 ]; then
+            status="conflict"
+        fi
+
+        local items_json
+        items_json="$(join_json "${DRY_ITEMS[@]}")"
+        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"files_missing\":$cap_missing,\"items\":[$items_json]}" )
+    done
+
+    local top_status="clean"
+    local top_desc
+    if [ "$DRY_MISSING" -gt 0 ] || [ "$DRY_INST_MISSING" -gt 0 ]; then
+        top_status="error"
+        top_desc="Dry-run found missing source files."
+    elif [ "$DRY_EXISTING" -gt 0 ]; then
+        top_status="conflict"
+        top_desc="Dry-run found existing files. Apply will skip existing targets unless strategy is provided."
+    else
+        top_desc="Dry-run is clean. ${DRY_NEW} new files, ${DRY_FILES} managed files total."
+    fi
+
+    local capabilities_json
+    capabilities_json="$(join_json "${capability_jsons[@]}")"
+    local summary
+    summary="$(build_selected_list_summary "${capability_ids[@]}")"
+
     cat <<JSONEOF
 {
-  "mode": "apply",
-  "target": "$(json_escape "$TARGET")",
-  "status": "$OVERALL",
-  "applied_count": $APPLIED_COUNT,
-  "applied": "$(json_escape "$APPLIED")",
-  "skipped_count": $SKIPPED_COUNT,
-  "skipped": "$(json_escape "$SKIPPED")",
-  "errors": "$(json_escape "$ERRORS")",
-  "validation": "$(json_escape "$VALIDATION_RESULT")",
-  "description_nl": "$(json_escape "Scaffold applied: ${APPLIED_COUNT} file(s) created/copied. Validation: ${VALIDATION_RESULT}.")"
+  "mode":"dry-run",
+  "target":"$(json_escape "$TARGET")",
+  "status":"$top_status",
+  "capabilities":[${capabilities_json}],
+  "summary":"Selected capabilities: $(json_escape "$summary")",
+  "description_nl":"$(json_escape "$top_desc")",
+  "total_files":$DRY_FILES,
+  "files_new":$DRY_NEW,
+  "files_existing":$DRY_EXISTING,
+  "files_missing":$DRY_MISSING,
+  "capability_count":${#capability_ids[@]}
 }
 JSONEOF
 }
 
-# ===================== Main =====================
+do_apply() {
+    local requested_ids=()
+    local capability_ids=()
+    local capability_jsons=()
+
+    for id in $(resolve_request_ids); do
+        requested_ids+=( "$id" )
+    done
+    if [ "${#requested_ids[@]}" -eq 0 ]; then
+        echo "error: no capabilities requested" >&2
+        exit 2
+    fi
+
+    for id in $(resolve_with_dependencies "${requested_ids[@]}"); do
+        capability_ids+=( "$id" )
+    done
+    if [ "${#capability_ids[@]}" -eq 0 ]; then
+        echo "error: no capabilities resolved" >&2
+        exit 2
+    fi
+
+    APPLY_FILES=0
+    APPLY_NEW=0
+    APPLY_EXISTING=0
+    APPLY_SKIPPED=0
+    APPLY_MISSING=0
+    APPLY_ERROR=0
+    APPLY_PARTIAL=0
+    APPLY_INSTALLED=0
+    APPLY_STRATEGY_REQUIRED=0
+
+    local cap_id
+    for cap_id in "${capability_ids[@]}"; do
+        local manifest_path
+        manifest_path="$(manifest_path_for_id "$cap_id")"
+        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json
+        cap_desc="$(json_escape "$(jq -r '.description // empty' "$manifest_path")")"
+        cap_desc_nl="$(json_escape "$(jq -r '.description_nl // empty' "$manifest_path")")"
+        cap_default="$(jq -r '.default // false' "$manifest_path")"
+        dependencies_json="$(jq -c '.dependencies // []' "$manifest_path")"
+        acceptance_json="$(jq -c '.acceptance // []' "$manifest_path")"
+        installer_json="$(jq -c '.installer // null' "$manifest_path")"
+
+        local pre_new=$APPLY_NEW
+        local pre_existing=$APPLY_EXISTING
+        local pre_skipped=$APPLY_SKIPPED
+        local pre_missing=$APPLY_MISSING
+        local pre_error=$APPLY_ERROR
+        local pre_partial=$APPLY_PARTIAL
+        local pre_installed=$APPLY_INSTALLED
+        local pre_strategy=$APPLY_STRATEGY_REQUIRED
+
+        APPLY_ITEMS=()
+        local installer_script strategy_state blocked_desc
+        installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
+        strategy_state="allowed"
+        blocked_desc=""
+        if [ -n "$installer_script" ]; then
+            if [ -z "$STRATEGY" ]; then
+                strategy_state="needs_strategy"
+                blocked_desc="Capability has an installer; no files were written because --strategy was not provided."
+            elif [ "$STRATEGY" = "skip" ]; then
+                strategy_state="skip"
+                blocked_desc="Capability strategy is skip; no files were written."
+            else
+                local allowed_strategy="false"
+                local candidate
+                for candidate in $(jq -r '.installer.safe_strategies[]? // empty' "$manifest_path"); do
+                    if [ "$candidate" = "$STRATEGY" ]; then
+                        allowed_strategy="true"
+                        break
+                    fi
+                done
+                if [ "$allowed_strategy" != "true" ]; then
+                    strategy_state="needs_strategy"
+                    blocked_desc="Capability strategy is not allowed by the manifest; no files were written."
+                fi
+            fi
+        fi
+        if [ "$strategy_state" = "allowed" ]; then
+            collect_file_entries "$manifest_path" "template" "apply"
+            collect_file_entries "$manifest_path" "asset" "apply"
+            collect_installer_entry_apply "$manifest_path"
+        else
+            collect_file_entries_blocked "$manifest_path" "template" "$strategy_state" "$blocked_desc"
+            collect_file_entries_blocked "$manifest_path" "asset" "$strategy_state" "$blocked_desc"
+            collect_installer_entry_apply "$manifest_path"
+        fi
+
+        local cap_new=$((APPLY_NEW - pre_new))
+        local cap_existing=$((APPLY_EXISTING - pre_existing))
+        local cap_skipped=$((APPLY_SKIPPED - pre_skipped))
+        local cap_missing=$((APPLY_MISSING - pre_missing))
+        local cap_error=$((APPLY_ERROR - pre_error))
+        local cap_partial=$((APPLY_PARTIAL - pre_partial))
+        local cap_installed=$((APPLY_INSTALLED - pre_installed))
+        local cap_strategy=$((APPLY_STRATEGY_REQUIRED - pre_strategy))
+
+        local status="ok"
+        if [ "$cap_error" -gt 0 ] || [ "$cap_missing" -gt 0 ]; then
+            status="error"
+        elif [ "$cap_strategy" -gt 0 ]; then
+            status="needs_strategy"
+        elif [ "$cap_partial" -gt 0 ] || [ "$cap_installed" -gt 0 ] || [ "$cap_skipped" -gt 0 ]; then
+            status="partial"
+        fi
+
+        local items_json
+        items_json="$(join_json "${APPLY_ITEMS[@]}")"
+        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"items\":[$items_json]}" )
+    done
+
+    local overall_status="ok"
+    if [ "$APPLY_ERROR" -gt 0 ] || [ "$APPLY_MISSING" -gt 0 ]; then
+        overall_status="error"
+    elif [ "$APPLY_STRATEGY_REQUIRED" -gt 0 ]; then
+        overall_status="needs_strategy"
+    elif [ "$APPLY_PARTIAL" -gt 0 ] || [ "$APPLY_SKIPPED" -gt 0 ]; then
+        overall_status="partial"
+    fi
+
+    local validation_status="skipped"
+    local validation_desc=""
+    if [ -f "$VALIDATE_SCRIPT" ] && [ -x "$VALIDATE_SCRIPT" ]; then
+        set +e
+        validate_output="$(bash "$VALIDATE_SCRIPT" --json "$TARGET" 2>&1)"
+        validate_rc=$?
+        set -e
+        if [ "$validate_rc" -eq 0 ]; then
+            validation_status="passed"
+        else
+            validation_status="failed"
+            validation_desc="$(echo "$validate_output" | jq -r '.description_nl // .summary // "validate failed"' 2>/dev/null || echo "validate failed")"
+        fi
+    fi
+
+    local top_desc="Apply completed with status $overall_status."
+    if [ "$overall_status" = "needs_strategy" ]; then
+        top_desc="Apply required a strategy for installer-backed capabilities. Re-run with --strategy merge|skip."
+    elif [ "$overall_status" = "partial" ]; then
+        top_desc="Apply completed with partial changes. Existing targets were skipped by default."
+    elif [ "$overall_status" = "error" ]; then
+        top_desc="Apply encountered errors. Resolve conflicts and retry."
+    fi
+
+    local capabilities_json
+    capabilities_json="$(join_json "${capability_jsons[@]}")"
+    local summary
+    summary="$(build_selected_list_summary "${capability_ids[@]}")"
+    local applied_list
+    applied_list="$(build_selected_list_summary "${capability_ids[@]}")"
+
+    cat <<JSONEOF
+{
+  "mode":"apply",
+  "target":"$(json_escape "$TARGET")",
+  "status":"$overall_status",
+  "capabilities":[${capabilities_json}],
+  "summary":"Applied capability set: $(json_escape "$summary")",
+  "description_nl":"$(json_escape "$top_desc")",
+  "applied_count":$APPLY_NEW,
+  "skipped_count":$APPLY_SKIPPED,
+  "files_total":$((APPLY_NEW + APPLY_EXISTING)),
+  "files_new":$APPLY_NEW,
+  "files_existing":$APPLY_EXISTING,
+  "validation":"$(json_escape "$validation_status")",
+  "validation_description_nl":"$(json_escape "$validation_desc")",
+  "applied":"$(json_escape "$applied_list")"
+}
+JSONEOF
+}
+
 case "$MODE" in
     dry-run)
         do_dry_run
@@ -468,11 +855,15 @@ case "$MODE" in
         do_apply
         ;;
     prompt)
-        # Default: show dry-run preview + prompt for confirmation
         do_dry_run
         echo "" >&2
         echo "=== 以上为预览 (dry-run) ===" >&2
         echo "执行 scaffold.sh --apply 以实际复制文件。" >&2
-        echo "或使用 --only <category> 限制范围。" >&2
+        echo "或使用 --enable <ids> / --only <category> 进一步过滤。" >&2
+        echo "安装器能力（含 installer）如需执行，请提供 --strategy merge|skip。" >&2
+        ;;
+    *)
+        usage >&2
+        exit 2
         ;;
 esac

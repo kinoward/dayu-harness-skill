@@ -1,0 +1,21 @@
+{
+  "id": "github.branch-release",
+  "description": "Branch and release protection assets",
+  "description_nl": "Deploy branch/tag protection rulesets and rely on Husky pre-push for local protection.",
+  "default": false,
+  "dependencies": ["core", "git.commit"],
+  "template_files": [
+    {"src":"templates/docs/practices/branch-and-release.md","dst":"docs/practices/branch-and-release.md"}
+  ],
+  "asset_files": [
+    {"src":"assets/github/rulesets/protect-main.json","dst":".github/rulesets/protect-main.json"},
+    {"src":"assets/github/rulesets/protect-tags.json","dst":".github/rulesets/protect-tags.json"}
+  ],
+  "installer": null,
+  "acceptance": [
+    "Main-branch ruleset exists",
+    "Tag ruleset exists",
+    "Pre-push hook available through git.commit dependency"
+  ],
+  "suggested_when": "Enable when branch protection and tag protection are required."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "project.docs",
+  "description": "Project-specific docs scaffold",
+  "description_nl": "Create project docs area for non-governance project content.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/project/AGENTS.md","dst":"docs/project/AGENTS.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "Project docs AGENTS exists"
+  ],
+  "suggested_when": "Enable for repositories with durable project-specific documentation."
+}

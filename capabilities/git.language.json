@@ -1,0 +1,18 @@
+{
+  "id": "git.language",
+  "description": "Git-side language policy validation",
+  "description_nl": "Enable CJK language checks in git hooks through the commit-msg hook.",
+  "default": false,
+  "dependencies": ["git.commit"],
+  "template_files": [
+    {"src":"templates/docs/practices/git-language-policy.md","dst":"docs/practices/git-language-policy.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "commit-msg hook is present",
+    "CJK checks documented in git-language-policy"
+  ],
+  "requires": ["git.commit"],
+  "suggested_when": "Enable when repository language policy is required."
+}

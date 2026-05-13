@@ -1,0 +1,20 @@
+{
+  "id": "github.release-please",
+  "description": "Automated release workflow with release-please",
+  "description_nl": "Deploy release-please workflow and manifest/config files.",
+  "default": false,
+  "dependencies": ["core", "git.commit", "github.pr"],
+  "template_files": [],
+  "asset_files": [
+    {"src":"assets/github/workflows/release-please.yml","dst":".github/workflows/release-please.yml"},
+    {"src":"assets/github/release-please-config.json","dst":"release-please-config.json"},
+    {"src":"assets/github/.release-please-manifest.json","dst":".release-please-manifest.json"}
+  ],
+  "installer": null,
+  "acceptance": [
+    "release-please workflow exists",
+    "release-please config exists",
+    "release-please manifest exists"
+  ],
+  "suggested_when": "Enable for GitHub-backed automated release management."
+}

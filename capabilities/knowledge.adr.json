@@ -1,0 +1,18 @@
+{
+  "id": "knowledge.adr",
+  "description": "Architecture decision record templates",
+  "description_nl": "Deploy decision record documentation templates and index.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/decisions/AGENTS.md","dst":"docs/decisions/AGENTS.md"},
+    {"src":"templates/docs/decisions/adr-template.md","dst":"docs/decisions/adr-template.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "ADR AGENTS exists",
+    "ADR template exists"
+  ],
+  "suggested_when": "Enable for projects that want explicit decision records."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "ai.collaboration",
+  "description": "AI collaboration execution practices",
+  "description_nl": "Deploy the AI collaboration practice document without enabling repository hooks.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/practices/ai-collaboration.md","dst":"docs/practices/ai-collaboration.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "AI collaboration practice document exists"
+  ],
+  "suggested_when": "Enable when AI agents regularly implement or maintain project work."
+}

@@ -1,0 +1,25 @@
+{
+  "id": "core",
+  "description": "Core governance documentation and maintenance scripts",
+  "description_nl": "Deploy the core governance documentation and maintenance scripts.",
+  "default": true,
+  "dependencies": [],
+  "template_files": [
+    {"src":"templates/CLAUDE.md","dst":"CLAUDE.md"},
+    {"src":"templates/AGENTS.md","dst":"AGENTS.md"},
+    {"src":"templates/docs/AGENTS.md","dst":"docs/AGENTS.md"},
+    {"src":"templates/docs/doc-maintenance.md","dst":"docs/doc-maintenance.md"},
+    {"src":"templates/docs/practices/AGENTS.md","dst":"docs/practices/AGENTS.md"},
+    {"src":"templates/docs/scripts/audit.sh","dst":"docs/scripts/audit.sh","executable":true},
+    {"src":"templates/docs/scripts/check-consistency.sh","dst":"docs/scripts/check-consistency.sh","executable":true},
+    {"src":"templates/docs/scripts/diff-helper.sh","dst":"docs/scripts/diff-helper.sh","executable":true},
+    {"src":"templates/docs/scripts/validate.sh","dst":"docs/scripts/validate.sh","executable":true}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "Core docs exist after scaffold",
+    "Maintenance scripts are executable"
+  ],
+  "suggested_when": "Always deploy in every scaffold run."
+}

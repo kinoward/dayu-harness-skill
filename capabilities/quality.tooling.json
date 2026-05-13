@@ -1,0 +1,25 @@
+{
+  "id": "quality.tooling",
+  "description": "Code quality and formatting tooling",
+  "description_nl": "Enable ESLint, Prettier, lint-staged, and Git ignore config files.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/practices/dev-hygiene.md","dst":"docs/practices/dev-hygiene.md"},
+    {"src":"templates/docs/practices/testing-strategy.md","dst":"docs/practices/testing-strategy.md"}
+  ],
+  "asset_files": [
+    {"src":"assets/eslint/eslint.config.js","dst":"eslint.config.js"},
+    {"src":"assets/prettier/.prettierrc","dst":".prettierrc"},
+    {"src":"assets/lint-staged/.lintstagedrc.json","dst":".lintstagedrc.json"},
+    {"src":"assets/gitignore/universal.gitignore","dst":".gitignore"}
+  ],
+  "installer": null,
+  "acceptance": [
+    "ESLint config exists",
+    "Prettier config exists",
+    "lint-staged config exists",
+    ".gitignore exists"
+  ],
+  "suggested_when": "Enable when project uses Node.js linting or formatting."
+}

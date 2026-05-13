@@ -1,0 +1,16 @@
+{
+  "id": "knowledge.research",
+  "description": "Research notes knowledge base scaffold",
+  "description_nl": "Create research notes index and structure.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/research/AGENTS.md","dst":"docs/research/AGENTS.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "Research AGENTS exists"
+  ],
+  "suggested_when": "Enable for teams that keep product or technology research in repository."
+}
