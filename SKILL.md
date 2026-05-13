@@ -1,6 +1,6 @@
 ---
 name: docs-governance
-description: 帮助项目低成本接入 Harness Engineering 理念的一次性引导工具。建立以 AGENTS.md 为根的渐进式披露约束体系。仅通过 /docs-governance 显式命令激活。
+description: 帮助项目低成本接入 Harness Engineering 理念的一次性部署工具。将以 AGENTS.md 为根的渐进式披露治理体系部署到目标项目。仅通过 /docs-governance 显式命令激活。
 disable-model-invocation: true
 ---
 
@@ -8,9 +8,9 @@ disable-model-invocation: true
 
 ## 定位
 
-本 Skill 是管理和维护项目治理体系的**一次性引导工具**。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。Skill 帮助创建和维护这套体系，但不替代或凌驾于它。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
+本 Skill 是管理和维护项目治理体系的**一次性部署工具**，不是治理体系本身。Skill 目录中的模板、脚本和资产只是部署来源；被部署到目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本，才是 Harness Engineering 治理体系的实际载体。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
 
-设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。部署的文档体系对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + doc-maintenance.md 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
+被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + doc-maintenance.md 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
 
 ## 激活条件
 
@@ -77,9 +77,9 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 根据项目特征和 `doc-maintenance.md` 中的 Q&A 决策参考，智能生成适配内容。
 
-## 经验沉淀行为
+## 部署后的经验沉淀约定
 
-每次 AI 协作会话中，如产生可复用的经验，主动建议沉淀到对应位置：
+该约定会写入目标项目的 `ai-collaboration.md`。每次 AI 协作会话中，如产生可复用的经验，主动建议沉淀到对应位置：
 
 | 经验类型 | 沉淀位置 |
 |---------|---------|
@@ -88,7 +88,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 | 研究发现 | `docs/research/` |
 | 约束变更 | `docs/practices/` + AGENTS.md |
 
-经验沉淀行为同时写入 `ai-collaboration.md` 模板，确保 Skill 删除后 AI 仍能自主沉淀。
+写入目标项目后，该约定确保 Skill 删除后 AI 仍能自主沉淀经验。
 
 ## 部署策略
 

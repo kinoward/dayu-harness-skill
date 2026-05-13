@@ -1,21 +1,21 @@
 # docs-governance
 
-帮助项目建立和维护渐进式披露的 AI 工程约束文档体系。
+一次性部署工具：帮助项目安装以 AGENTS.md 为根的 Harness Engineering 治理体系。
 
 设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)——人类设计约束，智能体写代码。
 
 ## 功能概述
 
-本 Skill 是一个**一次性引导工具**，帮助项目低成本接入 Harness Engineering 理念。以 AGENTS.md 为根的渐进式披露文档体系，将 HE 六大概念——仓库即记录系统、地图而非手册、机械化执行、智能体可读性、熵管理、人类掌舵——落地为可部署、可验证的工程工件。初始化完成后，Skill 可安全删除——项目的约束体系已独立运行。
+本 Skill 是一个**一次性部署与维护工具**，不是治理体系本身。它负责把 Harness Engineering 理念落地为目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本。初始化完成后，Skill 可安全删除；真正持续生效的是已部署到项目内的治理体系。
 
-核心能力：
+工具入口能力：
 - **脚手架**：按 `core + capability modules` 在新项目中建立 AGENTS.md + docs/ 文档体系
 - **融合**：与已有文档体系合并，保留现有内容，补全缺失
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
-- **强制执行**：AI 署名剥离、issue 引用拦截、Conventional Commits 校验等自动化约束
-- **release-please CI/CD**：Google release-please 自动化版本发布工作流
+- **自动化约束资产**：按需部署 AI 署名剥离、issue 引用拦截、Conventional Commits 校验等 hooks/CI
+- **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
 ## 项目结构
 
