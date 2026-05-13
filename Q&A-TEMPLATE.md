@@ -1,6 +1,6 @@
 # Q&A 参考模板
 
-> 本模板只定义提问方式和融合策略。能力列表、依赖、模板文件、资产文件、验收标准以 `capabilities/*.json` 为单一事实源；新增或删除能力时优先更新 manifest，再按 manifest 生成或校验本模板的提问内容。
+> 本模板只定义提问方式和融合策略。治理能力列表、依赖、模板文件、资产文件、验收标准以 `capabilities/*.json` 为单一事实源；新增或删除治理能力时优先更新 manifest，再按 manifest 生成或校验本模板的提问内容。
 
 ## 适配规则
 
@@ -22,7 +22,7 @@ Q: 是否使用 GitHub 远程托管？
    选项：[1] 是 [2] 否 [3] 其他托管平台（请描述）
 ```
 
-## 能力提问清单
+## 治理能力提问清单
 
 以下清单应从 manifest 字段生成或校验：`id`、`description_nl`、`dependencies`、`requires`、`acceptance`、`suggested_when`。
 
@@ -48,7 +48,7 @@ Q: 是否使用 GitHub 远程托管？
 ```markdown
 ## 确认汇总
 
-### 启用的能力
+### 启用的治理能力
 - git.commit → 安装 husky + commitlint，部署 commit-guidelines.md
 - github.pr → 部署 PR/issue lint 与 PR 规范文档
 
@@ -56,7 +56,7 @@ Q: 是否使用 GitHub 远程托管？
 - .husky/commit-msg → manual_required
 - .github/workflows/pr-lint.yml → manual_required
 
-### 跳过的能力
+### 跳过的治理能力
 - quality.tooling（用户选择跳过）
 
 [1] 确认 dry-run [2] 调整选择 [3] 取消
@@ -76,7 +76,7 @@ Merge plan:
 
 请选择：
 [1] 保留现有配置
-[2] 替换为 Skill 模板
+[2] 替换为 docs-governance 提供的治理模板
 [3] 手动合并后继续
 [4] 跳过此项
 ```
@@ -84,7 +84,7 @@ Merge plan:
 ## 执行规则
 
 1. `scaffold.sh --dry-run --enable <ids>` 先输出 JSON plan
-2. 用户确认启用能力和策略后，才执行 `scaffold.sh --apply --enable <ids> --strategy <merge|skip>`
+2. 用户确认启用治理能力和策略后，才执行 `scaffold.sh --apply --enable <ids> --strategy <merge|skip>`
 3. `install-*.sh --check` 只输出 merge plan，不写 tracked files
 4. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
 5. 应用后执行 `validate.sh --json`；需要结构一致性时执行 `check-consistency.sh --json`

@@ -10,7 +10,7 @@
 
 ### [scripts/](scripts/)
 
-维护脚本。包含诊断完整性（audit.sh）、smoke test（validate.sh）、差异分析（diff-helper.sh）、一致性检查（check-consistency.sh）。
+维护脚本。包含诊断完整性（audit.sh）、smoke test（validate.sh）、差异分析（diff-helper.sh）、一致性检查（check-consistency.sh）。已部署的 hook/CI/config 等配套资产按能力清单分布在项目对应位置。
 
 ### [doc-maintenance.md](doc-maintenance.md)
 
