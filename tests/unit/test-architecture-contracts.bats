@@ -83,6 +83,49 @@ has_commit_msg_cjk_support() {
     command -v perl >/dev/null 2>&1
 }
 
+@test "canonical SKILL.md uses Codex-compatible frontmatter" {
+    ! grep -q '^disable-model-invocation:' "$REPO_ROOT/SKILL.md"
+    grep -q '^metadata:' "$REPO_ROOT/SKILL.md"
+    grep -q 'invocation_policy: "explicit-command-only"' "$REPO_ROOT/SKILL.md"
+    grep -q 'command: "/docs-governance"' "$REPO_ROOT/SKILL.md"
+
+    local quick_validate="${CODEX_QUICK_VALIDATE:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
+    [ -f "$quick_validate" ] || skip "Codex quick_validate.py not available"
+
+    run python3 "$quick_validate" "$REPO_ROOT"
+    [ "$status" -eq 0 ]
+}
+
+@test "Codex sidecar disables implicit invocation" {
+    [ -f "$REPO_ROOT/agents/openai.yaml" ]
+    grep -q 'display_name: "Docs Governance"' "$REPO_ROOT/agents/openai.yaml"
+    grep -q 'default_prompt: "Use $docs-governance' "$REPO_ROOT/agents/openai.yaml"
+    grep -q '^  allow_implicit_invocation: false$' "$REPO_ROOT/agents/openai.yaml"
+}
+
+@test "agent compatibility reference is discoverable" {
+    [ -f "$REPO_ROOT/references/agent-compatibility.md" ]
+    grep -q 'references/agent-compatibility.md' "$REPO_ROOT/SKILL.md"
+    grep -q 'references/agent-compatibility.md' "$REPO_ROOT/AGENTS.md"
+}
+
+@test "capability manifest source paths resolve" {
+    while IFS= read -r source_path; do
+        [ -e "$REPO_ROOT/$source_path" ] || {
+            echo "missing manifest source: $source_path"
+            return 1
+        }
+    done < <(jq -r '.template_files[]?.src, .asset_files[]?.src' "$REPO_ROOT"/capabilities/*.json)
+
+    while IFS= read -r installer_script; do
+        [ -z "$installer_script" ] && continue
+        [ -f "$REPO_ROOT/scripts/$installer_script" ] || {
+            echo "missing installer script: scripts/$installer_script"
+            return 1
+        }
+    done < <(jq -r '.installer?.script // empty' "$REPO_ROOT"/capabilities/*.json)
+}
+
 @test "scaffold --dry-run default only includes core" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run
 
