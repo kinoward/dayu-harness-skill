@@ -7,9 +7,11 @@ when any check fails.
 
 Checks performed:
   1. Required sections are present (configurable via --config).
-  2. Test plan bullets use `- [ ]` or `- [x]` format and every bullet
+  2. Required order: Summary → Implementation notes → Test plan.
+  3. Test plan bullets use `- [ ]` or `- [x]` format and every bullet
      contains at least one backtick-enclosed executable command.
-  3. No AI-tool watermark / auto-generation signature is present.
+  4. Closing trailer line uses Closes/Fixes/Resolves with an issue number.
+  5. No AI-tool watermark / auto-generation signature is present.
 
 Usage:
   pr_body_structure.py [BODY_TEXT]
@@ -34,11 +36,20 @@ DEFAULT_SECTIONS = [
     "## Summary",
     "## Implementation notes",
     "## Test plan",
-    "## Closes",
 ]
 
-AI_WATERMARK_PATTERNS: List[str] = [
-    r"Generated with Claude Code",
+CLOSING_TRAILER_RE = re.compile(
+    r"^(?:\s*(?:Closes|Fixes|Resolves)\s+#\d+\s*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+FORBIDDEN_CLOSING_HEADING_RE = re.compile(r"^##\s*Closes\b", re.IGNORECASE | re.MULTILINE)
+
+AI_WATERMARK_PATTERNS = [
+    r"Generated with Claude",
+    r"Generated with ChatGPT",
+    r"Created with Claude",
+    r"Generated with [Cc]laude",
     r"Co-Authored-By:",
     r"This PR was created by",
     r"🤖\s*Generated with",
@@ -108,13 +119,26 @@ def gather_body() -> str:
 # ---------------------------------------------------------------------------
 
 def check_sections(body: str, required: List[str]) -> None:
-    """Verify that every required section heading appears in *body*."""
-    missing = [s for s in required if s not in body]
-    if missing:
-        die(
-            "Missing required section(s) in PR body: "
-            + ", ".join(missing)
-        )
+    """Verify required sections appear and are in the configured order."""
+    indices = {}
+    for section in required:
+        idx = body.find(section)
+        if idx == -1:
+            die(f"Missing required section in PR body: {section}")
+        indices[section] = idx
+
+    ordered = [indices[s] for s in required]
+    if ordered != sorted(ordered):
+        die("PR body sections must appear in order: " + " -> ".join(required))
+
+
+def check_closing_trailer(body: str) -> None:
+    """Verify that a closing trailer is present and no heading is used instead."""
+    if FORBIDDEN_CLOSING_HEADING_RE.search(body):
+        die("Do not use a '## Closes' heading in PR body. Use an inline trailer instead.")
+
+    if not CLOSING_TRAILER_RE.search(body):
+        die("PR body must include one trailer line: Closes #N / Fixes #N / Resolves #N.")
 
 
 def check_test_plan(body: str) -> None:
@@ -244,6 +268,7 @@ def main() -> None:
 
     # Run checks.
     check_sections(body, sections)
+    check_closing_trailer(body)
     check_test_plan(body)
     check_watermarks(body)
 

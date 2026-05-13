@@ -19,14 +19,21 @@ jobs:
         id: pr-body-structure
         continue-on-error: true
         run: |
-          python3 .github/scripts/pr_body_structure.py
+          BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+          if [ -z "$BODY" ]; then
+            echo "ERROR: PR body is empty. Provide a body that follows the PR template."
+            exit 1
+          fi
+          printf '%s\n' "$BODY" | python3 .github/scripts/pr_body_structure.py
 
       - name: Check PR title for CJK characters
         id: pr-title-cjk
         continue-on-error: true
+        env:
+          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
         run: |
           TITLE="${{ github.event.pull_request.title }}"
-          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}]'; then
+          if echo "$TITLE" | grep -P "$CJK_RE"; then
             echo "ERROR: PR title contains CJK characters. Use English."
             echo "See docs/practices/git-language-policy.md"
             exit 1
@@ -35,9 +42,15 @@ jobs:
       - name: Check PR body for CJK characters
         id: pr-body-cjk
         continue-on-error: true
+        env:
+          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
         run: |
-          BODY="${{ github.event.pull_request.body }}"
-          if echo "$BODY" | grep -P '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}]'; then
+          BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+          if echo "$BODY" | grep -q '<!-- skip-cjk-check -->'; then
+            echo "SKIP: PR body contains <!-- skip-cjk-check --> marker."
+            exit 0
+          fi
+          if echo "$BODY" | grep -P "$CJK_RE"; then
             echo "ERROR: PR body contains CJK characters. Use English."
             echo "See docs/practices/git-language-policy.md"
             exit 1

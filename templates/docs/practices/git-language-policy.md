@@ -4,31 +4,25 @@
 
 ## 硬性规则
 
-git 与远程仓库（GitHub）相关的所有内容一律使用英文。
+Git 与远程仓库（GitHub）相关内容默认使用英文；`docs/**` 文档继续使用中文。
 
 ## 适用对象
 
 必须使用英文：
 
-| 对象 | 范围 |
-|------|------|
-| Commit message | subject + body + footer（含 `BREAKING CHANGE:` 等） |
-| Branch 名 | 本地分支与远程分支 |
-| PR 标题 | 含 release-please 自动 PR |
-| PR 描述 | 正文全部内容，含章节名与列表项 |
-| PR 评论 | 所有人工评论 |
-| Issue 标题与描述 | 正文全部内容 |
-| GitHub Release notes | 由 CHANGELOG 派生 |
-| CHANGELOG.md | 由 release-please 从 commit 派生 |
-| Tag annotation | `git tag -a` 的 message |
+- Commit message（subject、body、footer）
+- Branch 名
+- PR 标题（含 release-please 自动 PR）
+- PR 描述（正文全部内容，含章节名与列表项）
+- PR / Issue 评论
+- Issue 标题与正文
+- GitHub Release notes / tag annotation
 
 不适用本规约：
 
-| 对象 | 语言 |
-|------|------|
-| `docs/**` 内所有文档 | 中文 |
-| 源代码注释 / docstring | 不纳入本规约 |
-| `README.md` 等根目录说明性文件 | 不纳入本规约 |
+- `docs/**` 内文档
+- 源代码注释与 docstring
+- 非 GitHub 交付文档（例如部分 `README.md`）
 
 ## 示例
 
@@ -44,7 +38,7 @@ docs: 更新使用说明
 
 ## CJK 检测原理
 
-检测基于 Unicode 范围匹配，覆盖以下字符区间：
+检测基于 Unicode 范围匹配，覆盖以下常见 CJK 区间：
 
 | 字符类型 | Unicode 范围 | 说明 |
 |---------|-------------|------|
@@ -55,7 +49,7 @@ docs: 更新使用说明
 | 中文标点 | `\x{3000}-\x{303f}` | CJK Symbols and Punctuation |
 | 全角字符 | `\x{ff00}-\x{ffef}` | Halfwidth and Fullwidth Forms |
 
-hook 中使用 `grep -P`（PCRE）进行匹配；CI 环境使用等效的 Python/JS 正则。
+hook 与 CI 均使用同一字符区间，确保一致性。
 
 ## 强制手段
 
@@ -70,7 +64,7 @@ hook 中使用 `grep -P`（PCRE）进行匹配；CI 环境使用等效的 Python
 | CI 检查 | 文件 | 作用 |
 |--------|------|------|
 | PR 标题/body | `.github/workflows/pr-lint.yml` | 检测 CJK 字符，含中文则 fail check |
-| Issue 标题/body | `.github/workflows/issue-lint.yml` | 检测 CJK 字符，含中文则自动标记 `needs-english` 并评论引导 |
+| Issue 标题/body | `.github/workflows/issue-lint.yml` | 检测 CJK 字符，含中文则 fail check |
 
 ### 无 CI 环境
 
@@ -79,10 +73,10 @@ hook 中使用 `grep -P`（PCRE）进行匹配；CI 环境使用等效的 Python
 
 ## 例外处理
 
-以下场景允许临时绕过 CJK 检测：
+以下场景允许临时绕过 CJK 检测（仅用于当前条目）：
 
-- 在 commit message 或 PR body 中添加 `<!-- skip-cjk-check -->` 注释标记（仅当引用中文专有名词或中文文档链接时使用）
-- 该标记仅跳过当前项（commit 或 PR），不影响其他检查
+- 在 commit message、PR body、Issue body 中添加 `<!-- skip-cjk-check -->` 注释标记
+- 标记仅跳过该条目的检查；不会影响其他内容
 - 滥用此标记应在 code review 中被识别和讨论
 
 ## 自动重试

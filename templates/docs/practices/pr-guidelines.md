@@ -25,7 +25,7 @@ PR 标题必须是自然语言描述性标题，建议使用首字母大写的 T
 
 ## PR 正文模板
 
-四段结构：
+三段结构 + Issue 关联 trailer：
 
 ```markdown
 ## Summary
@@ -47,12 +47,12 @@ PR 标题必须是自然语言描述性标题，建议使用首字母大写的 T
 
 - [ ] `command or inline check`
 
-Closes #<issue-number>
+Closes #<issue-number>  # 或 Fixes/Resolves
 ```
 
 关键规则：
-- **恰好四个 H2 section，按此顺序**：`## Summary` / `## Implementation notes` / `## Test plan`
-- **`Closes #N` trailer 必须独占一行**
+- **按顺序保留 H2 section**：`## Summary` / `## Implementation notes` / `## Test plan`
+- **`Closes #N` / `Fixes #N` / `Resolves #N` 之一必须作为单独行**
 - **Test plan 至少一条 bullet**，每条以 `- [ ]` 开头，内含可执行命令或 fenced code block
 
 ## 禁止 AI 工具签名

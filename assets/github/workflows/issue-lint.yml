@@ -9,9 +9,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check issue for CJK characters
+        env:
+          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
         run: |
           TITLE="${{ github.event.issue.title }}"
-          if echo "$TITLE" | grep -P '[\x{4e00}-\x{9fff}]'; then
+          BODY="$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH")"
+          if echo "$TITLE" | grep -P "$CJK_RE"; then
             echo "ERROR: Issue title contains CJK characters. Use English."
+            echo "See docs/practices/git-language-policy.md"
+            exit 1
+          fi
+          if echo "$BODY" | grep -q '<!-- skip-cjk-check -->'; then
+            echo "SKIP: Issue body contains <!-- skip-cjk-check --> marker."
+            exit 0
+          fi
+          if echo "$BODY" | grep -P "$CJK_RE"; then
+            echo "ERROR: Issue body contains CJK characters. Use English."
+            echo "See docs/practices/git-language-policy.md"
             exit 1
           fi
