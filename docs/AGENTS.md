@@ -2,16 +2,13 @@
 
 Skill 自身文档索引。
 
-## 目录结构
+## 目录索引
 
-```
-docs/
-├── AGENTS.md                 # 你正在读
-├── plan.md                   # 完整设计计划和架构文档
-└── optimization-2026-05.md   # 2026-05 优化记录和实施范围说明
-```
+- [AGENTS.md](AGENTS.md) - 当前索引
+- [plan.md](plan.md) - 完整设计计划和架构文档
+- [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 
-Skill 自身 `docs/` 目录变化时，必须同步更新本区块以及根 [AGENTS.md](../AGENTS.md) 和 [README.md](../README.md) 中对应的 `## 目录结构` 描述。
+Skill 自身 `docs/` 目录变化时，必须同步更新本区块以及根 [AGENTS.md](../AGENTS.md) 和 [README.md](../README.md) 中对应的 `## 目录索引` 与 `## 目录结构` 描述。
 
 ## 设计
 

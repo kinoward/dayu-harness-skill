@@ -39,7 +39,7 @@ docs-governance/
 └── tests/                    # Skill 自身 bats 测试与 fixture 项目
 ```
 
-维护 Skill 自身目录、模板或能力清单时，必须同步更新本结构图和根 [AGENTS.md](AGENTS.md) 中对应的 `## 目录结构` 区块。
+维护 Skill 自身目录、模板或能力清单时，必须同步更新本结构图和根 [AGENTS.md](AGENTS.md) 中对应的 `## 目录索引`（以及 `README.md` 的 `## 目录结构`）区块。
 
 ### 部署到目标项目后的结构
 
@@ -97,7 +97,7 @@ docs-governance/
 └── .release-please-manifest.json     # github.release-please
 ```
 
-能力清单、部署模板或目标项目治理骨架变化时，必须同步更新本结构图和 `templates/` 下对应 `AGENTS.md` 的 `## 目录结构` 区块。
+能力清单、部署模板或目标项目治理骨架变化时，必须同步更新本结构图和 `templates/` 下对应 `AGENTS.md` 的 `## 目录索引`（以及 `README.md` 的 `## 目录结构`）区块。
 
 ## 依赖与测试（维护者）
 

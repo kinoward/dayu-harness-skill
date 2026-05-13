@@ -5,28 +5,24 @@
 > **聚焦**: Git / GitHub / 文档治理
 > **规则**: 以本文件与 `docs/` 规则为准
 
-## 目录结构
+## 目录索引
 
-```
-<project>/
-├── CLAUDE.md                  # core：仅引用 @AGENTS.md
-├── AGENTS.md                  # core：项目级任务路由入口
-├── docs/
-│   ├── AGENTS.md              # core：docs 目录索引
-│   ├── harness/               # core：规则、反馈检查、维护流程
-│   ├── design-docs/           # 可选：ADR 与设计决策
-│   ├── exec-plans/            # core：执行计划
-│   ├── generated/             # core：自动生成资料索引
-│   ├── product-specs/         # 可选：产品规格和项目上下文
-│   ├── references/            # 可选：外部资料和研究索引
-│   ├── troubleshooting/       # 可选：排障知识库
-│   └── archive/               # 可选：历史归档
-├── .husky/                    # 可选：本地 Git hooks
-├── .github/                   # 可选：GitHub workflows、rulesets、辅助脚本
-└── *                          # 可选：commitlint、ESLint、Prettier、release-please 等配置
-```
+- [AGENTS.md](AGENTS.md) - 当前索引
+- [CLAUDE.md](CLAUDE.md) - 任务路由入口
+- [docs/AGENTS.md](docs/AGENTS.md) - core docs 目录索引
+- [docs/harness/AGENTS.md](docs/harness/AGENTS.md) - core：规则、反馈检查、维护流程
+- 可选：`knowledge.adr` [docs/design-docs/AGENTS.md](docs/design-docs/AGENTS.md) - ADR 与设计决策
+- [docs/exec-plans/AGENTS.md](docs/exec-plans/AGENTS.md) - core：执行计划
+- [docs/generated/AGENTS.md](docs/generated/AGENTS.md) - core：自动生成资料索引
+- 可选：`project.docs` [docs/product-specs/AGENTS.md](docs/product-specs/AGENTS.md) - 产品规格和项目上下文
+- 可选：`knowledge.research` [docs/references/AGENTS.md](docs/references/AGENTS.md) - 外部资料和研究索引
+- 可选：`knowledge.troubleshooting` [docs/troubleshooting/AGENTS.md](docs/troubleshooting/AGENTS.md) - 排障知识库
+- 可选：`archive.project` [docs/archive/AGENTS.md](docs/archive/AGENTS.md) - 历史归档
+- `.husky/` - 可选：本地 Git hooks
+- `.github/` - 可选：GitHub workflows、rulesets、辅助脚本
+- `*` - 可选：commitlint、ESLint、Prettier、release-please 等配置（仅示例）
 
-目录结构变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
 
 ## 使用顺序
 
