@@ -13,13 +13,13 @@ metadata:
 
 本 Skill 是管理和维护项目治理体系的**一次性部署工具**，不是治理体系本身。Skill 目录中的模板、脚本和资产只是部署来源；被部署到目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本，才是 Harness Engineering 治理体系的实际载体。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
 
-被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + doc-maintenance.md 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
+被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + `docs/harness/maintenance.md` 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
 
 ## 激活条件
 
 Skill 仅通过显式命令激活：用户输入 `/docs-governance`。
 
-Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的维护由 AI 读取项目中的 `doc-maintenance.md` 自行处理。
+Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的维护由 AI 读取项目中的 `docs/harness/maintenance.md` 自行处理。
 
 为兼容 Claude、Codex 和通用 Agent Skills 客户端，canonical `SKILL.md` 不使用工具专属 frontmatter。具体适配策略见 [references/agent-compatibility.md](references/agent-compatibility.md)。
 
@@ -52,7 +52,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 1. 优先执行 `audit.sh --json` 获取结构化诊断报告
 2. 将报告中的 `description_nl` 和 `results` 以自然语言呈现给用户
-3. 若 audit.sh 不可用，按 `doc-maintenance.md` 诊断清单手动逐项检查
+3. 若 audit.sh 不可用，按 `docs/harness/maintenance.md` 诊断清单手动逐项检查
 4. 报告缺失/冲突，给出修复建议
 
 ### 3. 融合
@@ -74,13 +74,13 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - **删除约束**：调用相关 `install-*.sh --check` 获取影响范围 → 展示 → 确认 → 移除 → 更新 AGENTS.md 索引
 - **修改约束**：调用 `diff-helper.sh --json` 获取变更描述 → 展示 → 确认 → 更新
 - **完整性检查**：同诊断模式
-- **更新项目文档**：按 `doc-maintenance.md` 流程 → 更新内容 → 同步索引
+- **更新项目文档**：按 `docs/harness/maintenance.md` 流程 → 更新内容 → 同步索引
 
 ### 5. 生成
 
 触发：需要特定文档或配置
 
-根据项目特征和 `doc-maintenance.md` 中的 Q&A 决策参考，智能生成适配内容。
+根据项目特征和 `docs/harness/maintenance.md` 中的 Q&A 决策参考，智能生成适配内容。
 
 ## 部署后的经验沉淀约定
 
@@ -88,10 +88,10 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 | 经验类型 | 沉淀位置 |
 |---------|---------|
-| 架构/技术决策 | `docs/decisions/` |
+| 架构/技术决策 | `docs/design-docs/` |
 | 问题排障 | `docs/troubleshooting/` |
-| 研究发现 | `docs/research/` |
-| 约束变更 | `docs/practices/` + AGENTS.md |
+| 研究发现 | `docs/references/research/` |
+| 约束变更 | `docs/harness/guides/` + AGENTS.md |
 
 写入目标项目后，该约定确保 Skill 删除后 AI 仍能自主沉淀经验。
 
@@ -99,7 +99,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 - 仅部署用户选择启用的文档和资产
 - 未启用的资产不复制到项目
-- `docs/scripts/`（audit.sh、validate.sh、diff-helper.sh、check-consistency.sh）始终部署
+- `docs/harness/sensors/scripts/`（audit.sh、validate.sh、diff-helper.sh、check-consistency.sh）始终部署
 - 后续需要新增约束时，重新安装 Skill 执行
 
 ## 结构化输出约定
@@ -123,7 +123,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 ## 能力清单约定
 
 - `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。
-- `core` 始终部署短根 `AGENTS.md`、`CLAUDE.md`、`docs/doc-maintenance.md` 与维护脚本；practice 文档、Git hooks、GitHub CI、release-please、知识库目录按 capability 启用。
+- `core` 始终部署短根 `AGENTS.md`、`CLAUDE.md`、`docs/harness/maintenance.md`、harness 索引、exec-plans 索引、generated 索引与维护脚本；guide 文档、Git hooks、GitHub CI、release-please、知识库目录按 capability 启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
 ## 辅助文件

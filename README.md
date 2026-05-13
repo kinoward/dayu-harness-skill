@@ -51,27 +51,40 @@ docs-governance/
 ├── AGENTS.md                         # core：项目级任务路由入口
 ├── docs/
 │   ├── AGENTS.md                     # core：docs 目录索引
-│   ├── doc-maintenance.md            # core：文档体系维护规范
-│   ├── practices/                    # core 索引 + 可选实践文档
+│   ├── harness/                      # core：规则、反馈检查和维护流程
 │   │   ├── AGENTS.md
-│   │   ├── commit-guidelines.md      # git.commit
-│   │   ├── git-language-policy.md    # git.language
-│   │   ├── pr-guidelines.md          # github.pr
-│   │   ├── code-review-checklist.md  # github.pr
-│   │   ├── branch-and-release.md     # github.branch-release
-│   │   ├── dev-hygiene.md            # quality.tooling
-│   │   ├── testing-strategy.md       # quality.tooling
-│   │   └── ai-collaboration.md       # ai.collaboration
-│   ├── scripts/                      # core：维护脚本
+│   │   ├── maintenance.md            # core：文档体系维护规范
+│   │   ├── guides/                   # 行动前规则卡片
+│   │   │   ├── AGENTS.md
+│   │   │   ├── commit-guidelines.md      # git.commit
+│   │   │   ├── git-language-policy.md    # git.language
+│   │   │   ├── pr-guidelines.md          # github.pr
+│   │   │   ├── branch-and-release.md     # github.branch-release
+│   │   │   ├── dev-hygiene.md            # quality.tooling
+│   │   │   ├── testing-strategy.md       # quality.tooling
+│   │   │   └── ai-collaboration.md       # ai.collaboration
+│   │   └── sensors/                  # 行动后检查与反馈
+│   │       ├── AGENTS.md
+│   │       ├── scripts/              # core：维护脚本
+│   │       │   ├── AGENTS.md
+│   │       │   ├── audit.sh
+│   │       │   ├── check-consistency.sh
+│   │       │   ├── diff-helper.sh
+│   │       │   └── validate.sh
+│   │       └── reviews/
+│   │           ├── AGENTS.md
+│   │           └── code-review-checklist.md  # github.pr
+│   ├── design-docs/                  # knowledge.adr
+│   ├── exec-plans/                   # core：执行计划
 │   │   ├── AGENTS.md
-│   │   ├── audit.sh
-│   │   ├── check-consistency.sh
-│   │   ├── diff-helper.sh
-│   │   └── validate.sh
-│   ├── decisions/                    # knowledge.adr
+│   │   ├── active/AGENTS.md
+│   │   └── completed/AGENTS.md
+│   ├── generated/                    # core：自动生成资料索引
+│   │   └── AGENTS.md
+│   ├── product-specs/                # project.docs
+│   ├── references/                   # knowledge.research
+│   │   └── research/
 │   ├── troubleshooting/              # knowledge.troubleshooting
-│   ├── research/                     # knowledge.research
-│   ├── project/                      # project.docs
 │   └── archive/                      # archive.project
 ├── .husky/                           # git.commit 通过安装脚本合并部署
 ├── .github/                          # github.pr / github.branch-release / github.release-please
@@ -129,7 +142,7 @@ cp -r docs-governance/ <agent-skills-dir>/
 rm -rf <installed-skills-dir>/docs-governance/
 ```
 
-项目的治理体系（AGENTS.md + docs/ + 已安装的脚本资产）独立存在，不受 Skill 删除影响。`doc-maintenance.md` 包含所有维护所需的知识，AI 仅凭项目文档即可执行后续维护操作。
+项目的治理体系（AGENTS.md + docs/ + 已安装的脚本资产）独立存在，不受 Skill 删除影响。`docs/harness/maintenance.md` 包含所有维护所需的知识，AI 仅凭项目文档即可执行后续维护操作。
 
 Skill 的后续版本更新对已完成初始化的项目没有影响。如需新增初始化时跳过的约束，重新安装最新版 Skill 执行即可。
 
@@ -137,7 +150,15 @@ Skill 的后续版本更新对已完成初始化的项目没有影响。如需�
 
 Skill 存在时，通过 `/docs-governance` 显式命令激活。Skill 不在日常 AI 协作中自动介入。
 
-Skill 删除后，AI 读取项目中的 `doc-maintenance.md` 自行处理所有维护意图。
+Skill 删除后，AI 读取项目中的 `docs/harness/maintenance.md` 自行处理所有维护意图。
+
+## 非技术说明
+
+- `harness/guides` 是 AI 做事前看的规则卡片，例如提交代码、写 PR、测试。
+- `harness/sensors` 是检查设备，例如脚本、hook、CI、review checklist，会在 AI 做完后发现问题。
+- `design-docs`、`exec-plans`、`product-specs`、`references` 是项目记忆，帮助 AI 下次接手时知道背景和进度。
+- `archive` 存放过时内容，避免 AI 误用旧规则。
+- 人负责定义方向和约束，AI 按路径读取、执行、接受检查、修正结果。
 
 ## 参考引用
 

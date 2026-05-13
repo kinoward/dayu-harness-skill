@@ -37,7 +37,7 @@ Q: 是否使用 GitHub 远程托管？
 | `knowledge.adr` | 是否建立 ADR 决策记录目录 | 通用 |
 | `knowledge.troubleshooting` | 是否建立排障知识库 | 通用 |
 | `knowledge.research` | 是否建立版本化研究目录 | 有持续调研需求时启用 |
-| `project.docs` | 是否建立项目专属文档区 | 有项目说明、草稿、设计背景时启用 |
+| `project.docs` | 是否建立产品规格与项目上下文文档区 | 有项目说明、草稿、设计背景时启用 |
 | `archive.project` | 是否建立项目归档区 | 有废弃/历史内容时启用 |
 | `github.release-please` | 是否启用 release-please 自动发版 | 仅在 GitHub + `git.commit` + `github.pr` 后建议；不自动启用 |
 
@@ -87,4 +87,4 @@ Merge plan:
 2. 用户确认启用治理能力和策略后，才执行 `scaffold.sh --apply --enable <ids> --strategy <merge|skip>`
 3. `install-*.sh --check` 只输出 merge plan，不写 tracked files
 4. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
-5. 应用后执行 `validate.sh --json`；需要结构一致性时执行 `check-consistency.sh --json`
+5. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
