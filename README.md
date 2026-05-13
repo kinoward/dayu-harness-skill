@@ -12,17 +12,22 @@
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
+- **强制执行**：AI 署名剥离、issue 引用拦截、Conventional Commits 校验等自动化约束
+- **release-please CI/CD**：Google release-please 自动化版本发布工作流
 
 ## 项目结构
 
 ```
 .claude/skills/docs-governance/
   README.md                 # 本文件
-  skill.md                  # Skill 行为定义
+  SKILL.md                  # Skill 行为定义
+  AGENTS.md                 # Skill 自身渐进式披露入口
   Q&A-TEMPLATE.md           # Q&A 参考模板
 
   docs/                     # Skill 自身文档
     plan.md                 # 设计计划
+    AGENTS.md               # Skill 文档入口
+    optimization-2026-05.md # 2026-05 优化记录
 
   templates/                # 文档模板（部署到目标项目）
     CLAUDE.md
@@ -30,28 +35,79 @@
     docs/
       AGENTS.md
       doc-maintenance.md
-      practices/            # 7 个工程规范
+      practices/            # 8 个工程规范
+        AGENTS.md
+        ai-collaboration.md
+        branch-and-release.md
+        code-review-checklist.md
+        commit-guidelines.md
+        dev-hygiene.md
+        git-language-policy.md
+        pr-guidelines.md
+        testing-strategy.md
       decisions/            # ADR 决策记录
+        AGENTS.md
+        adr-template.md
       troubleshooting/      # 排障知识库
+        AGENTS.md
       research/             # 版本化研究院
+        AGENTS.md
       project/              # 项目专属内容
+        AGENTS.md
       archive/              # 历史归档
+        AGENTS.md
+        project/
+          AGENTS.md
       scripts/              # 维护脚本
+        audit.sh
+        check-consistency.sh
+        diff-helper.sh
+        validate.sh
 
-  assets/                   # 脚本和配置资产
+  assets/                   # 脚本和配置资产（按用户选择部署）
     husky/                  # Git hooks（commit-msg + pre-commit + pre-push）
+      commit-msg
+      pre-commit
+      pre-push
     commitlint/             # Commitlint 配置
-    github/                 # GitHub workflows + rulesets JSON + CI scripts
+      commitlint.config.cjs
+    github/                 # GitHub workflows + rulesets + CI 脚本
       workflows/
+        issue-lint.yml
+        pr-lint.yml
+        release-please.yml
       rulesets/
+        protect-main.json
+        protect-tags.json
+      rulesets.md
+      release-please-config.json
+      .release-please-manifest.json
       scripts/
+        pr_body_structure.py
     eslint/                 # ESLint 配置
+      eslint.config.js
     prettier/               # Prettier 配置
+      .prettierrc
     lint-staged/            # lint-staged 配置
+      .lintstagedrc.json
     gitignore/              # .gitignore 模板
+      node.gitignore
+      python.gitignore
+      universal.gitignore
 
   scripts/                  # 初始化脚本（仅 Skill 内部使用）
+    scaffold.sh
+    install-commitlint.sh
+    install-eslint.sh
+    install-github-workflows.sh
+    install-gitignore.sh
+    install-husky.sh
+    install-lint-staged.sh
+    install-prettier.sh
+
   tests/                    # Skill 自身测试
+    unit/                   # bats 单元测试
+    fixtures/               # 5 个测试夹具项目
 ```
 
 ## 安装与删除
@@ -79,12 +135,9 @@ Skill 的后续版本更新对已完成初始化的项目没有影响。如需�
 
 ## 使用方式
 
-Skill 存在时，通过以下方式激活：
+Skill 存在时，通过 `/docs-governance` 显式命令激活。Skill 不在日常 AI 协作中自动介入。
 
-- **显式**：`/docs-governance`
-- **隐式**：自然语言描述意图，如「删除提交校验」「检查项目完整性」
-
-Skill 删除后，AI 读取项目中的 `doc-maintenance.md` 自行处理上述意图。
+Skill 删除后，AI 读取项目中的 `doc-maintenance.md` 自行处理所有维护意图。
 
 ## 参考引用
 
