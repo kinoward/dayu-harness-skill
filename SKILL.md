@@ -1,7 +1,10 @@
 ---
 name: docs-governance
 description: 帮助项目低成本接入 Harness Engineering 理念的一次性部署工具。将以 AGENTS.md 为根的渐进式披露治理体系部署到目标项目。仅通过 /docs-governance 显式命令激活。
-disable-model-invocation: true
+metadata:
+  invocation_policy: "explicit-command-only"
+  command: "/docs-governance"
+  compatible_agents: "agent-skills-common, claude-code, codex"
 ---
 
 # docs-governance
@@ -17,6 +20,8 @@ disable-model-invocation: true
 Skill 仅通过显式命令激活：用户输入 `/docs-governance`。
 
 Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的维护由 AI 读取项目中的 `doc-maintenance.md` 自行处理。
+
+为兼容 Claude、Codex 和通用 Agent Skills 客户端，canonical `SKILL.md` 不使用工具专属 frontmatter。具体适配策略见 [references/agent-compatibility.md](references/agent-compatibility.md)。
 
 ## 边界规则
 
@@ -127,6 +132,7 @@ Skill 目录中的其他文件按需加载：
 
 - **[AGENTS.md](AGENTS.md)**：Skill 自身渐进式披露入口，路由到各模块。
 - **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，提问内容以 `capabilities/*.json` 为准，包含融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
+- **[references/agent-compatibility.md](references/agent-compatibility.md)**：Claude、Codex 和通用 Agent Skills 客户端的兼容说明。需要安装、分发或调整触发策略时读取。
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），按用户选择部署到项目对应位置。

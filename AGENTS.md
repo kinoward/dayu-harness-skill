@@ -8,6 +8,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 
 - Skill 行为定义：[SKILL.md](SKILL.md)
 - 人类阅读概述：[README.md](README.md)
+- 跨 Agent 兼容说明：[references/agent-compatibility.md](references/agent-compatibility.md)
 
 ## 维护 Skill
 

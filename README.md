@@ -20,11 +20,15 @@
 ## 项目结构
 
 ```
-.claude/skills/docs-governance/
+docs-governance/
   README.md                 # 本文件
   SKILL.md                  # Skill 行为定义
   AGENTS.md                 # Skill 自身渐进式披露入口
   Q&A-TEMPLATE.md           # Q&A 参考模板
+  agents/
+    openai.yaml             # Codex UI 与触发策略元数据
+  references/
+    agent-compatibility.md  # Claude / Codex / 通用 Agent Skills 兼容说明
   capabilities/             # 治理能力 manifest（单一事实源）
 
   docs/                     # Skill 自身文档
@@ -122,19 +126,37 @@
 
 ### 安装
 
-仅在**项目级别**安装此 Skill，不要在全局安装：
+优先在**项目级别**安装此 Skill。若某个客户端只支持用户级 Skill 目录，完成目标项目部署后可删除该 Skill 目录。
+
+Claude Code：
 
 ```
 # 将整个 docs-governance/ 目录放到目标项目的 .claude/skills/ 下
 cp -r docs-governance/ <target-project>/.claude/skills/
 ```
 
+Codex：
+
+```
+# 使用 Codex 当前支持的 skills 目录；agents/openai.yaml 提供 Codex 适配元数据
+cp -r docs-governance/ <codex-skills-dir>/
+```
+
+通用 Agent Skills 客户端：
+
+```
+# 将整个目录作为一个 Skill 包安装，入口文件为 SKILL.md
+cp -r docs-governance/ <agent-skills-dir>/
+```
+
+兼容细节见 [references/agent-compatibility.md](references/agent-compatibility.md)。
+
 ### 删除
 
 初始化完成后，此 Skill 可**安全删除**：
 
 ```
-rm -rf .claude/skills/docs-governance/
+rm -rf <installed-skills-dir>/docs-governance/
 ```
 
 项目的治理体系（AGENTS.md + docs/ + 已安装的脚本资产）独立存在，不受 Skill 删除影响。`doc-maintenance.md` 包含所有维护所需的知识，AI 仅凭项目文档即可执行后续维护操作。

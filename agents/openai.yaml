@@ -1,0 +1,7 @@
+interface:
+  display_name: "Docs Governance"
+  short_description: "为项目部署 AGENTS 治理文档、维护脚本与自动化约束"
+  default_prompt: "Use $docs-governance to deploy or maintain the project governance system."
+
+policy:
+  allow_implicit_invocation: false
