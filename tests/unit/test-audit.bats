@@ -5,6 +5,7 @@ setup() {
     TEST_ROOT="${BATS_TEST_DIRNAME}/.tmp"
     mkdir -p "$TEST_ROOT"
     TEST_DIR="$(mktemp -d "$TEST_ROOT/audit.XXXXXX")"
+    REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 }
 
 teardown() {
@@ -61,4 +62,70 @@ teardown() {
 
     [[ "$output" =~ "docs/harness/sensors/scripts/audit.sh" ]]
     [[ "$output" =~ "docs/harness/sensors/scripts/AGENTS.md" ]]
+}
+
+@test "core-only scaffold passes optional-link checks" {
+    local project_dir="$TEST_DIR/core-only"
+    mkdir -p "$project_dir"
+
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    run bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$project_dir"
+    [ "$status" -eq 0 ]
+
+    run bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$project_dir"
+    [ "$status" -eq 0 ]
+}
+
+@test "check-consistency fails on non-optional broken AGENTS link" {
+    local project_dir="$TEST_DIR/broken-nonoptional"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [缺失的必选文档](docs/design-docs/does-not-exist.md)" >> "$project_dir/AGENTS.md"
+    run bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$project_dir"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.summary.failed >= 1'
+}
+
+@test "check-consistency fails on illegal optional marker" {
+    local project_dir="$TEST_DIR/broken-optional"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [缺失的可选文档](docs/design-docs/does-not-exist.md) 可选：unknown.capability" >> "$project_dir/AGENTS.md"
+    run bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$project_dir"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.summary.failed >= 1'
+}
+
+@test "audit.sh --json fails on non-optional broken root AGENTS link" {
+    local project_dir="$TEST_DIR/json-root-broken-nonoptional"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [缺失的必选文档](docs/design-docs/does-not-exist.md)" >> "$project_dir/AGENTS.md"
+
+    run bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$project_dir"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.summary.failed >= 1'
+    echo "$output" | jq -e '.results | any(.check == "AGENTS.md 链接: docs/design-docs/does-not-exist.md" and .status == "fail")'
+}
+
+@test "audit.sh --json fails on illegal optional marker in root AGENTS link" {
+    local project_dir="$TEST_DIR/json-root-illegal-optional"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [缺失的可选文档](docs/design-docs/does-not-exist.md) 可选：unknown.capability" >> "$project_dir/AGENTS.md"
+
+    run bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$project_dir"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.summary.failed >= 1'
+    echo "$output" | jq -e '.results | any(.check == "AGENTS.md 链接: docs/design-docs/does-not-exist.md" and .status == "fail" and (.detail | contains("可选 capability 未在白名单")))'
 }

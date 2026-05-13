@@ -2,6 +2,28 @@
 
 setup() {
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+    TARGET_AGENTS_FILES=(
+        "$REPO_ROOT/AGENTS.md"
+        "$REPO_ROOT/docs/AGENTS.md"
+        "$REPO_ROOT/templates/AGENTS.md"
+        "$REPO_ROOT/templates/docs/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/guides/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/sensors/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/sensors/reviews/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/sensors/scripts/AGENTS.md"
+        "$REPO_ROOT/templates/docs/exec-plans/AGENTS.md"
+        "$REPO_ROOT/templates/docs/exec-plans/active/AGENTS.md"
+        "$REPO_ROOT/templates/docs/exec-plans/completed/AGENTS.md"
+        "$REPO_ROOT/templates/docs/generated/AGENTS.md"
+        "$REPO_ROOT/templates/docs/design-docs/AGENTS.md"
+        "$REPO_ROOT/templates/docs/product-specs/AGENTS.md"
+        "$REPO_ROOT/templates/docs/archive/AGENTS.md"
+        "$REPO_ROOT/templates/docs/archive/product-specs/AGENTS.md"
+        "$REPO_ROOT/templates/docs/references/AGENTS.md"
+        "$REPO_ROOT/templates/docs/references/research/AGENTS.md"
+        "$REPO_ROOT/templates/docs/troubleshooting/AGENTS.md"
+    )
     WORK_ROOT="${BATS_TEST_DIRNAME}/.tmp"
     mkdir -p "$WORK_ROOT"
     WORK_DIR="${WORK_ROOT}/contract_$$"
@@ -81,6 +103,71 @@ write_file() {
 
 has_commit_msg_cjk_support() {
     command -v perl >/dev/null 2>&1
+}
+
+extract_allowed_capabilities() {
+    local script="$1"
+    sed -n '/^ALLOWED_OPTIONAL_CAPABILITIES=(/,/^)/p' "$script" \
+        | grep -oE '"[^"]+"' \
+        | tr -d '"'
+}
+
+extract_markdown_links() {
+    local file="$1"
+    awk '
+    {
+        line = $0
+        while (match(line, /\[[^]]+\]\([^)]*\)/)) {
+            raw = substr(line, RSTART, RLENGTH)
+            target = raw
+            sub(/^.*\(/, "", target)
+            sub(/\).*/, "", target)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", target)
+            print NR "\t" target "\t" $0
+            line = substr(line, RSTART + RLENGTH)
+        }
+    }' "$file"
+}
+
+extract_optional_capability() {
+    local line="$1"
+    local clean_line="${line//\`/}"
+    if [[ "$clean_line" =~ 可选[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
+        echo "${BASH_REMATCH[1]}"
+    fi
+}
+
+is_external_link() {
+    local path="$1"
+    case "$path" in
+        http://*|https://*|mailto:*|\#*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+resolve_relative_path() {
+    local base_dir="$1"
+    local target="$2"
+
+    target="${target%%#*}"
+    [ -z "$target" ] && { echo ""; return; }
+
+    case "$target" in
+        /*) target="${target#/}" ;;
+    esac
+
+    local combined="$target"
+    [ "$base_dir" != "." ] && combined="$base_dir/$target"
+
+    local resolved
+    resolved="$(python3 -c 'import os,sys; print(os.path.normpath(sys.argv[1]).replace("\\\\", "/"))' "$combined")"
+    resolved="${resolved#./}"
+
+    echo "$resolved"
 }
 
 @test "canonical SKILL.md uses Codex-compatible frontmatter" {
@@ -198,6 +285,153 @@ has_commit_msg_cjk_support() {
     [ -f "$target/.github/workflows/pr-lint.yml" ]
     [ -f "$target/.github/workflows/release-please.yml" ]
     [ ! -f "$target/commitlint.config.cjs" ]
+}
+
+@test "AGENTS.md uses directory index convention and non-target AGENTS keeps structure marker absent" {
+    local count=0
+
+    for file in "${TARGET_AGENTS_FILES[@]}"; do
+        if [ ! -f "$file" ]; then
+            echo "缺失目标 AGENTS 文件: $file"
+            return 1
+        fi
+        grep -q '^## 目录索引' "$file"
+        count=$((count + 1))
+    done
+    [ "$count" -eq 20 ]
+    ! rg -n '^## 目录结构' -g 'AGENTS.md' "$REPO_ROOT" > /dev/null 2>&1
+    ! grep -q '^## 目录索引' "$REPO_ROOT/tests/fixtures/messy-project/AGENTS.md"
+}
+
+@test "optional capability ids align with manifest and script allowlist" {
+    local expected="$WORK_DIR/expected_capabilities.txt"
+    local check_list="$WORK_DIR/check_allowed.txt"
+    local audit_list="$WORK_DIR/audit_allowed.txt"
+
+    jq -r 'select(.id != "core").id' "$REPO_ROOT/capabilities/"*.json | sort -u > "$expected"
+    extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" | sort -u > "$check_list"
+    extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" | sort -u > "$audit_list"
+
+    diff -u "$expected" "$check_list"
+    diff -u "$expected" "$audit_list"
+
+    is_allowed_capability() {
+        local capability="$1"
+        [ -z "$capability" ] && return 1
+        grep -Fxq "$capability" "$expected" 2>/dev/null
+    }
+
+    for file in "${TARGET_AGENTS_FILES[@]}"; do
+        while IFS=$'\t' read -r _line_no _target raw_line; do
+            raw_line="${raw_line-}"
+            opt="$(extract_optional_capability "$raw_line")"
+            [ -n "$opt" ] || continue
+            is_allowed_capability "$opt" || {
+                echo "非法可选能力 id: $opt in $file"
+                return 1
+            }
+        done < <(extract_markdown_links "$file")
+    done
+}
+
+@test "AGENTS markdown optional links must match capability boundaries" {
+    local path_capability_file="$WORK_DIR/path_capability.tsv"
+    : > "$path_capability_file"
+
+    lookup_capability() {
+        local target="$1"
+        awk -F'\t' -v target="$target" '$1 == target {print $2; exit}' "$path_capability_file"
+    }
+
+    lookup_capability_for_path() {
+        local target="$1"
+        local capability
+
+        capability="$(lookup_capability "$target")"
+        if [ -z "$capability" ]; then
+            if [ "${target%/}" = "$target" ]; then
+                capability="$(lookup_capability "$target/")"
+            else
+                capability="$(lookup_capability "${target%/}")"
+            fi
+        fi
+
+        echo "$capability"
+    }
+
+    for manifest in "$REPO_ROOT"/capabilities/*.json; do
+        cap_id="$(jq -r '.id' "$manifest")"
+        while IFS= read -r src_path; do
+            [ -z "$src_path" ] && continue
+            printf '%s\t%s\n' "$src_path" "$cap_id" >> "$path_capability_file"
+
+            dir_path="${src_path%/*}"
+            while [ -n "$dir_path" ] && [ "$dir_path" != "." ]; do
+                printf '%s\t%s\n' "$dir_path/" "$cap_id" >> "$path_capability_file"
+                if [[ "$dir_path" == */* ]]; then
+                    dir_path="${dir_path%/*}"
+                else
+                    break
+                fi
+            done
+        done < <(jq -r '.template_files[]?.src' "$manifest")
+    done
+
+    allowed_file="$WORK_DIR/check_allowed.txt"
+    extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" | sort -u > "$allowed_file"
+    is_allowed_capability() {
+        local capability="$1"
+        [ -z "$capability" ] && return 1
+        grep -Fxq "$capability" "$allowed_file" 2>/dev/null
+    }
+
+    for file in "${TARGET_AGENTS_FILES[@]}"; do
+        relative="${file#$REPO_ROOT/}"
+        base="${relative%/*}"
+        [ "$base" = "$relative" ] && base="."
+        current_capability="$(lookup_capability_for_path "$relative")"
+
+        while IFS=$'\t' read -r _line_no target raw_line; do
+            target="${target-}"
+            raw_line="${raw_line-}"
+            [ -z "$target" ] && continue
+            is_external_link "$target" && continue
+
+            resolved="$(resolve_relative_path "$base" "$target")"
+            [ -z "$resolved" ] && continue
+
+            optional_capability="$(extract_optional_capability "$raw_line")"
+            target_capability="$(lookup_capability_for_path "$resolved")"
+
+            if [ "$current_capability" = "core" ] && [ -n "$target_capability" ] && [ "$target_capability" != "core" ]; then
+                if [ -z "$optional_capability" ]; then
+                    echo "核心 AGENTS 指向非 core 能力时必须标可选: $relative 链接 $resolved，期望 $target_capability"
+                    return 1
+                fi
+                if [ "$optional_capability" != "$target_capability" ]; then
+                    echo "核心 AGENTS 的可选能力应匹配目标能力: $relative 链接 $resolved 标记 $optional_capability，期望 $target_capability"
+                    return 1
+                fi
+            fi
+
+            if [ -n "$current_capability" ] && [ "$current_capability" != "core" ] && [ -n "$target_capability" ] && [ "$target_capability" = "$current_capability" ] && [ -n "$optional_capability" ]; then
+                echo "同一 capability 内部 AGENTS 不应标可选: $relative 链接 $resolved"
+                return 1
+            fi
+
+            if [ ! -e "$REPO_ROOT/$resolved" ]; then
+                if [ -z "$optional_capability" ]; then
+                    echo "缺失可选标记导致断链: $relative -> $resolved"
+                    return 1
+                fi
+                if ! is_allowed_capability "$optional_capability"; then
+                    echo "非法可选 capability id: $optional_capability"
+                    return 1
+                fi
+
+            fi
+        done < <(extract_markdown_links "$file")
+    done
 }
 
 @test "all install-*.sh --check endpoints return JSON contract" {
