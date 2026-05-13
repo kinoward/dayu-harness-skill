@@ -2,7 +2,9 @@
 # diff-helper.sh 单元测试
 
 setup() {
-    TEST_DIR="$(mktemp -d)"
+    TEST_ROOT="${BATS_TEST_DIRNAME}/.tmp"
+    mkdir -p "$TEST_ROOT"
+    TEST_DIR="$(mktemp -d "$TEST_ROOT/diff-helper.XXXXXX")"
     F1="$TEST_DIR/file1.txt"
     F2="$TEST_DIR/file2.txt"
 }

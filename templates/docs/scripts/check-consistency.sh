@@ -240,9 +240,24 @@ run_c1() {
                 echo "$agents_file -> $link (目标不存在: $resolved)" >> "$C1_ISSUES_FILE"
             else
                 # 记录被引用路径（用于 C3）
-                echo "$resolved" >> "$REFERENCED_FILE"
+                echo "${resolved%/}" >> "$REFERENCED_FILE"
             fi
         done
+
+        # 记录 AGENTS.md 中用反引号声明的本地路径。可选 capability
+        # 目录在未部署时不能写成 markdown 链接，否则 core-only 项目会断链；
+        # 但如果这些路径实际存在，仍应计入 C3 引用，避免全量部署时误报孤儿。
+        grep -oE '`[^`]+`' "$PROJECT_ROOT/$agents_file" 2>/dev/null | \
+            sed 's/^`//;s/`$//' | while IFS= read -r code_path; do
+                [ -z "$code_path" ] && continue
+                resolved="$(resolve_relative_path "$base_dir" "$code_path")"
+                [ -z "$resolved" ] && continue
+
+                full_path="$PROJECT_ROOT/$resolved"
+                if [ -f "$full_path" ] || [ -d "$full_path" ]; then
+                    echo "${resolved%/}" >> "$REFERENCED_FILE"
+                fi
+            done
     done
 
     # 去重引用文件

@@ -1,0 +1,23 @@
+# scripts/AGENTS.md
+
+本目录包含文档治理体系的维护脚本。脚本负责确定性检查和结构化输出，AI 负责解释结果并与用户确认。
+
+## 目录结构
+
+```
+scripts/
+├── AGENTS.md              # 你正在读
+├── audit.sh               # 治理体系完整性诊断
+├── check-consistency.sh   # AGENTS 链接、索引、孤儿文件、一致性检查
+├── diff-helper.sh         # 变更差异与 merge plan 描述
+└── validate.sh            # 初始化或维护后的 smoke test
+```
+
+目录结构变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+
+## 下一步看什么
+
+- **检查治理体系完整性** → 运行 `audit.sh --json <project-root>`
+- **验证维护后状态** → 运行 `validate.sh --json <project-root>`
+- **检查 AGENTS 索引一致性** → 运行 `check-consistency.sh --json <project-root>`
+- **分析已有文件与模板差异** → 运行 `diff-helper.sh merge-plan <existing> <incoming>`

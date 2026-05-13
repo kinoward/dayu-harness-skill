@@ -162,6 +162,7 @@ fi
 # 4. 子目录 AGENTS.md 检查
 SUBDIRS=(
     "docs/practices"
+    "docs/scripts"
     "docs/decisions"
     "docs/troubleshooting"
     "docs/research"
@@ -215,7 +216,7 @@ else
 fi
 
 # docs/scripts/ 维护脚本
-for script in audit.sh validate.sh diff-helper.sh; do
+for script in audit.sh validate.sh diff-helper.sh check-consistency.sh; do
     if [ -f "$PROJECT_ROOT/docs/scripts/$script" ]; then
         if [ -x "$PROJECT_ROOT/docs/scripts/$script" ]; then
             record_result "docs/scripts/$script" "pass" "docs/scripts/$script 已安装且可执行"

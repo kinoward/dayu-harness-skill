@@ -126,6 +126,11 @@ has_commit_msg_cjk_support() {
     done < <(jq -r '.installer?.script // empty' "$REPO_ROOT"/capabilities/*.json)
 }
 
+@test "core capability deploys scripts AGENTS index" {
+    jq -e '.template_files[] | select(.src == "templates/docs/scripts/AGENTS.md" and .dst == "docs/scripts/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.acceptance | index("Maintenance scripts AGENTS index exists")' "$REPO_ROOT/capabilities/core.json"
+}
+
 @test "scaffold --dry-run default only includes core" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run
 
@@ -134,6 +139,7 @@ has_commit_msg_cjk_support() {
     echo "$output" | jq -e '.capability_count == 1'
     echo "$output" | jq -e '.capabilities | length == 1'
     echo "$output" | jq -e '.capabilities[0].id == "core"'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/scripts/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/practices/commit-guidelines.md")] | length == 0'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
 }
