@@ -3,6 +3,8 @@
 > **日期**: 2026-05-13
 > **实施状态**: 已完成
 
+> 范围说明：本文是 2026-05 优化记录，不是当前部署清单；是否部署以 `capabilities/*.json` 和 installer 行为为准。
+
 ## 用户确认的决策
 
 - **AGENTS.md 路由**：采用任务触发路由（task-trigger-based），与 youtube-translate-tools 一致

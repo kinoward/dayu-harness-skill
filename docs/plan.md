@@ -4,6 +4,8 @@
 
 从 youtube-translate-tools 提炼经验，构建一个完整的项目治理 Skill `docs-governance`。在当前项目中实现并验证，未来独立成 git 仓库分发。
 
+> 历史说明：本文保留早期设计追溯。当前行为以 `SKILL.md`、`README.md`、`capabilities/*.json` 为准；Skill 仅通过 `/docs-governance` 显式激活；自然语言维护意图由项目 AGENTS/doc-maintenance 体系处理；部署清单以 capability manifest 为单一事实源。
+
 **Skill 定位**：一次性引导工具。帮助项目建立自己的治理体系，初始化完成后作用大幅减少，可安全删除。项目治理体系的演化是内生的，不依赖外部 Skill。
 
 ## 核心设计原则
@@ -51,6 +53,8 @@ Skill 删除后：
 > 本文件是项目级权威入口。外部工具和模板（包括 docs-governance skill）仅作为创建和维护本体系的辅助参考。如发生冲突，以本文件及 docs/ 下的项目文档为准。
 
 ### 激活方式
+
+> 历史说明：本段中的隐式激活为早期设计，当前已废弃。
 
 以下激活方式仅在 Skill 存在时有效：
 

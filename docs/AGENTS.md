@@ -7,6 +7,7 @@ Skill 自身文档索引。
 > 触发时机：需要理解 Skill 架构决策、设计原理时读取
 
 - [plan.md](plan.md)：完整设计计划和架构文档
+- [optimization-2026-05.md](optimization-2026-05.md)：2026-05 优化记录和实施范围说明
 
 ## 约定
 
