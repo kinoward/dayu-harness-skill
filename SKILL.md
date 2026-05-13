@@ -1,6 +1,6 @@
 ---
 name: docs-governance
-description: 管理和维护项目治理体系的一次性引导工具。帮助建立以 AGENTS.md 为根的渐进式披露文档体系。仅通过 /docs-governance 显式命令激活。
+description: 帮助项目低成本接入 Harness Engineering 理念的一次性引导工具。建立以 AGENTS.md 为根的渐进式披露约束体系——仓库即记录系统、地图而非手册、机械化执行、智能体可读性、熵管理、人类掌舵。仅通过 /docs-governance 显式命令激活。
 disable-model-invocation: true
 ---
 
@@ -9,6 +9,8 @@ disable-model-invocation: true
 ## 定位
 
 本 Skill 是管理和维护项目治理体系的**一次性引导工具**。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。Skill 帮助创建和维护这套体系，但不替代或凌驾于它。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
+
+设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。部署的文档体系对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + doc-maintenance.md 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
 
 ## 激活条件
 

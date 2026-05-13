@@ -10,5 +10,5 @@
 - [testing-strategy.md](testing-strategy.md) — 测试策略（~60行）
 - [dev-hygiene.md](dev-hygiene.md) — 开发与测试纪律（~80行）
 - [code-review-checklist.md](code-review-checklist.md) — 代码 Review 自检清单（~30行）
-- [ai-collaboration.md](ai-collaboration.md) — AI 协作风格规约（~130行，含 Auto-Retry 约定、结构化输出消费模式）
+- [ai-collaboration.md](ai-collaboration.md) — AI 协作风格规约（~170行，含 Guides×Sensors 控制论框架、Auto-Retry 约定、结构化输出消费模式）
 - [git-language-policy.md](git-language-policy.md) — Git 与远程仓库语言规约（~110行，含 CJK 检测原理、双重校验、例外处理）

@@ -2,7 +2,44 @@
 
 > 触发时机：开始/继续任何由 AI 主导的实施任务时读取。规定「用户和 AI 各自做什么」以及「AI 在执行长任务时的默认行为」。
 
-## 1. 产品与技术的分工
+## 0. Guides × Sensors 控制论框架
+
+本文档的所有约束遵循「前馈约束 (Guides) + 反馈检查 (Sensors)」的控制论框架。
+
+### Guides — 前馈约束
+
+在行动**前**塑造智能体行为。AI 读取后即生效，不需要额外检查步骤。
+
+| Guide | 形式 | 生效时机 |
+|-------|------|---------|
+| AGENTS.md 路由 | 文档索引 | AI 接收任务时，按任务类型只加载相关文档 |
+| practices/ 规范文档 | 规则文档 | AI 执行具体操作前读取（如 commit 前读 commit-guidelines.md） |
+| pre-commit hook | 本地脚本 | `git commit` 时自动执行格式和语言校验 |
+| commit-msg hook | 本地脚本 | commit message 写入前校验 Conventional Commits 格式 |
+| PR 正文模板 | 结构化模板 | PR 创建时强制四段结构 |
+
+### Sensors — 反馈检查
+
+在行动**后**检测偏差。输出结构化报告，AI 按报告修复。
+
+| Sensor | 形式 | 触发时机 |
+|--------|------|---------|
+| audit.sh | 诊断脚本 | 手动或定期触发，检查治理体系完整性 |
+| validate.sh | 校验脚本 | 安装/修改约束后，检查配置正确性 |
+| pr-lint CI | GitHub Actions | PR 创建/修改时自动检查格式和水印 |
+| ESLint + Prettier | lint-staged | commit 前自动检查和格式化代码 |
+
+### 闭环
+
+```
+Guides 预防问题 → Sensors 发现偏差 → 修复 → 更新 Guides 防止复发
+```
+
+- Guides 失效（文档过时、规则遗漏）→ Sensors 检测到 → 按结构化输出中的建议修复
+- Sensors 无法检测的问题 → 人类在 review 中发现 → 编码为新的 Guide 或 Sensor
+- 每次修复都是一次品味的编码：人类判断 → 写入文档/lint → 自动应用于后续所有代码
+
+## 1. 产品与技术的分工（Guides 层）
 
 用户负责整体产品体验把控；技术决策由 AI 自主完成并落文档。
 
@@ -92,7 +129,7 @@ PR 创建后，主动按 PR body 的 `## Test plan` 清单逐条验证并汇报�
 
 PR 合并前，执行通过的条目在 PR body 把 `- [ ]` 改成 `- [x]`，让 PR 页面直观反映真实验证进度。
 
-## 3.1 结构化输出消费模式
+## 3.1 结构化输出消费模式（Sensors 消费协议）
 
 本项目的维护脚本（`audit.sh`、`validate.sh`、`diff-helper.sh`、`check-consistency.sh`）遵循统一的结构化输出协议。AI 调用时应：
 

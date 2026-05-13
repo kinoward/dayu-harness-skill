@@ -2,9 +2,11 @@
 
 帮助项目建立和维护渐进式披露的 AI 工程约束文档体系。
 
+设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)——人类设计约束，智能体写代码。这套文档体系将 HE 六大概念落地为可部署的工程工件。
+
 ## 功能概述
 
-本 Skill 是一个**一次性引导工具**，用于在项目中建立以 AGENTS.md 为根的渐进式披露文档体系。初始化完成后，Skill 的作用大幅减少，可安全删除——项目的治理体系已独立运行。
+本 Skill 是一个**一次性引导工具**，帮助项目低成本接入 Harness Engineering 理念。以 AGENTS.md 为根的渐进式披露文档体系，将 HE 六大概念——仓库即记录系统、地图而非手册、机械化执行、智能体可读性、熵管理、人类掌舵——落地为可部署、可验证的工程工件。初始化完成后，Skill 可安全删除——项目的约束体系已独立运行。
 
 核心能力：
 - **脚手架**：在新项目中从零建立 AGENTS.md + docs/ 文档体系
@@ -141,6 +143,8 @@ Skill 删除后，AI 读取项目中的 `doc-maintenance.md` 自行处理所有�
 
 ## 参考引用
 
+- [OpenAI — Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/) — 本 Skill 的设计哲学来源
+- [Martin Fowler — Harness Engineering](https://martinfowler.com/articles/harness-engineering.html) — Guides × Sensors 控制论框架
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md) — AGENTS.md 开放格式规范，本项目的文档体系根节点遵循此标准
 - [microsoft/skills](https://github.com/microsoft/skills) — 微软官方的 Skills、MCP servers、Agents.md 集合
 - [agent-sh/agnix](https://github.com/agent-sh/agnix) — AGENTS.md / CLAUDE.md / SKILL.md 的 linter 和 LSP，与诊断功能互补
