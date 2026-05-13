@@ -4,7 +4,7 @@
 
 ## 0. Guides × Sensors 控制论框架
 
-本文档的所有约束遵循「前馈约束 (Guides) + 反馈检查 (Sensors)」的控制论框架。
+本文档的所有约束遵循「前馈约束 (Guides) + 反馈检查 (Sensors)」的控制论框架。以下为典型项目中的 Guides 和 Sensors，实际以项目已安装的资产为准。
 
 ### Guides — 前馈约束
 

@@ -2,7 +2,7 @@
 
 帮助项目建立和维护渐进式披露的 AI 工程约束文档体系。
 
-设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)——人类设计约束，智能体写代码。这套文档体系将 HE 六大概念落地为可部署的工程工件。
+设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)——人类设计约束，智能体写代码。
 
 ## 功能概述
 

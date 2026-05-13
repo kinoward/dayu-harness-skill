@@ -1,6 +1,6 @@
 ---
 name: docs-governance
-description: 帮助项目低成本接入 Harness Engineering 理念的一次性引导工具。建立以 AGENTS.md 为根的渐进式披露约束体系——仓库即记录系统、地图而非手册、机械化执行、智能体可读性、熵管理、人类掌舵。仅通过 /docs-governance 显式命令激活。
+description: 帮助项目低成本接入 Harness Engineering 理念的一次性引导工具。建立以 AGENTS.md 为根的渐进式披露约束体系。仅通过 /docs-governance 显式命令激活。
 disable-model-invocation: true
 ---
 
