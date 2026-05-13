@@ -38,7 +38,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 1. 分析项目现状（读取文件结构、已有配置）
 2. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 连续提问（基于现状适配，不机械照搬）
 3. 展示确认汇总
-4. 用户确认后：调用 `scaffold.sh --dry-run` 预览变更 → 确认 → `scaffold.sh --apply` 复制启用的模板文档 + 安装联动的脚本资产 + 始终部署 `docs/scripts/` 维护脚本
+4. 用户确认后：调用 `scaffold.sh --dry-run --enable <capability ids>` 预览变更 → 确认策略 → `scaffold.sh --apply --enable <capability ids>` 复制启用的模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
 5. 执行 `validate.sh` smoke test
 
 ### 2. 诊断
@@ -115,14 +115,21 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 退出码：0=成功/无变更，1=检测到冲突/失败，2=脚本自身错误
 - LLM 不应自行解析原始 diff 或文件内容来替代脚本的结构化输出
 
+## 能力清单约定
+
+- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。
+- `core` 始终部署短根 `AGENTS.md`、`CLAUDE.md`、`docs/doc-maintenance.md` 与维护脚本；practice 文档、Git hooks、GitHub CI、release-please、知识库目录按 capability 启用。
+- Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
+
 ## 辅助文件
 
 Skill 目录中的其他文件按需加载：
 
 - **[AGENTS.md](AGENTS.md)**：Skill 自身渐进式披露入口，路由到各模块。
-- **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，包含 16 项治理约束描述（含 release-please 可选资产）、联动规则、融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
+- **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，提问内容以 `capabilities/*.json` 为准，包含融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
+- **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），按用户选择部署到项目对应位置。
-- **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + 7 个 install-*.sh），由各模式按需调用。
-- **[tests/](tests/)**：Skill 自身测试（bats 单元测试 + fixture 项目）。
+- **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + install-*.sh），由各模式按需调用。
+- **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。

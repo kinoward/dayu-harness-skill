@@ -9,7 +9,7 @@
 本 Skill 是一个**一次性引导工具**，帮助项目低成本接入 Harness Engineering 理念。以 AGENTS.md 为根的渐进式披露文档体系，将 HE 六大概念——仓库即记录系统、地图而非手册、机械化执行、智能体可读性、熵管理、人类掌舵——落地为可部署、可验证的工程工件。初始化完成后，Skill 可安全删除——项目的约束体系已独立运行。
 
 核心能力：
-- **脚手架**：在新项目中从零建立 AGENTS.md + docs/ 文档体系
+- **脚手架**：按 `core + capability modules` 在新项目中建立 AGENTS.md + docs/ 文档体系
 - **融合**：与已有文档体系合并，保留现有内容，补全缺失
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
@@ -25,6 +25,7 @@
   SKILL.md                  # Skill 行为定义
   AGENTS.md                 # Skill 自身渐进式披露入口
   Q&A-TEMPLATE.md           # Q&A 参考模板
+  capabilities/             # 治理能力 manifest（单一事实源）
 
   docs/                     # Skill 自身文档
     plan.md                 # 设计计划
@@ -37,7 +38,7 @@
     docs/
       AGENTS.md
       doc-maintenance.md
-      practices/            # 8 个工程规范
+      practices/            # 工程规范索引；具体文档按能力模块部署
         AGENTS.md
         ai-collaboration.md
         branch-and-release.md
@@ -81,7 +82,6 @@
       rulesets/
         protect-main.json
         protect-tags.json
-      rulesets.md
       release-please-config.json
       .release-please-manifest.json
       scripts/
@@ -111,6 +111,12 @@
     unit/                   # bats 单元测试
     fixtures/               # 5 个测试夹具项目
 ```
+
+## 依赖与测试（维护者）
+
+- 本 Skill 在目标项目中的运行与安装**不依赖** `bats`。
+- `tests/unit/` 是维护者专用测试套件，依赖 `bats`；该依赖为可选维护依赖，仅用于本仓库验证，不是 Skill 运行时依赖。
+- 部署到目标项目时不会安装或携带 `bats`，也不会携带测试目录。
 
 ## 安装与删除
 

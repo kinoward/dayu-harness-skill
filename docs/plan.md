@@ -79,7 +79,7 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
     docs/
       AGENTS.md
       doc-maintenance.md
-      practices/                    # [工程约束] 7 个工程规范
+      practices/                    # [工程约束] 工程规范（按能力模块部署）
         AGENTS.md
         commit-guidelines.md        # ~50行
         pr-guidelines.md            # ~100行
@@ -250,7 +250,7 @@ Q9: 「开发环境纪律」— 进程清理、资产保留、分层验证
 
 Q10: 「AI 协作风格」— 分工、自主执行、test plan 执行、review 自检、经验沉淀、汇报格式
      实施：文档约定
-     说明：核心模块，推荐所有项目启用
+     说明：可选能力，推荐 AI 经常参与实现的项目启用
 
 Q11: 「决策记录 (ADR)」— 架构决策的记录和索引
 
@@ -339,7 +339,7 @@ AI 读取 ai-collaboration.md 中的「经验沉淀」章节，自行判断何�
 4. 编写 `Q&A-TEMPLATE.md`（参考模板 + 适配说明）
 5. 创建 `templates/`（含优先级声明的 CLAUDE.md + 全部文档模板 + docs/scripts/ 维护脚本）
 6. 创建 `assets/` 全部脚本和配置
-7. 编写 `scripts/`（8 个初始化脚本）
+7. 编写 `scripts/`（初始化脚本）
 8. 编写 `tests/`（unit + 5 fixtures）
 9. 在 fixtures 上验证 5 个模式
 
@@ -393,7 +393,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 #### 2.2 安装脚本改造（scripts/）
 
-所有 7 个 `install-*.sh` + `scaffold.sh` 改为双模式：
+所有 `install-*.sh` + `scaffold.sh` 改为双模式：
 
 | 模式 | 标志 | 行为 |
 |------|------|------|
