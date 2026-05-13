@@ -35,7 +35,7 @@ jobs:
           TITLE="${{ github.event.pull_request.title }}"
           if echo "$TITLE" | grep -P "$CJK_RE"; then
             echo "ERROR: PR title contains CJK characters. Use English."
-            echo "See docs/practices/git-language-policy.md"
+            echo "See docs/harness/guides/git-language-policy.md"
             exit 1
           fi
 
@@ -52,7 +52,7 @@ jobs:
           fi
           if echo "$BODY" | grep -P "$CJK_RE"; then
             echo "ERROR: PR body contains CJK characters. Use English."
-            echo "See docs/practices/git-language-policy.md"
+            echo "See docs/harness/guides/git-language-policy.md"
             exit 1
           fi
 

@@ -5,8 +5,8 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/decisions/AGENTS.md","dst":"docs/decisions/AGENTS.md"},
-    {"src":"templates/docs/decisions/adr-template.md","dst":"docs/decisions/adr-template.md"}
+    {"src":"templates/docs/design-docs/AGENTS.md","dst":"docs/design-docs/AGENTS.md"},
+    {"src":"templates/docs/design-docs/adr-template.md","dst":"docs/design-docs/adr-template.md"}
   ],
   "asset_files": [],
   "installer": null,

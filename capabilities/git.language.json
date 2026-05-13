@@ -5,7 +5,7 @@
   "default": false,
   "dependencies": ["git.commit"],
   "template_files": [
-    {"src":"templates/docs/practices/git-language-policy.md","dst":"docs/practices/git-language-policy.md"}
+    {"src":"templates/docs/harness/guides/git-language-policy.md","dst":"docs/harness/guides/git-language-policy.md"}
   ],
   "asset_files": [],
   "installer": null,

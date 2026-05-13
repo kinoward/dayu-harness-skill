@@ -16,7 +16,7 @@ jobs:
           BODY="$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH")"
           if echo "$TITLE" | grep -P "$CJK_RE"; then
             echo "ERROR: Issue title contains CJK characters. Use English."
-            echo "See docs/practices/git-language-policy.md"
+            echo "See docs/harness/guides/git-language-policy.md"
             exit 1
           fi
           if echo "$BODY" | grep -q '<!-- skip-cjk-check -->'; then
@@ -25,6 +25,6 @@ jobs:
           fi
           if echo "$BODY" | grep -P "$CJK_RE"; then
             echo "ERROR: Issue body contains CJK characters. Use English."
-            echo "See docs/practices/git-language-policy.md"
+            echo "See docs/harness/guides/git-language-policy.md"
             exit 1
           fi

@@ -19,7 +19,7 @@ else
     if [ -n "$CJK_MATCHES" ]; then
         echo ""
         echo "ERROR: commit message contains CJK characters."
-        echo "Commit messages must be in English. See docs/practices/git-language-policy.md"
+        echo "Commit messages must be in English. See docs/harness/guides/git-language-policy.md"
         echo ""
         echo "Offending lines:"
         printf '%s\n' "$CJK_MATCHES"
@@ -36,7 +36,7 @@ if grep -qiE '^(Closes|Fixes|Resolves|Refs)[[:space:]]*#[0-9]+' "$COMMIT_MSG_FIL
     echo "allowed in individual commit messages."
     echo "Use them only in the PR body."
     echo ""
-    echo "See docs/practices/pr-guidelines.md"
+    echo "See docs/harness/guides/pr-guidelines.md"
     echo ""
     echo "Offending lines:"
     grep -inE '^(Closes|Fixes|Resolves|Refs)[[:space:]]*#[0-9]+' "$COMMIT_MSG_FILE"

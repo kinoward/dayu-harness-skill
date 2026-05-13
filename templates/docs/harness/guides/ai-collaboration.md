@@ -13,7 +13,7 @@
 | Guide | 形式 | 生效时机 |
 |-------|------|---------|
 | AGENTS.md 路由 | 文档索引 | AI 接收任务时，按任务类型只加载相关文档 |
-| practices/ 规范文档 | 规则文档 | AI 执行具体操作前读取（如 commit 前读 commit-guidelines.md） |
+| harness/guides/ 规范文档 | 规则文档 | AI 执行具体操作前读取（如 commit 前读 commit-guidelines.md） |
 | pre-commit hook | 本地脚本 | `git commit` 时自动执行格式和语言校验 |
 | commit-msg hook | 本地脚本 | commit message 写入前校验 Conventional Commits 格式 |
 | PR 正文模板 | 结构化模板 | PR 创建时强制四段结构 |
@@ -164,9 +164,9 @@ AI 在每次协作中产生的经验（决策、排障、研究），应在会�
 
 | 经验类型 | 沉淀位置 |
 |---------|---------|
-| 架构/技术决策 | `docs/decisions/` |
+| 架构/技术决策 | `docs/design-docs/` |
 | 问题排障 | `docs/troubleshooting/` |
-| 研究发现 | `docs/research/` |
-| 约束变更 | `docs/practices/` + AGENTS.md |
+| 研究发现 | `docs/references/research/` |
+| 约束变更 | `docs/harness/guides/` + AGENTS.md |
 
 项目是 AI 经验的唯一归纳场所，不应依赖全局记忆或外部系统。

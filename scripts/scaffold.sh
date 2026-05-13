@@ -7,7 +7,7 @@ set -eo pipefail
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MANIFEST_DIR="$SKILL_DIR/capabilities"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
-VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/scripts/validate.sh"
+VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/harness/sensors/scripts/validate.sh"
 
 MODE="prompt"
 TARGET=""

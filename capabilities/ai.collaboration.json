@@ -5,7 +5,7 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/practices/ai-collaboration.md","dst":"docs/practices/ai-collaboration.md"}
+    {"src":"templates/docs/harness/guides/ai-collaboration.md","dst":"docs/harness/guides/ai-collaboration.md"}
   ],
   "asset_files": [],
   "installer": null,

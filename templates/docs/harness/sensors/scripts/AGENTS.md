@@ -1,4 +1,4 @@
-# scripts/AGENTS.md
+# harness/sensors/scripts/AGENTS.md
 
 本目录包含文档治理体系的维护脚本。脚本负责确定性检查和结构化输出，AI 负责解释结果并与用户确认。
 
@@ -17,7 +17,7 @@ scripts/
 
 ## 下一步看什么
 
-- **检查治理体系完整性** → 运行 `audit.sh --json <project-root>`
-- **验证维护后状态** → 运行 `validate.sh --json <project-root>`
-- **检查 AGENTS 索引一致性** → 运行 `check-consistency.sh --json <project-root>`
-- **分析已有文件与模板差异** → 运行 `diff-helper.sh merge-plan <existing> <incoming>`
+- **检查治理体系完整性** → 运行 `docs/harness/sensors/scripts/audit.sh --json <project-root>`
+- **验证维护后状态** → 运行 `docs/harness/sensors/scripts/validate.sh --json <project-root>`
+- **检查 AGENTS 索引一致性** → 运行 `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`
+- **分析已有文件与模板差异** → 运行 `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>`

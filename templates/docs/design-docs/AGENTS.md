@@ -1,11 +1,11 @@
-# decisions/AGENTS.md
+# design-docs/AGENTS.md
 
-本目录包含架构决策记录（ADR）。每个 ADR 记录一个影响项目结构或技术方向的关键决策。
+本目录包含架构与设计决策记录。每个 ADR 记录一个影响项目结构或技术方向的关键决策。
 
 ## 目录结构
 
 ```
-decisions/
+design-docs/
 ├── AGENTS.md          # 你正在读
 ├── adr-template.md    # ADR 模板
 └── ADR-*.md           # 项目新增的决策记录

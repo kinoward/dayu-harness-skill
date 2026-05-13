@@ -5,8 +5,8 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/practices/dev-hygiene.md","dst":"docs/practices/dev-hygiene.md"},
-    {"src":"templates/docs/practices/testing-strategy.md","dst":"docs/practices/testing-strategy.md"}
+    {"src":"templates/docs/harness/guides/dev-hygiene.md","dst":"docs/harness/guides/dev-hygiene.md"},
+    {"src":"templates/docs/harness/guides/testing-strategy.md","dst":"docs/harness/guides/testing-strategy.md"}
   ],
   "asset_files": [
     {"src":"assets/eslint/eslint.config.js","dst":"eslint.config.js"},

@@ -5,8 +5,8 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/practices/pr-guidelines.md","dst":"docs/practices/pr-guidelines.md"},
-    {"src":"templates/docs/practices/code-review-checklist.md","dst":"docs/practices/code-review-checklist.md"}
+    {"src":"templates/docs/harness/guides/pr-guidelines.md","dst":"docs/harness/guides/pr-guidelines.md"},
+    {"src":"templates/docs/harness/sensors/reviews/code-review-checklist.md","dst":"docs/harness/sensors/reviews/code-review-checklist.md"}
   ],
   "asset_files": [
     {"src":"assets/github/workflows/pr-lint.yml","dst":".github/workflows/pr-lint.yml"},

@@ -1,4 +1,4 @@
-# research/AGENTS.md
+# references/research/AGENTS.md
 
 本目录是版本化研究院。产品研究、技术选型、设计原则等内容按版本化目录组织。
 

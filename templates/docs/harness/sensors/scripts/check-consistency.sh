@@ -363,7 +363,7 @@ run_c3() {
 
         # 检查是否被引用
         if ! grep -Fqx "$rel_path" "$REFERENCED_FILE" 2>/dev/null; then
-            # 也检查是否被作为目录引用（例如 docs/practices/ 而非 docs/practices/AGENTS.md）
+            # 也检查是否被作为目录引用（例如 docs/harness/guides/ 而非 docs/harness/guides/AGENTS.md）
             dir_part=$(dirname "$rel_path")
             if ! grep -Fqx "$dir_part" "$REFERENCED_FILE" 2>/dev/null; then
                 echo "$rel_path" >> "$C3_ISSUES_FILE"
@@ -408,9 +408,9 @@ run_c4() {
         done
     done
 
-    # 从 practices 文档中提取引用
-    if [ -d "$PROJECT_ROOT/docs/practices" ]; then
-        find "$PROJECT_ROOT/docs/practices" -name "*.md" -type f 2>/dev/null | while IFS= read -r practice_file; do
+    # 从 harness guide/review 文档中提取引用
+    if [ -d "$PROJECT_ROOT/docs/harness" ]; then
+        find "$PROJECT_ROOT/docs/harness/guides" "$PROJECT_ROOT/docs/harness/sensors/reviews" -name "*.md" -type f 2>/dev/null | while IFS= read -r practice_file; do
             [ -f "$practice_file" ] || continue
             rel="${practice_file#"$PROJECT_ROOT"/}"
             dir="$(dirname "$rel")"

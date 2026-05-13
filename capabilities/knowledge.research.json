@@ -5,7 +5,8 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/research/AGENTS.md","dst":"docs/research/AGENTS.md"}
+    {"src":"templates/docs/references/AGENTS.md","dst":"docs/references/AGENTS.md"},
+    {"src":"templates/docs/references/research/AGENTS.md","dst":"docs/references/research/AGENTS.md"}
   ],
   "asset_files": [],
   "installer": null,

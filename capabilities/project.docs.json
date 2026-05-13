@@ -1,16 +1,16 @@
 {
   "id": "project.docs",
-  "description": "Project-specific docs scaffold",
-  "description_nl": "Create project docs area for non-governance project content.",
+  "description": "Product specs and project context scaffold",
+  "description_nl": "Create product specs area for non-governance project content.",
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/project/AGENTS.md","dst":"docs/project/AGENTS.md"}
+    {"src":"templates/docs/product-specs/AGENTS.md","dst":"docs/product-specs/AGENTS.md"}
   ],
   "asset_files": [],
   "installer": null,
   "acceptance": [
-    "Project docs AGENTS exists"
+    "Product specs AGENTS exists"
   ],
-  "suggested_when": "Enable for repositories with durable project-specific documentation."
+  "suggested_when": "Enable for repositories with durable product specs or project-specific documentation."
 }

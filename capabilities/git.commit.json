@@ -5,7 +5,7 @@
   "default": false,
   "dependencies": ["core"],
   "template_files": [
-    {"src":"templates/docs/practices/commit-guidelines.md","dst":"docs/practices/commit-guidelines.md"}
+    {"src":"templates/docs/harness/guides/commit-guidelines.md","dst":"docs/harness/guides/commit-guidelines.md"}
   ],
   "asset_files": [
     {"src":"assets/commitlint/commitlint.config.cjs","dst":"commitlint.config.cjs"}

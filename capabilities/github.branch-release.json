@@ -5,7 +5,7 @@
   "default": false,
   "dependencies": ["core", "git.commit"],
   "template_files": [
-    {"src":"templates/docs/practices/branch-and-release.md","dst":"docs/practices/branch-and-release.md"}
+    {"src":"templates/docs/harness/guides/branch-and-release.md","dst":"docs/harness/guides/branch-and-release.md"}
   ],
   "asset_files": [
     {"src":"assets/github/rulesets/protect-main.json","dst":".github/rulesets/protect-main.json"},

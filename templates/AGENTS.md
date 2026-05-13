@@ -13,13 +13,13 @@
 ├── AGENTS.md                  # core：项目级任务路由入口
 ├── docs/
 │   ├── AGENTS.md              # core：docs 目录索引
-│   ├── doc-maintenance.md     # core：文档体系维护规范
-│   ├── practices/             # core 索引 + 可选工程实践文档
-│   ├── scripts/               # core：诊断、验证、差异、一致性脚本
-│   ├── decisions/             # 可选：ADR 决策记录
+│   ├── harness/               # core：规则、反馈检查、维护流程
+│   ├── design-docs/           # 可选：ADR 与设计决策
+│   ├── exec-plans/            # core：执行计划
+│   ├── generated/             # core：自动生成资料索引
+│   ├── product-specs/         # 可选：产品规格和项目上下文
+│   ├── references/            # 可选：外部资料和研究索引
 │   ├── troubleshooting/       # 可选：排障知识库
-│   ├── research/              # 可选：版本化研究
-│   ├── project/               # 可选：项目专属内容
 │   └── archive/               # 可选：历史归档
 ├── .husky/                    # 可选：本地 Git hooks
 ├── .github/                   # 可选：GitHub workflows、rulesets、辅助脚本
@@ -32,43 +32,46 @@
 
 - 项目总入口：本文件
 - docs 结构入口：[docs/AGENTS.md](docs/AGENTS.md)
-- practices 模块索引：[docs/practices/AGENTS.md](docs/practices/AGENTS.md)
-- 文档维护规范：[docs/doc-maintenance.md](docs/doc-maintenance.md)
+- harness 治理入口：[docs/harness/AGENTS.md](docs/harness/AGENTS.md)
+- guides 规则索引：[docs/harness/guides/AGENTS.md](docs/harness/guides/AGENTS.md)
+- sensors 检查索引：[docs/harness/sensors/AGENTS.md](docs/harness/sensors/AGENTS.md)
+- 文档维护规范：[docs/harness/maintenance.md](docs/harness/maintenance.md)
 
 ## 当你准备提交代码
 
 > 触发：每次 git commit 前或 hook 拒绝时
-- 若启用 `git.commit`，读取 `docs/practices/commit-guidelines.md`
-- 若启用 `git.language`，读取 `docs/practices/git-language-policy.md`
-- 若启用 `ai.collaboration`，读取 `docs/practices/ai-collaboration.md`
+- 若启用 `git.commit`，读取 `docs/harness/guides/commit-guidelines.md`
+- 若启用 `git.language`，读取 `docs/harness/guides/git-language-policy.md`
+- 若启用 `ai.collaboration`，读取 `docs/harness/guides/ai-collaboration.md`
 
 ## 当你准备创建或修改 PR
 
 > 触发：创建 PR、修正文案、CI 反馈失败
-- 若启用 `github.pr`，读取 `docs/practices/pr-guidelines.md`
+- 若启用 `github.pr`，读取 `docs/harness/guides/pr-guidelines.md`
 - 若启用 `github.pr`，按 `Summary / Implementation notes / Test plan` 写 PR body
 - 关闭 issue 使用 GitHub closing keyword trailer，例如 `Closes #123`
 
 ## 当你发布版本、审阅 PR、排查环境
 
 > 触发：分支发布、审阅变更、进程/端口问题
-- 若启用 `github.branch-release`，读取 `docs/practices/branch-and-release.md`
-- 若启用 `github.pr`，读取 `docs/practices/code-review-checklist.md`
-- 若启用 `quality.tooling`，读取 `docs/practices/dev-hygiene.md`
+- 若启用 `github.branch-release`，读取 `docs/harness/guides/branch-and-release.md`
+- 若启用 `github.pr`，读取 `docs/harness/sensors/reviews/code-review-checklist.md`
+- 若启用 `quality.tooling`，读取 `docs/harness/guides/dev-hygiene.md`
 
 ## 当你开始 AI 主导任务
 
 > 触发：AI 接手实现或执行
-- 若启用 `ai.collaboration`，读取 `docs/practices/ai-collaboration.md`
-- 若启用 `quality.tooling`，读取 `docs/practices/testing-strategy.md`
+- 若启用 `ai.collaboration`，读取 `docs/harness/guides/ai-collaboration.md`
+- 若启用 `quality.tooling`，读取 `docs/harness/guides/testing-strategy.md`
 
 ## 当你查阅知识库与项目上下文
 
 > 触发：理解背景、排障、技术选型、项目文案
-- 启用对应知识库模块后，进入 `docs/decisions/`、`docs/troubleshooting/`、`docs/research/`
-- 启用项目文档模块后，进入 `docs/project/` 或 `docs/archive/`
+- 启用对应知识库模块后，进入 `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/research/`
+- 启用项目文档模块后，进入 `docs/product-specs/` 或 `docs/archive/`
+- 自动生成资料进入 `docs/generated/`，确认后再沉淀到长期目录
 
 ## 当你维护文档与约束
 
 > 触发：新增、修改、删除文档
-- 先读 [docs/doc-maintenance.md](docs/doc-maintenance.md)
+- 先读 [docs/harness/maintenance.md](docs/harness/maintenance.md)

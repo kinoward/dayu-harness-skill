@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DIFF_HELPER="${SKILL_DIR}/templates/docs/scripts/diff-helper.sh"
+DIFF_HELPER="${SKILL_DIR}/templates/docs/harness/sensors/scripts/diff-helper.sh"
 
 # Parse mode
 MODE="default"

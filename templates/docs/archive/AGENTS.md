@@ -7,7 +7,7 @@
 ```
 archive/
 ├── AGENTS.md              # 你正在读
-└── project/               # 已归档的项目内容文档
+└── product-specs/         # 已归档的产品规格和项目内容
     └── AGENTS.md
 ```
 
@@ -15,10 +15,10 @@ archive/
 
 ## 子目录
 
-### [project/](project/AGENTS.md)
+### [product-specs/](product-specs/AGENTS.md)
 
-项目内容归档。已废弃的项目专属文档移入此处。
+产品规格和项目内容归档。已废弃的项目专属文档移入此处。
 
 <!-- 其它归档子目录由项目根据需要自行创建，例如： -->
-<!-- - decisions/ — 已废弃的 ADR -->
+<!-- - design-docs/ — 已废弃的 ADR -->
 <!-- - research/ — 已完成的研究 -->

@@ -124,8 +124,11 @@ if [ -f "$PROJECT_ROOT/AGENTS.md" ]; then
 
     # 使用 POSIX 兼容正则提取 docs/ 开头的链接（macOS 兼容，不用 grep -P）
     # 将提取的链接保存到临时文件以避免 bash 数组在 set -u 下的兼容性问题
-    _links_file="$PROJECT_ROOT/.docs-governance-audit-links.$$"
-    : > "$_links_file"
+    _tmp_dir="${TMPDIR:-/tmp}"
+    _links_file="$(mktemp "${_tmp_dir%/}/docs-governance-audit-links.XXXXXX" 2>/dev/null || mktemp "$PROJECT_ROOT/.docs-governance-audit-links.XXXXXX")" || {
+        echo "错误: 无法创建临时文件" >&2
+        exit 2
+    }
     trap 'rm -f "$_links_file"' EXIT
     grep -oE '\[[^]]+\]\(docs/[^)]+\)' "$PROJECT_ROOT/AGENTS.md" 2>/dev/null | \
         sed 's/.*](\(docs\/[^)]*\)).*/\1/' > "$_links_file" || true
@@ -161,13 +164,22 @@ fi
 
 # 4. 子目录 AGENTS.md 检查
 SUBDIRS=(
-    "docs/practices"
-    "docs/scripts"
-    "docs/decisions"
+    "docs/harness"
+    "docs/harness/guides"
+    "docs/harness/sensors"
+    "docs/harness/sensors/scripts"
+    "docs/harness/sensors/reviews"
+    "docs/exec-plans"
+    "docs/exec-plans/active"
+    "docs/exec-plans/completed"
+    "docs/generated"
+    "docs/design-docs"
     "docs/troubleshooting"
-    "docs/research"
-    "docs/project"
+    "docs/references"
+    "docs/references/research"
+    "docs/product-specs"
     "docs/archive"
+    "docs/archive/product-specs"
 )
 for dir in "${SUBDIRS[@]}"; do
     if [ -d "$PROJECT_ROOT/$dir" ]; then
@@ -215,19 +227,19 @@ else
     log_text "  - commitlint.config.cjs 未安装"
 fi
 
-# docs/scripts/ 维护脚本
+# docs/harness/sensors/scripts/ 维护脚本
 for script in audit.sh validate.sh diff-helper.sh check-consistency.sh; do
-    if [ -f "$PROJECT_ROOT/docs/scripts/$script" ]; then
-        if [ -x "$PROJECT_ROOT/docs/scripts/$script" ]; then
-            record_result "docs/scripts/$script" "pass" "docs/scripts/$script 已安装且可执行"
-            log_text "  ✓ docs/scripts/$script"
+    if [ -f "$PROJECT_ROOT/docs/harness/sensors/scripts/$script" ]; then
+        if [ -x "$PROJECT_ROOT/docs/harness/sensors/scripts/$script" ]; then
+            record_result "docs/harness/sensors/scripts/$script" "pass" "docs/harness/sensors/scripts/$script 已安装且可执行"
+            log_text "  ✓ docs/harness/sensors/scripts/$script"
         else
-            record_result "docs/scripts/$script" "warn" "docs/scripts/$script 已安装但不可执行"
-            log_text "  ⚠ docs/scripts/$script 已安装但不可执行"
+            record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script 已安装但不可执行"
+            log_text "  ⚠ docs/harness/sensors/scripts/$script 已安装但不可执行"
         fi
     else
-        record_result "docs/scripts/$script" "warn" "docs/scripts/$script 未安装"
-        log_text "  - docs/scripts/$script 未安装"
+        record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script 未安装"
+        log_text "  - docs/harness/sensors/scripts/$script 未安装"
     fi
 done
 

@@ -1,18 +1,18 @@
 {
   "id": "archive.project",
-  "description": "Project archive scaffold",
-  "description_nl": "Create archive project index for archived project records.",
+  "description": "Product specs archive scaffold",
+  "description_nl": "Create archive product-specs index for archived project records.",
   "default": false,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/archive/AGENTS.md","dst":"docs/archive/AGENTS.md"},
-    {"src":"templates/docs/archive/project/AGENTS.md","dst":"docs/archive/project/AGENTS.md"}
+    {"src":"templates/docs/archive/product-specs/AGENTS.md","dst":"docs/archive/product-specs/AGENTS.md"}
   ],
   "asset_files": [],
   "installer": null,
   "acceptance": [
     "Archive AGENTS exists",
-    "Archive project AGENTS exists"
+    "Archive product specs AGENTS exists"
   ],
   "suggested_when": "Enable when archived project artifacts need a fixed location."
 }

@@ -17,12 +17,12 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ## 能力清单与部署模型
 
-目标项目内的 `AGENTS.md`、`docs/`、`docs/scripts/` 与已部署 hook/CI/config 等资产是运行时权威；Skill 只作为初始化或升级这些文件的来源。
+目标项目内的 `AGENTS.md`、`docs/`、`docs/harness/sensors/scripts/` 与已部署 hook/CI/config 等资产是运行时权威；Skill 只作为初始化或升级这些文件的来源。
 
 目标项目通过能力清单（capability manifest）定义可用能力，并以 `core + module` 方式部署：
 
-- `core`：基础治理骨架（短根 AGENTS 路由、CLAUDE.md、doc-maintenance、维护脚本）
-- `module`：被部署到目标项目的可选治理能力模块（practice 文档、Git hooks、GitHub CI、release-please、知识库目录等）
+- `core`：基础治理骨架（短根 AGENTS 路由、CLAUDE.md、harness 入口、maintenance、维护脚本、exec-plans 索引）
+- `module`：被部署到目标项目的可选治理能力模块（guide 文档、Git hooks、GitHub CI、release-please、知识库目录等）
 
 联动组件是治理能力部署出的文件、hook、CI、脚本等。
 新增治理能力优先更新能力清单；未启用的治理能力不会在目标项目生效。
@@ -54,8 +54,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 | 方向 | 含义 | 目录 |
 |------|------|------|
-| **工程约束** | AI 读取的规则、经验和决策，跨项目可复用 | `practices/`、`decisions/`、`troubleshooting/`、`research/`、`scripts/`、各级 `AGENTS.md` |
-| **项目内容** | 项目强相关的产物，非 AI 规则 | `project/`、`archive/project/` |
+| **工程约束** | AI 读取的规则、经验和决策，跨项目可复用 | `harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/`、`harness/sensors/`、各级 `AGENTS.md` |
+| **项目内容** | 项目强相关的产物，非 AI 规则 | `product-specs/`、`archive/product-specs/` |
 
 工程约束文档描述 AI 应遵守的规范和积累的经验。项目内容文档是 AI 需要了解的上下文，但不是行为规范。
 
@@ -63,7 +63,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 新增约束
 
-1. 确定归属目录（practices/、decisions/、troubleshooting/ 或 research/）
+1. 确定归属目录（`harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/` 或 `product-specs/`）
 2. 创建文档文件（遵循本规范的语言和命名规则）
 3. 如需联动治理能力，更新能力清单并部署对应能力模块
 4. 更新该目录的 `AGENTS.md`，添加文件条目，并同步相关 `## 目录结构` 区块（含 `README.md`）
@@ -76,8 +76,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 2. 修改文档内容
 3. 如涉及脚本变更，同步更新对应脚本
 4. 如涉及索引变更（文件增删），更新对应 `AGENTS.md`，并同步受影响的 `## 目录结构` 区块
-5. 使用 `docs/scripts/diff-helper.sh` 生成变更描述（如可用），用户确认
-6. 执行 `docs/scripts/validate.sh` 验证（如可用）
+5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述（如可用），用户确认
+6. 执行 `docs/harness/sensors/scripts/validate.sh` 验证（如可用）
 
 ### 删除约束
 
@@ -94,7 +94,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 自动诊断
 
-优先执行 `docs/scripts/audit.sh`（如存在）。若不可用，AI 按以下检查清单手动逐项执行。
+优先执行 `docs/harness/sensors/scripts/audit.sh`（如存在）。若不可用，AI 按以下检查清单手动逐项执行。
 
 ### 检查清单
 
@@ -148,11 +148,11 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `knowledge.adr` | 决策记录 (ADR) | docs/decisions/ 目录 + 模板 | adr-template.md | 通用 |
-| `knowledge.troubleshooting` | 排障知识库 | docs/troubleshooting/ 目录 | — | 通用 |
-| `knowledge.research` | 版本化研究院 | docs/research/ 目录 | — | 有持续研究需求 |
-| `project.docs` | 项目专属文档 | docs/project/ 目录 | — | 有项目专属内容 |
-| `archive.project` | 历史归档 | docs/archive/ 目录 | — | 有已废弃的历史内容 |
+| `knowledge.adr` | 决策记录 (ADR) | `docs/design-docs/` 目录 + 模板 | adr-template.md | 通用 |
+| `knowledge.troubleshooting` | 排障知识库 | `docs/troubleshooting/` 目录 | — | 通用 |
+| `knowledge.research` | 版本化研究院 | `docs/references/research/` 目录 | — | 有持续研究需求 |
+| `project.docs` | 产品规格与项目上下文 | `docs/product-specs/` 目录 | — | 有项目专属内容 |
+| `archive.project` | 历史归档 | `docs/archive/` 目录 | — | 有已废弃的历史内容 |
 
 ### 文档与脚本联动关系
 
@@ -246,7 +246,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 - 文件名使用英文小写 + 连字符（如 `commit-guidelines.md`）
 - 版本化目录命名格式：`YYYY-MM-DD-vN`（如 `2026-04-17-v3`）
-- 中文文件名仅在 `project/` 和 `archive/project/` 下允许（项目内容文档可使用中文命名）
+- 中文文件名仅在 `product-specs/` 和 `archive/product-specs/` 下允许（项目内容文档可使用中文命名）
 
 ## 新增文档流程
 
