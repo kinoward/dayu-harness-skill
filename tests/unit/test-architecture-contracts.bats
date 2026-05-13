@@ -126,8 +126,14 @@ has_commit_msg_cjk_support() {
     done < <(jq -r '.installer?.script // empty' "$REPO_ROOT"/capabilities/*.json)
 }
 
-@test "core capability deploys scripts AGENTS index" {
-    jq -e '.template_files[] | select(.src == "templates/docs/scripts/AGENTS.md" and .dst == "docs/scripts/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+@test "core capability deploys harness indexes and scripts" {
+    jq -e '.template_files[] | select(.src == "templates/docs/harness/maintenance.md" and .dst == "docs/harness/maintenance.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/harness/AGENTS.md" and .dst == "docs/harness/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/harness/sensors/scripts/AGENTS.md" and .dst == "docs/harness/sensors/scripts/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/exec-plans/AGENTS.md" and .dst == "docs/exec-plans/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/generated/AGENTS.md" and .dst == "docs/generated/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.acceptance | index("Harness indexes exist")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.acceptance | index("Generated docs index exists")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.acceptance | index("Maintenance scripts AGENTS index exists")' "$REPO_ROOT/capabilities/core.json"
 }
 
@@ -139,8 +145,16 @@ has_commit_msg_cjk_support() {
     echo "$output" | jq -e '.capability_count == 1'
     echo "$output" | jq -e '.capabilities | length == 1'
     echo "$output" | jq -e '.capabilities[0].id == "core"'
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/scripts/AGENTS.md")] | length == 1'
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/practices/commit-guidelines.md")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/maintenance.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/AGENTS.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/AGENTS.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/AGENTS.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/generated/AGENTS.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/audit.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/check-consistency.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/diff-helper.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/validate.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/commit-guidelines.md")] | length == 0'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
 }
 
@@ -196,7 +210,7 @@ has_commit_msg_cjk_support() {
 }
 
 @test "audit --json returns expected schema" {
-    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/scripts/audit.sh" "$FIXTURE_EMPTY"
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$FIXTURE_EMPTY"
 
     [ "$status" -eq 1 ]
     echo "$output" | jq -e 'has("results") and has("summary") and has("description_nl")'
@@ -205,7 +219,7 @@ has_commit_msg_cjk_support() {
 }
 
 @test "validate --json returns expected schema" {
-    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/scripts/validate.sh" "$FIXTURE_EMPTY"
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$FIXTURE_EMPTY"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'has("checks") and ( .checks | type == "array" ) and has("summary") and has("description_nl")'
@@ -214,7 +228,7 @@ has_commit_msg_cjk_support() {
 }
 
 @test "check-consistency --json returns expected schema" {
-    run_with_wrapper bash "$REPO_ROOT/templates/docs/scripts/check-consistency.sh" --json "$FIXTURE_EMPTY"
+    run_with_wrapper bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$FIXTURE_EMPTY"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'has("checks") and ( .checks | type == "array" and length == 4 ) and has("summary") and has("description_nl")'
@@ -227,7 +241,7 @@ has_commit_msg_cjk_support() {
     echo "alpha" > "$existing"
     echo -e "alpha\nbeta" > "$incoming"
 
-    run_with_wrapper bash "$REPO_ROOT/templates/docs/scripts/diff-helper.sh" merge-plan "$existing" "$incoming"
+    run_with_wrapper bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/diff-helper.sh" merge-plan "$existing" "$incoming"
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "conflict" and .existing.exists == true and .diff.added == 1 and .diff.removed == 0'
 }
