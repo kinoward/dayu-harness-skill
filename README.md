@@ -160,6 +160,12 @@ Skill 删除后，AI 读取项目中的 `docs/harness/maintenance.md` 自行处�
 - `archive` 存放过时内容，避免 AI 误用旧规则。
 - 人负责定义方向和约束，AI 按路径读取、执行、接受检查、修正结果。
 
+## 与 Agent 记忆系统的关系
+
+本项目把仓库文档作为项目级长期记忆的单一事实源。应沉淀的是经过归纳的可复用结论，而不是完整聊天记录、临时假设或未确认方案。
+
+LangChain、LangGraph、向量库或 AI 产品内置 memory 可以用于运行时检索、跨会话偏好、会话恢复和上下文召回，但不能替代仓库内的 `AGENTS.md` 与 `docs/`。外部记忆系统中的有价值内容，应整理成 ADR、排障记录、研究记录或规则文档后回写项目，并通过 AGENTS.md 索引暴露给后续 Agent。
+
 ## 参考引用
 
 - [OpenAI — Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/) — 本 Skill 的设计哲学来源
