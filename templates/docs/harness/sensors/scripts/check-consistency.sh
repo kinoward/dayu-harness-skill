@@ -16,6 +16,20 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 PROJECT_ROOT="."
 JSON_MODE=false
+ALLOWED_OPTIONAL_CAPABILITIES=(
+    "ai.collaboration"
+    "archive.project"
+    "git.commit"
+    "git.language"
+    "github.branch-release"
+    "github.pr"
+    "github.release-please"
+    "knowledge.adr"
+    "knowledge.research"
+    "knowledge.troubleshooting"
+    "project.docs"
+    "quality.tooling"
+)
 
 for arg in "$@"; do
     case "$arg" in
@@ -85,15 +99,6 @@ trap cleanup EXIT
 # 工具函数
 # ---------------------------------------------------------------------------
 
-# 判断路径是否为外部链接（http, https, mailto, # 锚点）
-is_external_link() {
-    local path="$1"
-    case "$path" in
-        http://*|https://*|mailto:*|\#*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 # 解析相对路径：给定 AGENTS.md 所在目录和链接目标，返回相对于项目根的路径
 # 参数: $1 = AGENTS.md 所在目录（相对于项目根）, $2 = 链接目标
 resolve_relative_path() {
@@ -137,16 +142,59 @@ resolve_relative_path() {
     echo "$combined"
 }
 
-# 从文件中提取所有 markdown 链接目标
+# 从文件中提取所有 markdown 链接
 # 参数: $1 = 文件路径（绝对路径）
-# 输出: 每行一个链接目标
+# 输出: 每行 "line_number<TAB>target<TAB>raw_line"
 extract_markdown_links() {
     local file="$1"
     [ -f "$file" ] || return 0
 
-    grep -oE '\[[^]]*\]\([^)]*\)' "$file" 2>/dev/null | \
-        sed -E 's/\[[^]]*\]\(([^)]*)\)/\1/' | \
-        sed -E 's/^[[:space:]]*//;s/[[:space:]]*$//'
+    awk '
+    {
+        line = $0
+        while (match(line, /\[[^]]+\]\([^)]*\)/)) {
+            raw = substr(line, RSTART, RLENGTH)
+            target = raw
+            sub(/^.*\(/, "", target)
+            sub(/\).*/, "", target)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", target)
+            print NR "\t" target "\t" $0
+            line = substr(line, RSTART + RLENGTH)
+        }
+    }
+    ' "$file"
+}
+
+is_external_link() {
+    local path="$1"
+    case "$path" in
+        http://*|https://*|mailto:*|\#*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+is_allowed_optional_capability() {
+    local capability="$1"
+    local item
+    [ -z "$capability" ] && return 1
+
+    for item in "${ALLOWED_OPTIONAL_CAPABILITIES[@]}"; do
+        [ "$item" = "$capability" ] && return 0
+    done
+    return 1
+}
+
+extract_optional_capability() {
+    local raw_line="$1"
+    local capability=""
+    local clean_line
+
+    clean_line="${raw_line//\`/}"
+    if [[ "$clean_line" =~ 可选[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
+        capability="${BASH_REMATCH[1]}"
+    fi
+
+    printf '%s' "$capability"
 }
 
 # JSON 字符串转义
@@ -215,7 +263,10 @@ run_c1() {
 
         base_dir="$(dirname "$agents_file")"
 
-        extract_markdown_links "$PROJECT_ROOT/$agents_file" | while IFS= read -r link; do
+        extract_markdown_links "$PROJECT_ROOT/$agents_file" | while IFS=$'\t' read -r link_line link raw_line; do
+            link_line="${link_line-}"
+            link="${link-}"
+            raw_line="${raw_line-}"
             [ -z "$link" ] && continue
 
             # 跳过外部链接
@@ -237,16 +288,24 @@ run_c1() {
             fi
 
             if [ "$exists" = false ]; then
-                echo "$agents_file -> $link (目标不存在: $resolved)" >> "$C1_ISSUES_FILE"
+                optional_capability="$(extract_optional_capability "$raw_line")"
+                if [ -n "$optional_capability" ]; then
+                    if ! is_allowed_optional_capability "$optional_capability"; then
+                        echo "$agents_file:$link_line\t$resolved\t可选 capability 未在白名单: $optional_capability" >> "$C1_ISSUES_FILE"
+                    fi
+                else
+                    echo "$agents_file:$link_line\t$resolved\t目标不存在" >> "$C1_ISSUES_FILE"
+                fi
             else
                 # 记录被引用路径（用于 C3）
                 echo "${resolved%/}" >> "$REFERENCED_FILE"
             fi
         done
 
-        # 记录 AGENTS.md 中用反引号声明的本地路径。可选 capability
-        # 目录在未部署时不能写成 markdown 链接，否则 core-only 项目会断链；
-        # 但如果这些路径实际存在，仍应计入 C3 引用，避免全量部署时误报孤儿。
+        # 记录 AGENTS.md 中用反引号声明的本地路径。
+        # Core 索引允许链接可选 capability 入口，但必须带合法 capability id；
+        # 同时保留反引号路径用于通配/占位场景，便于孤儿检测。
+        # 若这些路径实际存在，仍应计入 C3 引用，避免全量部署时误报孤儿。
         grep -oE '`[^`]+`' "$PROJECT_ROOT/$agents_file" 2>/dev/null | \
             sed 's/^`//;s/`$//' | while IFS= read -r code_path; do
                 [ -z "$code_path" ] && continue
@@ -397,7 +456,7 @@ run_c4() {
         [ -f "$full_path" ] || continue
 
         base_dir="$(dirname "$agents_file")"
-        extract_markdown_links "$full_path" | while IFS= read -r link; do
+        extract_markdown_links "$full_path" | while IFS=$'\t' read -r _line_no link _raw; do
             [ -z "$link" ] && continue
             if is_external_link "$link"; then
                 continue
@@ -414,7 +473,7 @@ run_c4() {
             [ -f "$practice_file" ] || continue
             rel="${practice_file#"$PROJECT_ROOT"/}"
             dir="$(dirname "$rel")"
-            extract_markdown_links "$practice_file" | while IFS= read -r link; do
+            extract_markdown_links "$practice_file" | while IFS=$'\t' read -r _line_no link _raw; do
                 [ -z "$link" ] && continue
                 if is_external_link "$link"; then
                     continue

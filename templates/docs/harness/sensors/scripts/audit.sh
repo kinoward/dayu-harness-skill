@@ -7,6 +7,52 @@ set -euo pipefail
 
 JSON_MODE=false
 PROJECT_ROOT="."
+ALLOWED_OPTIONAL_CAPABILITIES=(
+    "ai.collaboration"
+    "archive.project"
+    "git.commit"
+    "git.language"
+    "github.branch-release"
+    "github.pr"
+    "github.release-please"
+    "knowledge.adr"
+    "knowledge.research"
+    "knowledge.troubleshooting"
+    "project.docs"
+    "quality.tooling"
+)
+
+is_allowed_optional_capability() {
+    local capability="$1"
+    local item
+    [ -z "$capability" ] && return 1
+
+    for item in "${ALLOWED_OPTIONAL_CAPABILITIES[@]}"; do
+        [ "$item" = "$capability" ] && return 0
+    done
+    return 1
+}
+
+extract_optional_capability() {
+    local raw_line="$1"
+    local capability=""
+    local clean_line
+
+    clean_line="${raw_line//\`/}"
+    if [[ "$clean_line" =~ 可选[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
+        capability="${BASH_REMATCH[1]}"
+    fi
+
+    printf '%s' "$capability"
+}
+
+is_external_link() {
+    local path="$1"
+    case "$path" in
+        http://*|https://*|mailto:*|\#*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
 
 # 解析参数
 while [ $# -gt 0 ]; do
@@ -48,6 +94,61 @@ json_escape() {
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
+}
+
+resolve_relative_path() {
+    local base_dir="$1"
+    local target="$2"
+
+    # 去掉 URL fragment
+    target="${target%%\#*}"
+
+    [ -z "$target" ] && { echo ""; return; }
+
+    case "$target" in
+        /*)
+            target="${target#/}"
+            ;;
+    esac
+
+    if [ -f "$PROJECT_ROOT/$target" ] || [ -d "$PROJECT_ROOT/$target" ]; then
+        echo "$target"
+        return
+    fi
+
+    local combined
+    if [ "$base_dir" = "." ]; then
+        combined="$target"
+    else
+        combined="$base_dir/$target"
+    fi
+
+    while echo "$combined" | grep -q '/\.\./\|/\.\.$\|/\./\|/\.$'; do
+        combined=$(echo "$combined" | sed 's|/\./|/|g; s|/\.$||')
+        combined=$(echo "$combined" | sed 's|/[^/]*/\.\./|/|g; s|/[^/]*/\.\.$||')
+    done
+
+    echo "$combined"
+}
+
+extract_markdown_links() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+
+    awk '
+    {
+        line = $0
+        while (match(line, /\[[^]]+\]\([^)]*\)/)) {
+            raw = substr(line, RSTART, RLENGTH)
+            target = raw
+            sub(/^.*\(/, "", target)
+            sub(/\).*/, "", target)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", target)
+            print NR "\t" target "\t" $0
+            line = substr(line, RSTART + RLENGTH)
+        }
+    }
+    ' "$file"
 }
 
 # ---- 检查结果记录 ----
@@ -122,32 +223,48 @@ if [ -f "$PROJECT_ROOT/AGENTS.md" ]; then
     record_result "AGENTS.md" "pass" "根 AGENTS.md 存在"
     log_text "  ✓ 根 AGENTS.md 存在"
 
-    # 使用 POSIX 兼容正则提取 docs/ 开头的链接（macOS 兼容，不用 grep -P）
-    # 将提取的链接保存到临时文件以避免 bash 数组在 set -u 下的兼容性问题
-    _tmp_dir="${TMPDIR:-/tmp}"
-    _links_file="$(mktemp "${_tmp_dir%/}/docs-governance-audit-links.XXXXXX" 2>/dev/null || mktemp "$PROJECT_ROOT/.docs-governance-audit-links.XXXXXX")" || {
-        echo "错误: 无法创建临时文件" >&2
-        exit 2
-    }
-    trap 'rm -f "$_links_file"' EXIT
-    grep -oE '\[[^]]+\]\(docs/[^)]+\)' "$PROJECT_ROOT/AGENTS.md" 2>/dev/null | \
-        sed 's/.*](\(docs\/[^)]*\)).*/\1/' > "$_links_file" || true
+    while IFS=$'\t' read -r _line_no raw_link raw_line; do
+        raw_link="${raw_link-}"
+        raw_line="${raw_line-}"
+        [ -z "$raw_link" ] && continue
 
-    if [ -s "$_links_file" ]; then
-        while IFS= read -r link; do
-            if [ -n "$link" ]; then
-                if [ -f "$PROJECT_ROOT/$link" ] || [ -d "$PROJECT_ROOT/$link" ]; then
-                    record_result "AGENTS.md 链接: $link" "pass" "链接有效: $link"
-                    log_text "    ✓ $link"
-                else
-                    record_result "AGENTS.md 链接: $link" "fail" "断链: $link"
-                    log_text "    ✗ 断链: $link"
-                fi
+        case "$raw_link" in
+            docs/*|./docs/*)
+                ;;
+            *)
+                continue
+                ;;
+        esac
+
+        if is_external_link "$raw_link"; then
+            continue
+        fi
+
+        link="$(resolve_relative_path "." "$raw_link")"
+        [ -z "$link" ] && continue
+        optional_capability="$(extract_optional_capability "$raw_line")"
+        exists=false
+        if [ -f "$PROJECT_ROOT/$link" ] || [ -d "$PROJECT_ROOT/$link" ]; then
+            exists=true
+            record_result "AGENTS.md 链接: ${raw_link}" "pass" "链接有效: ${raw_link}"
+            log_text "    ✓ ${raw_link}"
+            continue
+        fi
+
+        if [ -n "$optional_capability" ]; then
+            if is_allowed_optional_capability "$optional_capability"; then
+                record_result "AGENTS.md 链接: ${raw_link}" "pass" "可选能力未部署，跳过断链检查: ${raw_link}（${optional_capability}）"
+                log_text "    ✅ 可选能力未部署，跳过: ${raw_link} (${optional_capability})"
+            else
+                record_result "AGENTS.md 链接: ${raw_link}" "fail" "可选 capability 未在白名单: ${optional_capability}"
+                log_text "    ✗ 可选 capability 未在白名单: ${optional_capability} (${raw_link})"
             fi
-        done < "$_links_file"
-    fi
-    rm -f "$_links_file"
-    trap - EXIT
+            continue
+        fi
+
+        record_result "AGENTS.md 链接: ${raw_link}" "fail" "断链: ${raw_link}"
+        log_text "    ✗ 断链: ${raw_link}"
+    done < <(extract_markdown_links "$PROJECT_ROOT/AGENTS.md")
 else
     record_result "AGENTS.md" "fail" "根 AGENTS.md 不存在"
     log_text "  ✗ 根 AGENTS.md 不存在"
