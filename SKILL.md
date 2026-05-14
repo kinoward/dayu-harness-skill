@@ -15,6 +15,8 @@ metadata:
 
 被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + `docs/harness/maintenance.md` 是「熵管理」、ai-collaboration.md 是「人类掌舵，智能体执行」。
 
+直接把治理规则只做成 Skill，只能让某个 Agent 在当前环境中按规则工作，属于 Agent-centric 约束。docs-governance 的目标是 Project-centric：把长期规则、项目记忆和机械化反馈部署进目标仓库，使它们可版本化、可 review、可迁移，并且不依赖某个 Skill、会话或工具长期存在。
+
 ## 激活条件
 
 Skill 仅通过显式命令激活：用户输入 `/docs-governance`。

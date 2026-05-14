@@ -8,6 +8,8 @@
 
 本 Skill 是一个**一次性部署与维护工具**，不是治理体系本身。它负责把 Harness Engineering 理念落地为目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本。初始化完成后，Skill 可安全删除；真正持续生效的是已部署到项目内的治理体系。
 
+设计边界：直接把规则只做成 Skill，可以约束某个 Agent 在当前环境中的行为；但 Harness Engineering 更强调项目拥有自己的外部约束环境。docs-governance 因此只作为安装器、问答引导器和升级入口，最终权威必须落在目标项目内，让规则和反馈回路可版本化、可审查、可迁移、可执行。
+
 工具入口能力：
 - **脚手架**：按 `core + capability modules` 在新项目中建立 AGENTS.md + docs/ 文档体系
 - **融合**：与已有文档体系合并，保留现有内容，补全缺失
