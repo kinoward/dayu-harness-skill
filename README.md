@@ -5,16 +5,14 @@
 ### *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social)](https://github.com/kinoward/dayu-harness-skill/stargazers)
-[![AgentSkills](https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A)](https://agentskills.io)
-[![Harness Engineering](https://img.shields.io/badge/Harness-Engineering-0E7C86)](https://openai.com/zh-Hans-CN/index/harness-engineering/)
-[![Project Governance](https://img.shields.io/badge/Project-Governance-4B5D67)](docs/AGENTS.md)
-
-[![大禹治库](https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B)](SKILL.md)
 [![One-shot Deploy](https://img.shields.io/badge/One--shot-Deploy-6C5CE7)](scripts/scaffold.sh)
-[![Repo Native](https://img.shields.io/badge/Repo-Native-2563EB)](templates/)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet)](references/agent-compatibility.md)
-[![Codex](https://img.shields.io/badge/Codex-Skill-black)](agents/openai.yaml)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
+[![Stars](https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social)](https://github.com/kinoward/dayu-harness-skill/stargazers)
+
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet)](https://claude.ai/code)
+[![Hermes](https://img.shields.io/badge/Hermes-Skill-orange)](https://github.com/titanwings/colleague-skill)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-Skill-teal)](https://github.com/titanwings/colleague-skill)
+[![Codex](https://img.shields.io/badge/Codex-Skill-black)](https://github.com/titanwings/colleague-skill)
 
 <br>
 
