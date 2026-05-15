@@ -154,10 +154,6 @@ write_file() {
     printf '%s\n' "$@" > "$file"
 }
 
-has_commit_msg_cjk_support() {
-    command -v perl >/dev/null 2>&1
-}
-
 extract_allowed_capabilities() {
     local script="$1"
     sed -n '/^ALLOWED_OPTIONAL_CAPABILITIES=(/,/^)/p' "$script" \
@@ -239,6 +235,13 @@ expected_agents_h1() {
 
     if [[ "$relative" == templates/* ]]; then
         relative="${relative#templates/}"
+        echo "# ${relative}"
+        return
+    fi
+
+    if [[ "$relative" == .tmp/* ]]; then
+        relative="${relative#.tmp/}"
+        relative="${relative#*/*/}"
         echo "# ${relative}"
         return
     fi
@@ -326,8 +329,8 @@ expected_agents_h1() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capability_count == 12'
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","repo.language"]'
+    echo "$output" | jq -e '.capability_count == 11'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore"]'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/maintenance.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/AGENTS.md")] | length == 1'
@@ -341,7 +344,6 @@ expected_agents_h1() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/ai-execution.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/design-docs/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/repo-language-pr-lint.yml")] | length == 0'
 }
 
 @test "environment preflight check script has machine-readable contract" {
@@ -349,7 +351,7 @@ expected_agents_h1() {
         skip "ensure-environment.sh not available in this branch yet"
     fi
 
-    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$FIXTURE_EMPTY" --check --capabilities "core,git.hooks,git.commit-format,repo.language"
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$FIXTURE_EMPTY" --check --capabilities "core,git.hooks,git.commit-format"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'has("status") and has("items") and ( .items | type == "array" ) and has("summary") and has("description_nl")'
@@ -423,23 +425,40 @@ expected_agents_h1() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning","repo.language"]'
-    echo "$output" | jq -e '.capability_count == 15'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning"]'
+    echo "$output" | jq -e '.capability_count == 14'
 }
 
 @test "legacy capability ids and presets expand to new capability set" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,github.branch-release,quality.tooling,ai.collaboration,project.docs,archive.project
 
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning","repo.language"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning"]'
+    echo "$output" | jq -e '.capability_count == 15'
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.delivery
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","github.language","github.pr","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","repo.language"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","github.pr","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore"]'
+    echo "$output" | jq -e '.capability_count == 13'
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.standard
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","repo.language"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices"]'
+    echo "$output" | jq -e '.capability_count == 13'
+}
+
+@test "legacy language IDs are rejected as unknown capability" {
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,repo.language
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown capability 'repo.language'"* ]]
+
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.language
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown capability 'git.language'"* ]]
+
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.language
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown capability 'github.language'"* ]]
 }
 
 @test "split capabilities stay atomic in dry-run output" {
@@ -737,6 +756,79 @@ expected_agents_h1() {
     [[ "$output" == *"OK: PR body passes all structure checks."* ]]
 }
 
+@test "PR body validator accepts marker-only sections" {
+    local body_file="$WORK_DIR/pr-body-markers.md"
+    write_file "$body_file" \
+        "<!-- docs-governance:summary -->" \
+        "- adjust release notes and hook checks" \
+        "<!-- docs-governance:implementation-notes -->" \
+        "- [x] \`npm test\`" \
+        "<!-- docs-governance:test-plan -->" \
+        "- [x] \`npm run lint\`" \
+        "Closes #222"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: PR body passes all structure checks."* ]]
+}
+
+@test "PR body accepts English H2 followed by exact Test plan marker" {
+    local body_file="$WORK_DIR/pr-body-test-plan-h2-marker.md"
+    write_file "$body_file" \
+        "## Summary" \
+        "- adjust release notes and hook checks" \
+        "## Implementation notes" \
+        "- [x] \`npm test\`" \
+        "## Test plan" \
+        "<!-- docs-governance:test-plan -->" \
+        "- [ ] \`npm run lint\`" \
+        "Closes #654"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: PR body passes all structure checks."* ]]
+}
+
+@test "PR body validator preserves custom configured sections" {
+    local config_file="$WORK_DIR/pr-body-custom-sections.json"
+    local body_file="$WORK_DIR/pr-body-custom-sections.md"
+    write_file "$config_file" \
+        '{"sections":["## Summary","## Risks","## Test plan"]}'
+    write_file "$body_file" \
+        "## Summary" \
+        "- update docs" \
+        "## Risks" \
+        "- deployment watch needed" \
+        "## Test plan" \
+        "- [x] \`npm test\`" \
+        "Closes #444"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" --config "$config_file" < "$body_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: PR body passes all structure checks."* ]]
+}
+
+@test "PR body supports localized H2 plus markers and ignores non-test bullets after Test plan" {
+    local body_file="$WORK_DIR/pr-body-localized-boundary.md"
+    write_file "$body_file" \
+        "## 概要" \
+        "<!-- docs-governance:summary -->" \
+        "- adjust release notes and hook checks" \
+        "## 实施说明" \
+        "<!-- docs-governance:implementation-notes -->" \
+        "- [x] \`npm test\`" \
+        "## 测试计划" \
+        "<!-- docs-governance:test-plan -->" \
+        "- [ ] \`npm run lint\`" \
+        "## 风险" \
+        "- [ ] 需要和 release 负责人确认文案边界" \
+        "Closes #333"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: PR body passes all structure checks."* ]]
+}
+
 @test "PR body fails when Test plan section is missing" {
     local body_file="$WORK_DIR/pr-body-missing-test-plan.md"
     write_file "$body_file" \
@@ -792,41 +884,20 @@ expected_agents_h1() {
 
 @test "GitHub workflows do not shell-interpolate user-controlled PR or issue text" {
     ! rg -n '\$\{\{ github\.event\.(pull_request|issue)\.(title|body)' "$REPO_ROOT/assets/github/workflows"
-    grep -q 'jq -r' "$REPO_ROOT/assets/github/workflows/repo-language-pr-lint.yml"
-    grep -q 'jq -r' "$REPO_ROOT/assets/github/workflows/repo-language-issue-lint.yml"
 }
 
-@test "commit-msg hook honors skip-cjk-check marker" {
-    local target="$WORK_DIR/repo-language-skip"
+@test "commit-msg hook accepts Chinese commit messages" {
+    local target="$WORK_DIR/repo-commit-msg"
     mkdir -p "$target"
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=repo.language bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
     [ "$status" -eq 0 ]
 
-    local msg_file="$WORK_DIR/commit-msg-with-marker.txt"
+    local msg_file="$WORK_DIR/commit-msg-zh.txt"
     write_file "$msg_file" \
-        "feat: add commit message policy checks" \
-        "添加中文描述" \
-        "<!-- skip-cjk-check -->"
+        "feat: 支持中文提交信息"
 
     run bash -c 'cd "$1" && .husky/commit-msg "$2"' _ "$target" "$msg_file"
     [ "$status" -eq 0 ]
-}
-
-@test "commit-msg hook rejects CJK content when checker support is available" {
-    if ! has_commit_msg_cjk_support; then
-        skip "commit-msg CJK check requires perl support"
-    fi
-
-    local target="$WORK_DIR/repo-language-cjk"
-    mkdir -p "$target"
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=repo.language bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
-    [ "$status" -eq 0 ]
-
-    local msg_file="$WORK_DIR/commit-msg-cjk.txt"
-    write_file "$msg_file" "feat: 添加中文提交信息"
-
-    run bash -c 'cd "$1" && .husky/commit-msg "$2"' _ "$target" "$msg_file"
-    [ "$status" -eq 1 ]
 }
 
 @test "hook installer installs only selected capability snippets" {
@@ -839,7 +910,6 @@ expected_agents_h1() {
     [ ! -f "$target/.husky/pre-commit" ]
     [ ! -f "$target/.husky/pre-push" ]
     grep -q 'docs-governance:git.commit-format' "$target/.husky/commit-msg"
-    ! grep -q 'docs-governance:repo.language' "$target/.husky/commit-msg"
 }
 
 @test "pre-push snippets can share the same hook stdin" {

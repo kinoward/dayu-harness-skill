@@ -35,8 +35,8 @@
 这是对话回放式 E2E，不驱动真实聊天 UI。它将本次测试过程收束为可重复的 CI 验收：
 
 - 空项目：模拟用户用旧 id 追加质量能力，验证默认 Git/知识库能力与兼容展开后的新原子能力。
-- 已有项目：模拟用户在默认能力基础上追加 GitHub PR、GitHub 语言 workflow、分支保护、版本保护和质量工具，明确跳过 release-please，并确认 merge 既有 hook。
-- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg` CJK 拦截、`pre-push` main 分支保护和 release tag 保护。
+- 已有项目：模拟用户在默认能力基础上追加 GitHub PR、分支保护、版本保护和质量工具，明确跳过 release-please，并确认 merge 既有 hook。
+- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg`、`pre-push` main 分支保护和 release tag 保护。
 - 融合行为：验证已有项目中的 `CLAUDE.md`、根 `AGENTS.md` 断链和孤儿旧文档在用户确认后被修复并纳入渐进式文档索引。
 
 ## 运行方式
