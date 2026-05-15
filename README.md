@@ -128,9 +128,16 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 [github-prs-link]: https://github.com/kinoward/dayu-harness-skill/pulls
 [github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
-<a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors" target="_blank">
-  <img src="https://contrib.rocks/image?repo=kinoward/dayu-harness-skill" alt="Dayu Harness Skill contributors">
-</a>
+<table>
+  <tr>
+    <td align="center" width="96">
+      <a href="https://github.com/kinoward">
+        <img src="https://avatars.githubusercontent.com/kinoward?s=96" width="64" height="64" alt="kinoward"><br>
+        <sub><b>kinoward</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
   <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/kinoward/dayu-harness-skill?label=Contributors&color=0EA5E9"></a>
