@@ -1,70 +1,48 @@
 <div align="center">
 
-<h1>🌊 Dayu Harness Skill（大禹治库.skill）</h1>
+# 🌊 Dayu Harness Skill（大禹治库.skill）
 
-<p><strong><em>“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”</em></strong></p>
+### *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
 
-<p>
-  <a href="LICENSE"><img alt="许可证: MIT" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-MIT-2E8B57"></a>
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?label=Stars&amp;logo=github&amp;style=flat">
-  <img alt="AgentSkills Compatible" src="https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A">
-  <img alt="Harness Engineering" src="https://img.shields.io/badge/Harness-Engineering-0E7C86">
-  <img alt="Project Governance" src="https://img.shields.io/badge/Project-Governance-4B5D67">
-</p>
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social)](https://github.com/kinoward/dayu-harness-skill/stargazers)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A)](https://agentskills.io)
+[![Harness Engineering](https://img.shields.io/badge/Harness-Engineering-0E7C86)](https://openai.com/zh-Hans-CN/index/harness-engineering/)
+[![Project Governance](https://img.shields.io/badge/Project-Governance-4B5D67)](docs/AGENTS.md)
 
-<p>
-  <img alt="大禹治库 Skill" src="https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B">
-  <img alt="One-shot Deploy" src="https://img.shields.io/badge/One--shot-Deploy-6C5CE7">
-  <img alt="Repo Native" src="https://img.shields.io/badge/Repo-Native-2563EB">
-  <img alt="Claude Code Skill" src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet">
-  <img alt="Codex Skill" src="https://img.shields.io/badge/Codex-Skill-111827">
-</p>
+[![大禹治库](https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B)](SKILL.md)
+[![One-shot Deploy](https://img.shields.io/badge/One--shot-Deploy-6C5CE7)](scripts/scaffold.sh)
+[![Repo Native](https://img.shields.io/badge/Repo-Native-2563EB)](templates/)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet)](references/agent-compatibility.md)
+[![Codex](https://img.shields.io/badge/Codex-Skill-black)](agents/openai.yaml)
 
 <br>
 
-<table width="78%">
-  <tr>
-    <td align="left">
-      <strong>🤖 你的项目已经开始让智能体参与开发、审查、排障和文档维护？</strong><br>
-      <strong>📚 你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？</strong><br>
-      <strong>🧭 你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？</strong>
-    </td>
-  </tr>
+<table>
+<tr><td align="left">
+
+🤖 &nbsp;你的项目已经开始让智能体参与开发、审查、排障和文档维护？<br>
+📚 &nbsp;你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？<br>
+🧭 &nbsp;你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？
+
+</td></tr>
 </table>
 
-<br>
-
-<h3>✨ 这些，大禹治库都能解决。</h3>
-
-<p>
-  <strong>从一次性提示升级成仓库级治理体系</strong>，不再让规则只停留在某次对话里。
-</p>
-
-<p>
-  聊天记录 · PR 评论 · 团队口头约定 · 旧文档 · 排障经验，都可以被整理成可审查的项目资产。
-</p>
-
-<p>
-  <strong>地图、指南、检查脚本和自动化反馈</strong>各归其位，让项目自己知道怎么协作、怎么检查、怎么沉淀。
-</p>
+### ✨ 这些，大禹治库都能解决。
 
 <br>
 
-<p>
-  <a href="#前言">🧭 前言</a> ·
-  <a href="#一句话理解">⚡ 一句话理解</a> ·
-  <a href="#核心观念">🧱 核心观念</a> ·
-  <a href="#快速开始">🚀 快速开始</a> ·
-  <a href="#能力清单">📦 能力清单</a>
-</p>
+从 **一次性提示升级成仓库级治理体系**，不再让规则只停留在某次对话里。
 
-<p>
-  <a href="#工作模式">🛠️ 工作模式</a> ·
-  <a href="#生成内容">📚 生成内容</a> ·
-  <a href="#目录结构">🗂️ 目录结构</a> ·
-  <a href="#维护测试">✅ 维护测试</a> ·
-  <a href="#参考引用">🔗 参考引用</a>
-</p>
+聊天记录 · PR 评论 · 团队口头约定 · 旧文档 · 排障经验，都可以被整理成可审查的项目资产。
+
+**地图、指南、检查脚本和自动化反馈**各归其位，让项目自己知道怎么协作、怎么检查、怎么沉淀。
+
+<br>
+
+[🧭 前言](#前言) · [⚡ 一句话理解](#一句话理解) · [🧱 核心观念](#核心观念) · [🚀 快速开始](#快速开始) · [📦 能力清单](#能力清单)
+
+[🛠️ 工作模式](#工作模式) · [📚 生成内容](#生成内容) · [🗂️ 目录结构](#目录结构) · [✅ 维护测试](#维护测试) · [🔗 参考引用](#参考引用)
 
 </div>
 
