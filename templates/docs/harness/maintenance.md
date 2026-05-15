@@ -51,16 +51,19 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 详见 [链接](路径)。
 ```
 
-## 工程约束 vs 项目内容
+## docs 内容分类
 
-整个 docs/ 体系从目录层面区分两个方向：
+整个 docs/ 体系按用途区分内容类型，但仍保留当前物理目录结构，不拆分为 `project-docs/` 或 `ai-docs/`。
 
-| 方向 | 含义 | 目录 |
+| 类型 | 含义 | 目录 |
 |------|------|------|
-| **工程约束** | AI 读取的规则、经验和决策，跨项目可复用 | `harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/`、`harness/sensors/`、各级 `AGENTS.md` |
-| **项目内容** | 项目强相关的产物，非 AI 规则 | `product-specs/`、`archive/` |
+| **治理约束** | AI 与人类协作时必须遵守的行为规则、反馈检查和维护流程 | `harness/`、`harness/guides/`、`harness/sensors/`、各级 `AGENTS.md` |
+| **项目知识/经验** | 经过归纳的技术决策、排障经验和研究结论，用于后续理解和复用 | `design-docs/`、`troubleshooting/`、`references/research/` |
+| **项目内容** | 项目强相关的产品规格、项目背景和专属上下文，不直接作为行为规范 | `product-specs/` |
+| **执行与生成资料** | 任务执行计划、临时报告、草稿和批量生成资料 | `exec-plans/`、`generated/` |
+| **归档** | 已废弃或不再作为当前依据的历史资料 | `archive/` |
 
-工程约束文档描述 AI 应遵守的规范和积累的经验。项目内容文档是 AI 需要了解的上下文，但不是行为规范。
+治理约束描述「AI 应该怎么做」。项目知识/经验描述「项目为什么这样做、遇到问题如何处理」。项目内容描述「项目是什么、要实现什么、面向谁」。
 
 ## 项目记忆边界
 
@@ -76,7 +79,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 新增约束
 
-1. 确定归属目录（`harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/` 或 `product-specs/`）
+1. 确定归属目录：行为规范进入 `harness/guides/`；架构/技术决策进入 `design-docs/`；排障经验进入 `troubleshooting/`；研究结论进入 `references/research/`；产品规格和项目上下文进入 `product-specs/`
 2. 创建文档文件（遵循本规范的目录和命名规则）
 3. 如需联动治理能力，更新能力清单并部署对应能力模块
 4. 更新该目录的 `AGENTS.md`，添加文件条目，并同步相关 `## 目录索引` 区块（含 `README.md` 的 `## 目录结构`）
@@ -270,10 +273,10 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 - 文件名使用英文小写 + 连字符（如 `commit-guidelines.md`）
 - 版本化目录命名格式：`YYYY-MM-DD-vN`（如 `2026-04-17-v3`）
-- 中文文件名仅在 `product-specs/` 和 `archive/product-specs/` 下允许（项目内容文档可使用中文命名）
+- 中文文件名仅在 `product-specs/` 和 `archive/product-specs/` 下允许（产品规格和项目上下文文档可使用中文命名）
 
 ## 新增文档流程
 
-1. 在目标目录下创建 `.md` 文件（工程约束用英文命名，项目内容可用中文命名）
+1. 在目标目录下创建 `.md` 文件（治理约束和项目知识/经验默认使用英文命名，产品规格和项目上下文可使用中文命名）
 2. 更新该目录的 `AGENTS.md`，添加文件条目，并同步该目录的 `## 目录索引` 区块
 3. 如果是新建子目录，同时创建该子目录的 `AGENTS.md`，在父级 `AGENTS.md` 中添加子目录入口，并同步所有受影响的 `## 目录索引` 区块（及 `README.md` 的 `## 目录结构`）
