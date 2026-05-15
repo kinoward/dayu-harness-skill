@@ -651,17 +651,29 @@ expected_agents_h1() {
     done
 }
 
-@test "all install-*.sh --check endpoints return JSON contract" {
-    for script in "$REPO_ROOT"/scripts/install-*.sh; do
-        if [ "$(basename "$script")" = "install-husky.sh" ]; then
-            run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$script" "$FIXTURE_EMPTY" --check
+@test "all manifest installer scripts --check endpoints return JSON contract" {
+    local installer_scripts
+    installer_scripts="$(jq -r 'select(.installer.script != null) | .installer.script' "$REPO_ROOT/capabilities/"*.json | sort -u)"
+    while IFS= read -r installer_script; do
+        [ -z "$installer_script" ] && continue
+        local script="$REPO_ROOT/scripts/$installer_script"
+        local capability
+        capability="$(jq -r --arg script "$installer_script" 'select(.installer.script == $script) | .id' "$REPO_ROOT/capabilities/"*.json | head -n 1)"
+
+        if [ ! -f "$script" ]; then
+            echo "Manifest 引用的 installer 缺失：$installer_script"
+            return 1
+        fi
+
+        if [ "$installer_script" = "install-husky.sh" ]; then
+            run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY="${capability:-git.commit-format}" bash "$script" "$FIXTURE_EMPTY" --check
         else
             run_with_wrapper bash "$script" "$FIXTURE_EMPTY" --check
         fi
         [ "$status" -eq 0 ]
         echo "$output" | jq -e 'has("status") and (has("items") and (.items | type == "array") and has("summary") and has("description_nl"))'
         echo "$output" | jq -e '.status == "clean"'
-    done
+    done <<< "$installer_scripts"
 }
 
 @test "install-husky requires an explicit capability selection" {
