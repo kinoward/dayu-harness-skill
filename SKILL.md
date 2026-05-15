@@ -15,7 +15,7 @@ metadata:
 
 被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + `docs/harness/maintenance.md` 是「熵管理」、ai-execution.md + ai-memory.md 是「人类掌舵，智能体执行，并把经验沉淀回项目」。
 
-直接把治理规则只做成 Skill，只能让某个 Agent 在当前环境中按规则工作，属于 Agent-centric 约束。docs-governance 的目标是 Project-centric：把长期规则、项目记忆和机械化反馈部署进目标仓库，使它们可版本化、可 review、可迁移，并且不依赖某个 Skill、会话或工具长期存在。
+直接把治理规则只做成 Skill，只能让某个 Agent 在当前环境中按规则工作，属于 Agent-centric 约束。docs-governance 的目标是 Project-centric：把长期规则、项目知识/经验和机械化反馈部署进目标仓库，使它们可版本化、可 review、可迁移，并且不依赖某个 Skill、会话或工具长期存在。
 
 ## 激活条件
 
@@ -110,23 +110,24 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 - 检查发现需要用户取舍的问题：说明影响，用自然语言询问用户选择，不输出大段原始日志。
 - 未启用的能力出现 skip 或可选缺失时，不作为失败汇报，只说明这次没有安装相关内容。
 
-## 部署后的经验沉淀约定
+## 部署后的项目知识/经验沉淀约定
 
-该约定会写入目标项目的 `ai-memory.md`。每次 AI 协作会话中，如产生可复用的经验，主动建议沉淀到对应位置：
+该约定会写入目标项目的 `ai-memory.md`。每次 AI 协作会话中，如产生可复用的项目知识、经验或上下文，主动建议沉淀到对应位置：
 
-| 经验类型 | 沉淀位置 |
+| 类型 | 沉淀位置 |
 |---------|---------|
 | 架构/技术决策 | `docs/design-docs/` |
 | 问题排障 | `docs/troubleshooting/` |
 | 研究发现 | `docs/references/research/` |
 | 约束变更 | `docs/harness/guides/` + AGENTS.md |
+| 项目背景和产品上下文 | `docs/product-specs/` |
 
-写入目标项目后，该约定确保 Skill 删除后 AI 仍能自主沉淀经验。
+写入目标项目后，该约定确保 Skill 删除后 AI 仍能自主沉淀项目知识/经验。
 
 沉淀边界：
 - 只沉淀经过归纳的可复用结论，不把完整对话记录、临时假设、未确认方案或敏感信息写入长期目录。
 - 目标项目中的 `AGENTS.md` 与 `docs/` 是项目级长期记忆的单一事实源；外部 Agent memory、LangChain/LangGraph store、向量库或产品内置记忆只能作为检索缓存或运行时辅助，不作为权威规则来源。
-- 外部记忆系统产生的有价值经验，必须整理成决策、排障、研究或约束文档后回写项目，并同步对应 `AGENTS.md` 索引。
+- 外部记忆系统产生的有价值内容，必须整理成决策、排障、研究、项目上下文或约束文档后回写项目，并同步对应 `AGENTS.md` 索引。
 
 ## 部署策略
 

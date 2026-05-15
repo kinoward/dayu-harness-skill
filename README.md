@@ -45,7 +45,9 @@ docs-governance/
 
 ### 部署到目标项目后的结构
 
-目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、知识库和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
+目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、项目知识/经验和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
+
+`docs/` 保持单一入口，但内容语义分层：`harness/` 是治理约束和反馈系统；`design-docs/`、`troubleshooting/`、`references/research/` 是项目知识/经验；`product-specs/` 是项目内容；`exec-plans/` 与 `generated/` 承载执行过程和临时生成资料；`archive/` 保存历史资料。
 
 ```
 <target-project>/
@@ -78,17 +80,17 @@ docs-governance/
 │   │       └── reviews/
 │   │           ├── AGENTS.md
 │   │           └── code-review-checklist.md  # optional：github.pr
-│   ├── design-docs/                  # default：knowledge.adr
+│   ├── design-docs/                  # default：项目知识/经验：ADR
 │   ├── exec-plans/                   # core：执行计划
 │   │   ├── AGENTS.md
 │   │   ├── active/AGENTS.md
 │   │   └── completed/AGENTS.md
 │   ├── generated/                    # core：自动生成资料索引
 │   │   └── AGENTS.md
-│   ├── product-specs/                # default：project.context
-│   ├── references/                   # default：knowledge.research
+│   ├── product-specs/                # default：项目内容和项目上下文
+│   ├── references/                   # default：项目知识/经验：外部资料和研究
 │   │   └── research/
-│   ├── troubleshooting/              # default：knowledge.troubleshooting
+│   ├── troubleshooting/              # default：项目知识/经验：排障知识库
 │   └── archive/                      # default：knowledge.archive
 ├── .husky/                           # default：git.hooks + hook-backed Git capabilities
 ├── .github/                          # optional：github.pr / github.branch-protection / release.versioning / github.release-please
@@ -170,8 +172,10 @@ Skill 删除后，AI 读取项目中的 `docs/harness/maintenance.md` 自行处�
 
 - `harness/guides` 是 AI 做事前看的规则卡片，例如提交代码、写 PR、测试。
 - `harness/sensors` 是检查设备，例如脚本、hook、CI、review checklist，会在 AI 做完后发现问题。
-- `design-docs`、`exec-plans`、`product-specs`、`references` 是项目记忆，帮助 AI 下次接手时知道背景和进度。
-- `archive` 存放过时内容，避免 AI 误用旧规则。
+- `design-docs`、`troubleshooting`、`references/research` 是项目知识/经验，记录决策、排障和研究结论。
+- `product-specs` 是项目内容，说明项目是什么、要实现什么、面向谁。
+- `exec-plans` 和 `generated` 存放执行计划、进度和临时生成资料。
+- `archive` 存放过时内容，避免 AI 误用旧规则或旧上下文。
 - 人负责定义方向和约束，AI 按路径读取、执行、接受检查、修正结果。
 
 ## 与 Agent 记忆系统的关系

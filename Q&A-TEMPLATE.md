@@ -65,12 +65,12 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 | `git.commit-format` | 每次提交必须可追溯、可自动审查，减少后续 review 与回溯成本。 | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
 | `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 按 universal / Node.js / Python 模板检测并 merge。 | Git 项目；已有 `.gitignore` 走 merge plan |
 | `ai.execution` | AI 执行方式、自动重试和汇报规则必须沉淀到项目文档中。 | 部署 AI 执行实践文档。 | 默认启用 |
-| `ai.memory` | 项目长期记忆边界和经验沉淀规则必须写入仓库。 | 部署 AI 记忆边界文档并将 `AGENTS.md` 作为长期记忆锚点。 | 默认启用 |
-| `knowledge.adr` | 必须有稳定的决策记录位点，避免关键架构讨论只留在会话里。 | 部署 ADR 目录与模板。 | 默认启用 |
-| `knowledge.troubleshooting` | 故障处理经验必须可复用、可检索。 | 部署排障目录与入口说明。 | 默认启用 |
-| `knowledge.research` | 研究结论必须可版本化沉淀，避免重复探索。 | 部署版本化研究目录。 | 默认启用 |
-| `project.context` | 必须搭好产品规格与项目上下文文档区，避免需求与实现反复漂移。 | 部署项目文档骨架（产品规格入口）。 | 默认启用 |
-| `knowledge.archive` | 必须有统一归档入口，减少当前上下文被历史信息淹没。 | 部署历史档案区与索引。 | 默认启用 |
+| `ai.memory` | 项目长期知识/经验的边界和沉淀规则必须写入仓库。 | 部署 AI 记忆边界文档，并将 `AGENTS.md` 与 `docs/` 作为长期知识/经验锚点。 | 默认启用 |
+| `knowledge.adr` | 必须有稳定的项目技术决策记录位点，避免关键架构讨论只留在会话里。 | 部署 ADR 目录与模板，作为项目知识/经验的一部分。 | 默认启用 |
+| `knowledge.troubleshooting` | 排障经验必须可复用、可检索。 | 部署排障目录与入口说明，作为项目知识/经验的一部分。 | 默认启用 |
+| `knowledge.research` | 研究结论必须可版本化沉淀，避免重复探索。 | 部署版本化研究目录，作为项目知识/经验的一部分。 | 默认启用 |
+| `project.context` | 必须搭好产品规格与项目上下文文档区，避免需求与实现反复漂移。 | 部署项目内容骨架（产品规格入口）。 | 默认启用 |
+| `knowledge.archive` | 必须有统一归档入口，减少当前上下文被历史信息淹没。 | 部署历史档案区与索引，存放过时的项目知识、项目内容或治理资料。 | 默认启用 |
 
 ## 可选治理能力提问清单
 
