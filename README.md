@@ -38,7 +38,7 @@
 
 <br>
 
-[🧭 前言](#前言) · [🚀 快速开始](#快速开始) · [🧩 使用方式](#使用方式) · [📦 会生成什么](#会生成什么) · [🔎 更多细节](#更多细节)
+[🧭 前言](#前言) · [🚀 快速开始与使用](#快速开始与使用) · [📦 会生成什么](#会生成什么) · [🔎 更多细节](#更多细节)
 
 [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
 
@@ -61,37 +61,86 @@ Dayu Harness Skill 面向 [Harness Engineering](https://openai.com/zh-Hans-CN/in
 - 团队希望 AI 协作经验能持续沉淀，而不是留在不可检索的聊天记录里。
 - 项目需要在 Claude Code、Codex 和通用 Agent Skills 客户端之间保持可迁移规则。
 
-## 快速开始
+## 快速开始与使用
 
-在目标项目目录安装（默认即为项目级安装，不会写入用户全局目录）：
+Dayu Harness Skill 建议只安装到需要治理的目标项目里，不做全局安装。它是一次性部署、融合、诊断和维护入口；使用完成后可以删除 Skill 目录，长期生效的是目标项目内写入的 `AGENTS.md`、`docs/`、hooks、CI 和检查脚本。
 
-推荐安装方式（Vercel `skills` CLI）：
+### Claude Code CLI
 
 ```bash
 cd <target-project>
-
-# 项目目录安装（默认作用域），不带 -g
-npx skills add kinoward/dayu-harness-skill --yes
+mkdir -p .claude/skills
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git .claude/skills/dayu-harness
 ```
 
-安装完成后在项目中运行：
+在该项目目录启动 Claude Code：
+
+```bash
+claude
+```
+
+然后在会话中输入 `/dayu-harness`。
+
+移除：
+
+```bash
+rm -rf .claude/skills/dayu-harness
+```
+
+### Codex
+
+```bash
+cd <target-project>
+mkdir -p .agents/skills
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git .agents/skills/dayu-harness
+```
+
+在该项目目录启动 Codex：
+
+```bash
+codex -C .
+```
+
+然后在会话中输入 `/dayu-harness`。
+
+移除：
+
+```bash
+rm -rf .agents/skills/dayu-harness
+```
+
+### Vercel skills CLI
+
+默认安装到项目目录；如果不加 `-a`，CLI 会根据已检测到的客户端提示选择目标目录。
+
+```bash
+cd <target-project>
+npx skills add kinoward/dayu-harness-skill
+```
+
+也可以明确指定目标客户端：
+
+```bash
+# Claude Code -> .claude/skills/
+npx skills add kinoward/dayu-harness-skill -a claude-code
+
+# Codex -> .agents/skills/
+npx skills add kinoward/dayu-harness-skill -a codex
+```
+
+安装完成后，在支持 Agent Skills 的客户端中打开该项目并调用：
 
 ```text
 /dayu-harness
 ```
 
-移除（可选）：
+移除：
 
 ```bash
-npx skills remove <skill-name>
+npx skills remove dayu-harness
 ```
 
-## 使用方式
-
-1. 在目标项目目录安装 Skill。
-2. 在该项目中运行 `/dayu-harness`。
-3. 按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。
-4. 根据 Skill 生成的计划确认变更；已有 hooks、CI、lint 和发布配置会先给出合并方案。
+运行 `/dayu-harness` 后，按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再给出变更计划；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
 
 ## 会生成什么
 

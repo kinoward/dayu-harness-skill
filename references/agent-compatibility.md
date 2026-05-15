@@ -6,7 +6,7 @@
 
 - **通用 Agent Skills 客户端**：读取 `SKILL.md` 的 `name`、`description`、`metadata` 和正文说明。
 - **Claude Code**：可将整个 `dayu-harness-skill/` 目录安装到目标项目的 `.claude/skills/dayu-harness/`。
-- **Codex**：读取 `SKILL.md`；Codex UI 和隐式触发策略由 `agents/openai.yaml` 提供。
+- **Codex**：可将整个 `dayu-harness-skill/` 目录安装到目标项目的 `.agents/skills/dayu-harness/`；Codex UI 和隐式触发策略由 `agents/openai.yaml` 提供。
 
 ## 触发策略
 
@@ -21,7 +21,7 @@ canonical `SKILL.md` 不再使用 `disable-model-invocation: true`，因为该�
 优先使用项目级安装，初始化或升级完成后可删除 Skill 目录。
 
 - Claude Code：`<target-project>/.claude/skills/dayu-harness/`
-- Codex：使用 Codex 当前支持的项目级或用户级 skills 目录；若只能放在用户级目录，完成目标项目部署后可删除。
+- Codex：`<target-project>/.agents/skills/dayu-harness/`
 - 其他客户端：将整个 `dayu-harness-skill/` 目录作为一个 Skill 包安装，入口文件为 `SKILL.md`。
 
 ## 与部署产物的关系
