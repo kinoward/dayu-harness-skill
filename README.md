@@ -1,30 +1,64 @@
-# Dayu Harness Skill
+<div align="center">
 
-> 大禹治库 Skill：把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。
+<h1>🌊 Dayu Harness Skill（大禹治库）</h1>
 
-[![许可证: MIT](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-MIT-2E8B57)](LICENSE)
-![大禹治库](https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B)
-![AgentSkills](https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A)
-![AGENTS.md](https://img.shields.io/badge/AGENTS.md-%E6%A0%B9%E7%B4%A2%E5%BC%95-4B5D67)
-![命令](https://img.shields.io/badge/%E5%91%BD%E4%BB%A4-%2Fdayu--harness-6C5CE7)
-![Harness Engineering](https://img.shields.io/badge/Harness-Engineering-0E7C86)
-![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet)
-![Codex](https://img.shields.io/badge/Codex-Skill-111827)
-![Bats](https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-Bats-1F6FEB)
+<p><strong><em>“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”</em></strong></p>
 
-**中文名：大禹治库 Skill** · **英文名：Dayu Harness Skill** · **项目目录：`dayu-harness-skill`** · **显式命令：`/dayu-harness`**
+<p>
+  <a href="LICENSE"><img alt="许可证: MIT" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-MIT-2E8B57"></a>
+  <img alt="大禹治库 Skill" src="https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B">
+  <img alt="AgentSkills Compatible" src="https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A">
+  <img alt="AGENTS.md 根索引" src="https://img.shields.io/badge/AGENTS.md-%E6%A0%B9%E7%B4%A2%E5%BC%95-4B5D67">
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social">
+</p>
 
-你的项目已经开始让智能体参与开发、审查、排障和文档维护？
+<p>
+  <img alt="命令 /dayu-harness" src="https://img.shields.io/badge/%E5%91%BD%E4%BB%A4-%2Fdayu--harness-6C5CE7">
+  <img alt="Harness Engineering" src="https://img.shields.io/badge/Harness-Engineering-0E7C86">
+  <img alt="Claude Code Skill" src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet">
+  <img alt="Codex Skill" src="https://img.shields.io/badge/Codex-Skill-111827">
+  <img alt="Bats tests" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-Bats-1F6FEB">
+</p>
 
-你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？
+<p>
+  <strong>中文名：</strong>大禹治库 Skill ·
+  <strong>英文名：</strong>Dayu Harness Skill ·
+  <strong>项目目录：</strong><code>dayu-harness-skill</code> ·
+  <strong>显式命令：</strong><code>/dayu-harness</code>
+</p>
 
-你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？
+<table>
+  <tr>
+    <td align="left">
+      🤖 你的项目已经开始让智能体参与开发、审查、排障和文档维护？<br>
+      📚 你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？<br>
+      🧭 你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？
+    </td>
+  </tr>
+</table>
 
-**大禹治库 Skill 不把规则堵在一次对话里，而是把它们疏导进仓库：地图、指南、检查脚本和自动化反馈各归其位。**
+<h3>✨ 大禹治库 Skill 不把规则堵在一次对话里，而是把它们疏导进仓库。</h3>
 
-项目现状 + `capabilities/*.json` + `/dayu-harness` -> `AGENTS.md` + `docs/harness` + hooks/CI + 检查脚本 + 长期知识目录
+<p>地图、指南、检查脚本和自动化反馈各归其位。</p>
 
-[一句话理解](#一句话理解) · [核心观念](#核心观念) · [快速开始](#快速开始) · [能力清单](#能力清单) · [工作模式](#工作模式) · [生成内容](#生成内容) · [目录结构](#目录结构) · [维护测试](#维护测试) · [参考引用](#参考引用)
+<p>
+  <strong>项目现状 + <code>capabilities/*.json</code> + <code>/dayu-harness</code> → <code>AGENTS.md</code> + <code>docs/harness</code> + hooks/CI + 检查脚本 + 长期知识目录</strong>
+</p>
+
+<p>
+  <a href="#前言">前言</a> ·
+  <a href="#一句话理解">一句话理解</a> ·
+  <a href="#核心观念">核心观念</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#能力清单">能力清单</a> ·
+  <a href="#工作模式">工作模式</a> ·
+  <a href="#生成内容">生成内容</a> ·
+  <a href="#目录结构">目录结构</a> ·
+  <a href="#维护测试">维护测试</a> ·
+  <a href="#参考引用">参考引用</a>
+</p>
+
+</div>
 
 ---
 
