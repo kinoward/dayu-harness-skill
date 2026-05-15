@@ -155,16 +155,16 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 `capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。
 
-| 分组 | 能力 ID | 部署内容 |
-| --- | --- | --- |
-| 核心治理 | `core` | 根 `AGENTS.md`、`docs/` 索引、`docs/harness/maintenance.md`、执行计划、生成区和检查脚本骨架。 |
-| Git 基线 | `git.commit-format`、`project.gitignore` | 约定式提交指南、`commitlint.config.cjs`、commit-msg hook 片段和可合并 `.gitignore`。 |
-| AI 协作 | `ai.execution`、`ai.memory` | AI 执行边界、协作姿态、自动重试、汇报规则、长期记忆边界和外部记忆回写规则。 |
-| 知识沉淀 | `knowledge.adr`、`knowledge.troubleshooting`、`knowledge.research`、`project.context`、`knowledge.archive` | ADR、排障、研究资料、产品上下文和历史归档目录。 |
-| GitHub 可选 | `github.pr`、`github.branch-protection` | PR 指南、审查清单、PR 正文检查工作流、分支保护规则集和 pre-push 片段。 |
-| 发布可选 | `release.versioning`、`github.release-please` | 版本与 tag 规则、发布指南、release-please 工作流和配置。 |
-| 质量可选 | `quality.practices`、`quality.node-tooling` | 通用开发纪律、测试策略、ESLint、Prettier、lint-staged 和 pre-commit hook 片段。 |
-| 内部承载 | `git.hooks` | hook 片段的内部承载能力，不作为独立业务治理入口。 |
+| 分组 | 部署内容 |
+| --- | --- |
+| 核心治理 | 根 `AGENTS.md`、`docs/` 索引、`docs/harness/maintenance.md`、执行计划、生成区和检查脚本骨架。 |
+| Git 基线 | 约定式提交指南、`commitlint.config.cjs`、commit-msg hook 片段和可合并 `.gitignore`。 |
+| AI 协作 | AI 执行边界、协作姿态、自动重试、汇报规则、长期记忆边界和外部记忆回写规则。 |
+| 知识沉淀 | ADR、排障、研究资料、产品上下文和历史归档目录。 |
+| GitHub 可选 | PR 指南、审查清单、PR 正文检查工作流、分支保护规则集和 pre-push 片段。 |
+| 发布可选 | 版本与 tag 规则、发布指南、release-please 工作流和配置。 |
+| 质量可选 | 通用开发纪律、测试策略、ESLint、Prettier、lint-staged 和 pre-commit hook 片段。 |
+| 内部承载 | hook 片段的内部承载能力，不作为独立业务治理入口。 |
 
 ## 工作模式
 
