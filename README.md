@@ -347,7 +347,7 @@ bats tests/unit
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
 - [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
 
-## ⭐ Star History
+## <a href="https://github.com/kinoward"><img src="https://github.com/kinoward.png?size=96" width="42" height="42" alt="kinoward avatar" align="absmiddle"></a> ⭐ Star History
 
 <div align="center">
 
