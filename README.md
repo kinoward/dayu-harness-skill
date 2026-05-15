@@ -20,14 +20,9 @@
   <img alt="Bats tests" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-Bats-1F6FEB">
 </p>
 
-<p>
-  <strong>中文名：</strong>大禹治库 Skill ·
-  <strong>英文名：</strong>Dayu Harness Skill ·
-  <strong>项目目录：</strong><code>dayu-harness-skill</code> ·
-  <strong>显式命令：</strong><code>/dayu-harness</code>
-</p>
+<br>
 
-<table width="100%">
+<table width="78%">
   <tr>
     <td align="left">
       <strong>🤖 你的项目已经开始让智能体参与开发、审查、排障和文档维护？</strong><br>
@@ -37,13 +32,23 @@
   </tr>
 </table>
 
-<h3>✨ 大禹治库 Skill 不把规则堵在一次对话里，而是把它们疏导进仓库。</h3>
+<br>
 
-<p>地图、指南、检查脚本和自动化反馈各归其位。</p>
+<h3>✨ 这些，大禹治库都能解决。</h3>
 
 <p>
-  <strong>项目现状 + <code>capabilities/*.json</code> + <code>/dayu-harness</code> → <code>AGENTS.md</code> + <code>docs/harness</code> + hooks/CI + 检查脚本 + 长期知识目录</strong>
+  <strong>从一次性提示升级成仓库级治理体系</strong>，不再让规则只停留在某次对话里。
 </p>
+
+<p>
+  聊天记录 · PR 评论 · 团队口头约定 · 旧文档 · 排障经验，都可以被整理成可审查的项目资产。
+</p>
+
+<p>
+  <strong>地图、指南、检查脚本和自动化反馈</strong>各归其位，让项目自己知道怎么协作、怎么检查、怎么沉淀。
+</p>
+
+<br>
 
 <p>
   <a href="#前言">🧭 前言</a> ·
