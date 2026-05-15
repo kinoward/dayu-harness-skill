@@ -129,36 +129,16 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 [github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
 <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors" target="_blank">
-  <table>
-    <tr>
-      <th colspan="2">
-        <br><img src="https://contrib.rocks/image?repo=kinoward/dayu-harness-skill" alt="Dayu Harness Skill contributors"><br><br>
-      </th>
-    </tr>
-    <tr>
-      <td>
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="Active contributors">
-        </picture>
-      </td>
-      <td rowspan="2">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=4x7&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=4x7&color_scheme=light" alt="Participant growth">
-        </picture>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="New contributors">
-        </picture>
-      </td>
-    </tr>
-  </table>
+  <img src="https://contrib.rocks/image?repo=kinoward/dayu-harness-skill" alt="Dayu Harness Skill contributors">
 </a>
+
+<p align="center">
+  <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/kinoward/dayu-harness-skill?label=Contributors&color=0EA5E9"></a>
+  <a href="https://github.com/kinoward/dayu-harness-skill/commits/main"><img alt="Commits" src="https://img.shields.io/github/commit-activity/t/kinoward/dayu-harness-skill?label=Commits&color=7C3AED"></a>
+  <a href="https://github.com/kinoward/dayu-harness-skill/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/kinoward/dayu-harness-skill?label=Last%20commit&color=16A34A"></a>
+  <a href="https://github.com/kinoward/dayu-harness-skill/issues"><img alt="Issues" src="https://img.shields.io/github/issues/kinoward/dayu-harness-skill?label=Issues&color=F59E0B"></a>
+  <a href="https://github.com/kinoward/dayu-harness-skill/pulls"><img alt="PRs" src="https://img.shields.io/github/issues-pr/kinoward/dayu-harness-skill?label=PRs&color=2563EB"></a>
+</p>
 
 ## ⭐ Star History
 
