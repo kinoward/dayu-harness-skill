@@ -2,7 +2,7 @@
   "id": "knowledge.research",
   "description": "Research notes knowledge base scaffold",
   "description_nl": "Create research notes index and structure.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/references/AGENTS.md","dst":"docs/references/AGENTS.md"},

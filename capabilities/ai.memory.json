@@ -2,7 +2,7 @@
   "id": "ai.memory",
   "description": "AI project-memory boundaries and experience capture",
   "description_nl": "Deploy project-memory boundaries and experience capture rules for AI collaboration.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/harness/guides/ai-memory.md","dst":"docs/harness/guides/ai-memory.md"}

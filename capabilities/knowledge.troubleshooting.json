@@ -2,7 +2,7 @@
   "id": "knowledge.troubleshooting",
   "description": "Troubleshooting knowledge base scaffold",
   "description_nl": "Create troubleshooting knowledge index and structure.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/troubleshooting/AGENTS.md","dst":"docs/troubleshooting/AGENTS.md"}

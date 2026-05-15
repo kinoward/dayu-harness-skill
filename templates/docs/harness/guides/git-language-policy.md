@@ -49,24 +49,24 @@ docs: 更新使用说明
 | 中文标点 | `\x{3000}-\x{303f}` | CJK Symbols and Punctuation |
 | 全角字符 | `\x{ff00}-\x{ffef}` | Halfwidth and Fullwidth Forms |
 
-hook 与 CI 均使用同一字符区间，确保一致性。
+本地 hook 与可选 GitHub CI 均使用同一字符区间，确保一致性。
 
 ## 强制手段
 
-双重校验——本地 hook 实时拦截 + 远程 CI 合并门禁：
+基础校验由本地 hook 实时拦截；如启用 `github.language`，再追加 GitHub CI 门禁：
 
 ### 层一：本地 hook
 
 `.husky/commit-msg` 在 commit 时检测 CJK 字符，拦截含中文的 commit message。CJK 检测由 `repo.language` 能力安装，不依赖 Conventional Commits 校验。
 
-### 层二：CI 远程校验（GitHub Actions 可用时）
+### 层二：CI 远程校验（启用 `github.language` 时）
 
 | CI 检查 | 文件 | 作用 |
 |--------|------|------|
 | PR 标题/body | `.github/workflows/repo-language-pr-lint.yml` | 检测 CJK 字符，含中文则 fail check |
 | Issue 标题/body | `.github/workflows/repo-language-issue-lint.yml` | 检测 CJK 字符，含中文则 fail check |
 
-### 无 CI 环境
+### 未启用 GitHub CI 时
 
 - 本地 `.husky/commit-msg` hook 拦截含中文的 commit message
 - PR/Issue 内容依赖人工检查和 AI 自觉遵循

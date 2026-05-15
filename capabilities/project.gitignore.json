@@ -2,7 +2,7 @@
   "id": "project.gitignore",
   "description": "Project gitignore management",
   "description_nl": "Enable project .gitignore generation and merge using universal, Node.js, and Python templates.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [],
   "asset_files": [],

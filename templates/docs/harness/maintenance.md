@@ -15,20 +15,20 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 凡 `AGENTS.md` 或 `README.md` 中存在 `## 目录索引`/`## 目录结构` 区块，目录、文件、子目录或 capability 部署清单变化时，必须同步更新该区块。`AGENTS.md` 仅维护 `## 目录索引`（本层和直接子目录）；`README.md` 可维护 `## 目录结构`（项目或部署后整体结构）。
 
-`AGENTS.md` 的可选标记应仅用于 core 索引到未部署的 capability 入口，并且必须写明合法 `可选：capability.id`；同一 capability 内部文件链接不要求也不应标可选。  
+`AGENTS.md` 的可选标记应仅用于 core 索引到未部署的非默认 capability 入口，并且必须写明合法 `可选：capability.id`；`default=true` 的能力不应标可选，同一 capability 内部文件链接不要求也不应标可选。
 通配和占位路径（如 `*.md`、`YYYY-MM-DD-vN/`）不应写成 Markdown 链接，需使用反引号文本说明。
 
 ## 能力清单与部署模型
 
 目标项目内的 `AGENTS.md`、`docs/`、`docs/harness/sensors/scripts/` 与已部署 hook/CI/config 等资产是运行时权威；Skill 只作为初始化或升级这些文件的来源。
 
-目标项目通过能力清单（capability manifest）定义可用能力，并以 `core + module` 方式部署：
+目标项目通过能力清单（capability manifest）定义可用能力，并以 `default + optional module` 方式部署：
 
-- `core`：基础治理骨架（短根 AGENTS 路由、CLAUDE.md、harness 入口、maintenance、维护脚本、exec-plans 索引）
-- `module`：被部署到目标项目的可选治理能力模块（guide 文档、Git hooks、GitHub CI、release-please、知识库目录等）
+- `default`：无须用户选择的必选治理能力，包括 `core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
+- `optional module`：被部署到目标项目的可选治理能力模块（GitHub CI、release-please、Node.js 工具、分支/标签保护等）
 
 联动组件是治理能力部署出的文件、hook、CI、脚本等。
-新增治理能力优先更新能力清单；未启用的治理能力不会在目标项目生效。
+新增治理能力优先更新能力清单；未启用的可选治理能力不会在目标项目生效。
 目标项目部署后的文档不依赖 Skill 内部文件路径；若后续需要未启用能力，需要重新安装 Skill，或手工引入对应模块。
 
 ### 核心原则
@@ -133,14 +133,21 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ## Q&A 决策参考
 
-以下治理约束是交互式问答参考。实际启用项、依赖、模板文件、资产文件、验收标准以能力清单 manifest 为准；如两者不一致，先修正 manifest，再更新本节。
+以下治理约束是交互式问答参考。`default=true` 的能力不询问是否启用，只在已有文件需要融合策略时询问；可选能力才进入启用/跳过选择。实际启用项、依赖、模板文件、资产文件、验收标准以能力清单 manifest 为准；如两者不一致，先修正 manifest，再更新本节。
 
 ### Git 相关
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `git.commit-format` | 提交信息格式校验 | husky snippet + commitlint | commit-msg snippet + commitlint config | Git 项目 |
-| `repo.language` | Git/GitHub 内容语言规范 | husky snippet + 可选 CI | commit-msg CJK snippet + language workflows | Git 或 GitHub 项目 |
+| `git.commit-format` | 提交信息格式校验 | husky snippet + commitlint | commit-msg snippet + commitlint config | 默认启用 |
+| `repo.language` | Git commit 内容语言规范 | husky snippet | commit-msg CJK snippet | 默认启用 |
+| `project.gitignore` | 忽略文件管理 | gitignore installer | .gitignore | 默认启用 |
+
+### GitHub 与发布可选能力
+
+| capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
+|---|------|---------|---------|---------|
+| `github.language` | GitHub PR/Issue 内容语言规范 | GitHub workflows | repo-language-pr-lint.yml + repo-language-issue-lint.yml | GitHub 项目 |
 | `github.pr` | PR 工作流规范 | 文档约定 + 可选 CI | pr-lint.yml（仅 GitHub） | GitHub 项目 |
 | `github.branch-protection` | 分支保护 | 文档约定 + ruleset + hook snippet | protect-main ruleset + pre-push snippet | GitHub 项目 |
 | `release.versioning` | 版本与标签保护 | 文档约定 + tag ruleset + hook snippet | protect-tags ruleset + pre-push snippet | 发布项目 |
@@ -151,32 +158,32 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 |---|------|---------|---------|---------|
 | `quality.practices` | 开发纪律与测试策略 | 文档指引 | dev-hygiene + testing-strategy | 含代码项目 |
 | `quality.node-tooling` | Node.js 代码风格与格式化 | ESLint + Prettier + lint-staged + hook snippet | eslint config + prettier config + lint-staged config + pre-commit snippet | Node.js 项目 |
-| `project.gitignore` | 忽略文件管理 | gitignore installer | .gitignore | Git 项目 |
 
 ### 开发规范
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
 | `quality.practices` | 开发环境纪律 | 文档指引 + validate.sh | — | 含代码项目 |
-| `ai.execution` | AI 执行风格 | 文档约定 | — | AI 经常参与实现的项目 |
-| `ai.memory` | AI 记忆边界 | 文档约定 | — | 需要长期经验沉淀的项目 |
+| `ai.execution` | AI 执行风格 | 文档约定 | — | 默认启用 |
+| `ai.memory` | AI 记忆边界 | 文档约定 | — | 默认启用 |
 
 ### 知识管理
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `knowledge.adr` | 决策记录 (ADR) | `docs/design-docs/` 目录 + 模板 | adr-template.md | 通用 |
-| `knowledge.troubleshooting` | 排障知识库 | `docs/troubleshooting/` 目录 | — | 通用 |
-| `knowledge.research` | 版本化研究院 | `docs/references/research/` 目录 | — | 有持续研究需求 |
-| `project.context` | 产品规格与项目上下文 | `docs/product-specs/` 目录 | — | 有项目专属内容 |
-| `knowledge.archive` | 历史归档 | `docs/archive/` 目录 | — | 有已废弃的历史内容 |
+| `knowledge.adr` | 决策记录 (ADR) | `docs/design-docs/` 目录 + 模板 | adr-template.md | 默认启用 |
+| `knowledge.troubleshooting` | 排障知识库 | `docs/troubleshooting/` 目录 | — | 默认启用 |
+| `knowledge.research` | 版本化研究院 | `docs/references/research/` 目录 | — | 默认启用 |
+| `project.context` | 产品规格与项目上下文 | `docs/product-specs/` 目录 | — | 默认启用 |
+| `knowledge.archive` | 历史归档 | `docs/archive/` 目录 | — | 默认启用 |
 
 ### 文档与脚本联动关系
 
 | capability | 联动组件 | 说明 |
 |------|---------|------|
 | `git.commit-format` | commit-msg commitlint snippet + commitlint config | 仅安装提交格式校验 |
-| `repo.language` | commit-msg CJK snippet + repo-language workflows | 仅安装语言校验 |
+| `repo.language` | commit-msg CJK snippet | 默认 Git 语言校验，不部署 GitHub workflow |
+| `github.language` | repo-language-pr-lint.yml + repo-language-issue-lint.yml | 可选 GitHub PR/Issue 语言校验 |
 | `github.pr` | PR 本体化检查（pr-lint.yml + pr_body_structure.py） | 仅 GitHub 项目联动 CI |
 | `github.branch-protection` | protect-main ruleset + pre-push branch snippet | GitHub ruleset（远程）+ pre-push snippet（本地）双重保护 |
 | `release.versioning` | protect-tags ruleset + pre-push tag snippet | 标签保护和版本规范 |
@@ -185,7 +192,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `github.release-please` | release-please.yml + guide + config + manifest | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr`；需要 PAT |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
-> 纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）仍由 manifest 控制启用，不通过脚本资产隐式部署。
+> 默认纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）由 `default=true` manifest 强制部署，不通过用户问答决定；可选能力仍由 manifest 控制。
 
 ## 兼容化处理参考
 
@@ -194,7 +201,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 1. **检测**：检查目标位置是否已有对应配置（如 `.husky/commit-msg`、`commitlint.config.cjs`）
 2. **差异分析**：比较已有配置和 docs-governance 提供的治理模板差异
 3. **生成变更描述**：用自然语言描述变更内容，例如「你的项目已有 commit-msg hook，包含 Conventional Commits 校验。新增内容与现有规则并存，不影响既有行为」
-4. **用户确认**：提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项
+4. **用户确认**：只对已有配置的处理策略提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项；默认能力本身不提供跳过选项
 5. **执行**：按用户选择处理
 6. **校验**：验证变更结果（hook 可执行、config 语法正确）
 
@@ -206,9 +213,17 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 提问前必须先分析项目现状：
 
-1. 检查是否存在 `CLAUDE.md`、`AGENTS.md`、`docs/` 目录
-2. 检查 `.husky/`、`commitlint.config.cjs`、`.github/workflows/` 等已有配置
-3. 基于检测结果适配提问——已有配置的不直接问「是否启用」，而是问「检测到已有 X，是否保留/增强/跳过」
+1. 首先执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`，确认环境依赖与初始化状态；未确定可选能力时不传 `--capabilities`，按默认必选能力检查
+2. 检查是否存在 `CLAUDE.md`、`AGENTS.md`、`docs/` 目录
+3. 检查 `.husky/`、`commitlint.config.cjs`、`.github/workflows/` 等已有配置
+4. 基于检测结果适配提问——默认能力不问「是否启用」；已有配置只问「检测到已有 X，是否保留/增强/跳过」
+
+如果前置检查提示缺失依赖或缺少 Git：
+- 告知用户需先执行 `git init`；
+- 需要 Node 初始化（如 `package.json`）则引导用户先执行 `npm init -y`；
+- 缺少必需 Node 依赖时引导用户执行脚本给出的 `npm install --save-dev ...`；
+- 明确告知不能通过写 `package.json` 模板文件来替代初始化。
+用户拒绝初始化时应立即终止，等待用户下一步操作。
 
 ### 提问措辞模板
 
@@ -217,7 +232,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | 约束 | 提问措辞建议 |
 |------|------------|
 | 提交信息格式校验 | 「每次 git commit 时自动检查提交信息是否符合 Conventional Commits 格式。启用后会安装 husky 和 commitlint 作为本地检查工具。」 |
-| Git/GitHub 内容语言规范 | 「要求 commit、PR、issue 等协作内容使用指定语言。启用后会在 commit 和 GitHub 检查中拦截 CJK 内容。」 |
+| Git 内容语言规范 | 「要求 commit 等 Git 协作内容使用指定语言。默认启用后会在 commit-msg hook 中拦截 CJK 内容。」 |
+| GitHub 内容语言规范 | 「如果项目使用 GitHub，可以额外要求 PR、issue 等文本也接受 CI 语言检查。」 |
 | PR 工作流规范 | 「为 PR 建立标题、正文模板和 Test plan 格式标准。如果使用 GitHub，还可以安装自动 CI 检查。」 |
 | 代码风格与质量 | 「可以只安装通用开发/测试实践，也可以额外安装 Node.js 的 ESLint + Prettier + lint-staged。」 |
 | AI 执行与记忆 | 「建立 AI 和人类的分工规则、自主执行约定，以及经验沉淀和项目记忆边界。」 |
@@ -231,17 +247,18 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 启用的约束
 - 提交信息格式校验 → 安装 commit-msg 格式校验 snippet + commitlint
-- Git/GitHub 内容语言规范 → 安装 CJK 检测 hook/CI
+- Git 内容语言规范 → 安装 CJK 检测 commit-msg hook
 - AI 执行与记忆 → 部署 ai-execution.md 与 ai-memory.md 文档
+- 知识库与项目上下文 → 部署 ADR、排障、研究、产品规格和归档入口
 
 ### 联动组件
 - .husky/commit-msg
-- .husky/pre-commit
 - commitlint.config.cjs
+- .gitignore
 
 ### 跳过的项
 - 代码风格与质量（用户选择跳过）
-- PR 工作流规范（用户选择跳过）
+- GitHub PR / Issue workflow（用户选择跳过）
 
 [1] 确认执行 [2] 回退修改 [3] 取消
 ```

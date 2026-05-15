@@ -2,7 +2,7 @@
   "id": "git.commit-format",
   "description": "Conventional Commits validation and commit format guidance",
   "description_nl": "Enable Conventional Commits guidance, commitlint config, and commit-msg format validation.",
-  "default": false,
+  "default": true,
   "dependencies": ["core", "git.hooks"],
   "template_files": [
     {"src":"templates/docs/harness/guides/commit-guidelines.md","dst":"docs/harness/guides/commit-guidelines.md"}

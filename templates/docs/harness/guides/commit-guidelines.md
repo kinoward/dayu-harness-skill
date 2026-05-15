@@ -4,7 +4,7 @@
 
 ## 语言
 
-若启用 `repo.language`，commit message（subject + body + trailer）必须遵守仓库语言规约。
+Commit message（subject + body + trailer）必须遵守仓库语言规约。
 
 ## Commit Message 格式
 

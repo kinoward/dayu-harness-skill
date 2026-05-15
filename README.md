@@ -11,12 +11,12 @@
 设计边界：直接把规则只做成 Skill，可以约束某个 Agent 在当前环境中的行为；但 Harness Engineering 更强调项目拥有自己的外部约束环境。docs-governance 因此只作为安装器、问答引导器和升级入口，最终权威必须落在目标项目内，让规则和反馈回路可版本化、可审查、可迁移、可执行。
 
 工具入口能力：
-- **脚手架**：按 `core + capability modules + presets` 在新项目中建立 AGENTS.md + docs/ 文档体系
+- **脚手架**：按必选默认能力 + 可选 capability modules + presets 在新项目中建立 AGENTS.md + docs/ 文档体系
 - **融合**：与已有文档体系合并，保留现有内容，补全缺失
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
-- **自动化约束资产**：按需部署 Conventional Commits、语言校验、分支/标签保护等 hook/CI 片段
+- **自动化约束资产**：默认部署 Git 提交格式、仓库语言和 .gitignore 约束；按需追加 GitHub、分支/标签保护等 hook/CI 片段
 - **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
 ## 目录结构
@@ -37,7 +37,7 @@ docs-governance/
 ├── docs/                     # Skill 自身设计、优化记录与执行完成报告模板
 ├── templates/                # 部署到目标项目的文档模板来源
 ├── assets/                   # 按能力部署的 hook、CI、配置资产来源
-├── scripts/                  # Skill 内部初始化和安装脚本
+├── scripts/                  # Skill 内部环境前置、初始化和安装脚本
 └── tests/                    # Skill 自身 bats 测试、fixture 模板与执行测试基线
 ```
 
@@ -45,7 +45,7 @@ docs-governance/
 
 ### 部署到目标项目后的结构
 
-目标项目只接收 `capabilities/*.json` 选中的模板和资产。`core` 始终部署；其它目录和文件按 capability 启用。
+目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、知识库和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
 
 ```
 <target-project>/
@@ -58,16 +58,16 @@ docs-governance/
 │   │   ├── maintenance.md            # core：文档体系维护规范
 │   │   ├── guides/                   # 行动前规则卡片
 │   │   │   ├── AGENTS.md
-│   │   │   ├── commit-guidelines.md      # git.commit-format
-│   │   │   ├── git-language-policy.md    # repo.language
-│   │   │   ├── pr-guidelines.md          # github.pr
-│   │   │   ├── branch-protection.md      # github.branch-protection
-│   │   │   ├── release-versioning.md     # release.versioning
-│   │   │   ├── release-please.md         # github.release-please
+│   │   │   ├── commit-guidelines.md      # default：git.commit-format
+│   │   │   ├── git-language-policy.md    # default：repo.language
+│   │   │   ├── pr-guidelines.md          # optional：github.pr
+│   │   │   ├── branch-protection.md      # optional：github.branch-protection
+│   │   │   ├── release-versioning.md     # optional：release.versioning
+│   │   │   ├── release-please.md         # optional：github.release-please
 │   │   │   ├── dev-hygiene.md            # quality.practices
 │   │   │   ├── testing-strategy.md       # quality.practices
-│   │   │   ├── ai-execution.md           # ai.execution
-│   │   │   └── ai-memory.md              # ai.memory
+│   │   │   ├── ai-execution.md           # default：ai.execution
+│   │   │   └── ai-memory.md              # default：ai.memory
 │   │   └── sensors/                  # 行动后检查与反馈
 │   │       ├── AGENTS.md
 │   │       ├── scripts/              # core：维护脚本
@@ -78,26 +78,26 @@ docs-governance/
 │   │       │   └── validate.sh
 │   │       └── reviews/
 │   │           ├── AGENTS.md
-│   │           └── code-review-checklist.md  # github.pr
-│   ├── design-docs/                  # knowledge.adr
+│   │           └── code-review-checklist.md  # optional：github.pr
+│   ├── design-docs/                  # default：knowledge.adr
 │   ├── exec-plans/                   # core：执行计划
 │   │   ├── AGENTS.md
 │   │   ├── active/AGENTS.md
 │   │   └── completed/AGENTS.md
 │   ├── generated/                    # core：自动生成资料索引
 │   │   └── AGENTS.md
-│   ├── product-specs/                # project.context
-│   ├── references/                   # knowledge.research
+│   ├── product-specs/                # default：project.context
+│   ├── references/                   # default：knowledge.research
 │   │   └── research/
-│   ├── troubleshooting/              # knowledge.troubleshooting
-│   └── archive/                      # knowledge.archive
-├── .husky/                           # git.hooks + hook-backed capabilities
-├── .github/                          # github.pr / repo.language / github.branch-protection / release.versioning / github.release-please
-├── commitlint.config.cjs             # git.commit-format
+│   ├── troubleshooting/              # default：knowledge.troubleshooting
+│   └── archive/                      # default：knowledge.archive
+├── .husky/                           # default：git.hooks + hook-backed Git capabilities
+├── .github/                          # optional：github.language / github.pr / github.branch-protection / release.versioning / github.release-please
+├── commitlint.config.cjs             # default：git.commit-format
 ├── eslint.config.js                  # quality.node-tooling
 ├── .prettierrc                       # quality.node-tooling
 ├── .lintstagedrc.json                # quality.node-tooling
-├── .gitignore                        # project.gitignore
+├── .gitignore                        # default：project.gitignore
 ├── release-please-config.json        # github.release-please
 └── .release-please-manifest.json     # github.release-please
 ```
@@ -110,6 +110,14 @@ docs-governance/
 - `tests/README.md` 是 Skill 自身执行测试基线入口，记录 fixture 模板、对话回放式 E2E 和运行方式。
 - `tests/unit/` 是维护者专用测试套件，依赖 `bats`；该依赖为可选维护依赖，仅用于本仓库验证，不是 Skill 运行时依赖。
 - 部署到目标项目时不会安装或携带 `bats`，也不会携带测试目录。
+
+### 环境依赖与初始化
+
+- 脚手架运行前会执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"` 进行前置依赖检查；未传 `--capabilities` 时按默认必选能力检查。
+- 缺失 Git 上下文时提示并默认提供初始化路径（`git init`）；
+  缺失 Node 初始化上下文时提示执行 `npm init -y`，而不是在目标项目中手写 `package.json`。
+- 缺少必需的 `package.json` 依赖时返回 `needs_install`，批准后由 `npm install --save-dev ...` 安装，不通过模板手写依赖。
+- `status=needs_install/needs_initialization/needs_user_action` 时，用户拒绝安装、初始化或登录则流程终止；批准后继续执行 dry-run/apply。
 
 ## 安装与删除
 

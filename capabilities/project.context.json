@@ -2,7 +2,7 @@
   "id": "project.context",
   "description": "Product specs and project context scaffold",
   "description_nl": "Create product specs area for non-governance project content.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/product-specs/AGENTS.md","dst":"docs/product-specs/AGENTS.md"}

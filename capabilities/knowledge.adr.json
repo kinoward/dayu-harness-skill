@@ -2,7 +2,7 @@
   "id": "knowledge.adr",
   "description": "Architecture decision record templates",
   "description_nl": "Deploy decision record documentation templates and index.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/design-docs/AGENTS.md","dst":"docs/design-docs/AGENTS.md"},

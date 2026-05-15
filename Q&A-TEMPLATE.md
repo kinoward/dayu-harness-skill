@@ -11,38 +11,78 @@
 
 ## 前置问题
 
-每项 3 选项：[1] 启用 [2] 跳过 [3] 自定义需求。
+### 环境前置检查
+
+进入能力问答前，先执行：
+
+```bash
+scripts/ensure-environment.sh <project-root> --check
+# 或在可选能力已确定后：
+scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"
+```
+
+- `status == "ok"`：继续问题收集与能力选配。
+- `status == "needs_install"`、`status == "needs_initialization"` 或 `status == "needs_user_action"`：展示缺失依赖与 `items`，提示用户选择「安装/初始化/登录」或「终止流程」。
+- 未显式传入 `--capabilities` 时，环境脚本按默认必选能力检查；可选能力确定后，必须用完整 resolved capability ids 重新检查或通过 `scaffold.sh --dry-run` 查看内嵌的 `environment` 结果。
+- 默认 Git 约束缺失时提示执行 `git init`。
+- 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化。
+- 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或 `install-*.sh`。
+
+默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
+
+- `core`
+- `git.commit-format`
+- `repo.language`
+- `project.gitignore`
+- `ai.execution`
+- `ai.memory`
+- `knowledge.adr`
+- `knowledge.troubleshooting`
+- `knowledge.research`
+- `project.context`
+- `knowledge.archive`
+
+Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。只有 GitHub、发布自动化、Node.js 工具等可选能力需要询问。
+
+可选能力每项 3 选项：[1] 启用 [2] 跳过 [3] 自定义需求。
 
 ```
-Q: 项目是否使用 Git 版本控制？
-   选项：[1] 是 [2] 否 [3] 其他版本控制系统（请描述）
-
 Q: 是否使用 GitHub 远程托管？
-   （仅 Git 项目继续询问）
    选项：[1] 是 [2] 否 [3] 其他托管平台（请描述）
+
+Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
+   选项：[1] 启用 [2] 跳过 [3] 自定义工具链
 ```
 
-## 治理能力提问清单
+## 必选治理能力清单
+
+以下能力不询问是否启用，只在 dry-run 或已有配置冲突时展示影响范围与 merge plan。
 
 以下清单应从 manifest 字段生成或校验：`id`、`description_nl`、`dependencies`、`requires`、`acceptance`、`suggested_when`。
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `git.commit-format` | 是否希望把每次提交约束为可追溯、可自动审查的标准格式，从而减少后续 review 与回溯成本？ | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
-| `repo.language` | 是否需要对 commit/PR/issue/release notes/分支名称等协作文字保持统一语言约束？ | 通过 commit-msg hook snippet 与 GitHub language workflows 做 CJK 校验。 | Git 或 GitHub 项目 |
+| `git.commit-format` | 每次提交必须可追溯、可自动审查，减少后续 review 与回溯成本。 | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
+| `repo.language` | commit 等仓库协作文字必须有统一语言约束。 | 通过 commit-msg hook snippet 做 CJK 校验；GitHub PR/Issue workflow 已拆到 `github.language`。 | Git 项目；已有 hook 逐文件确认 |
+| `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 按 universal / Node.js / Python 模板检测并 merge。 | Git 项目；已有 `.gitignore` 走 merge plan |
+| `ai.execution` | AI 执行方式、自动重试和汇报规则必须沉淀到项目文档中。 | 部署 AI 执行实践文档。 | 默认启用 |
+| `ai.memory` | 项目长期记忆边界和经验沉淀规则必须写入仓库。 | 部署 AI 记忆边界文档并将 `AGENTS.md` 作为长期记忆锚点。 | 默认启用 |
+| `knowledge.adr` | 必须有稳定的决策记录位点，避免关键架构讨论只留在会话里。 | 部署 ADR 目录与模板。 | 默认启用 |
+| `knowledge.troubleshooting` | 故障处理经验必须可复用、可检索。 | 部署排障目录与入口说明。 | 默认启用 |
+| `knowledge.research` | 研究结论必须可版本化沉淀，避免重复探索。 | 部署版本化研究目录。 | 默认启用 |
+| `project.context` | 必须搭好产品规格与项目上下文文档区，避免需求与实现反复漂移。 | 部署项目文档骨架（产品规格入口）。 | 默认启用 |
+| `knowledge.archive` | 必须有统一归档入口，减少当前上下文被历史信息淹没。 | 部署历史档案区与索引。 | 默认启用 |
+
+## 可选治理能力提问清单
+
+| capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
+|---|---|---|---|
+| `github.language` | 是否希望 GitHub PR/Issue 文本也被 CI 检查语言规范？ | 部署 `repo-language-pr-lint.yml` 与 `repo-language-issue-lint.yml`。 | GitHub 项目；依赖 `repo.language` |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？ | 通过 GitHub 工作流实现 PR body 结构、closing trailer 与 AI watermark 检查（`Summary` / `Implementation notes` / `Test plan`）。 | GitHub 项目 |
 | `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？ | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
 | `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？ | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
 | `quality.practices` | 是否希望建立通用开发纪律和测试策略？ | 部署 dev hygiene 与 testing strategy 文档，不安装 Node.js 工具。 | 含代码项目 |
 | `quality.node-tooling` | 是否希望在提交前自动拦截常见 Node.js 代码质量与格式问题？ | 通过 ESLint、Prettier、lint-staged 和 pre-commit hook snippet 实现。 | Node.js 项目；复杂配置默认 `manual_required` |
-| `project.gitignore` | 是否希望规范化 `.gitignore`？ | 按 universal / Node.js / Python 模板检测并 merge。 | Git 项目 |
-| `ai.execution` | 是否希望把 AI 执行方式、自动重试和汇报规则沉淀到项目文档中？ | 部署 AI 执行实践文档。 | 推荐 AI 经常参与实现的项目启用 |
-| `ai.memory` | 是否希望把项目长期记忆边界和经验沉淀规则写入仓库？ | 部署 AI 记忆边界文档并将 `AGENTS.md` 作为长期记忆锚点。 | 有长期 AI 协作或知识沉淀需求时启用 |
-| `knowledge.adr` | 是否需要有稳定的决策记录位点，避免关键架构讨论只留在会话里？ | 部署 ADR 目录与模板。 | 通用 |
-| `knowledge.troubleshooting` | 是否需要将故障处理经验沉淀为可复用、可检索的知识？ | 部署排障目录与入口说明。 | 通用 |
-| `knowledge.research` | 是否需要持续沉淀研究结论，避免反复重复同类探索？ | 部署版本化研究目录。 | 有持续调研需求时启用 |
-| `project.context` | 是否要先搭好产品规格与项目上下文文档区，避免需求与实现反复漂移？ | 部署项目文档骨架（产品规格入口）。 | 有项目说明、草稿、设计背景时启用 |
-| `knowledge.archive` | 是否需要统一归档旧内容，减少当前上下文被历史信息淹没？ | 部署历史档案区与索引。 | 有废弃/历史内容时启用 |
 | `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？ | 通过 release-please guide、workflow 与配置文件实现自动发布节奏。 | 仅在 GitHub + `git.commit-format` + `github.pr` 后建议；不自动启用 |
 
 ## 确认汇总
@@ -53,8 +93,8 @@ Q: 是否使用 GitHub 远程托管？
 ## 确认汇总
 
 ### 启用的治理能力
-- git.commit-format → 已启用提交格式约束，提交信息和协作流程更容易审查与追溯
-- github.pr → 已启用 PR 协作检查与交付结构约束
+- 默认必选 → core、Git 提交/语言/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
+- github.pr → 用户选择启用 PR 协作检查与交付结构约束
 
 ### 需要确认策略的已有文件
 - .husky/commit-msg → manual_required
@@ -87,9 +127,10 @@ Merge plan:
 
 ## 执行规则
 
-1. `scaffold.sh --dry-run --enable <ids>` 先输出 JSON plan
-2. 用户确认启用治理能力和策略后，才执行 `scaffold.sh --apply --enable <ids> --strategy <merge|replace|skip>`；具体可用策略以 capability manifest 为准
-3. `install-*.sh --check` 只输出 merge plan，不写 tracked files
-4. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
-5. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
-6. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项
+1. `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`：先返回依赖检查结果；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行的安装、初始化或登录动作并等待用户确认；用户若拒绝则终止流程。
+2. `scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan；脚本会自动包含 `default=true` 的必选能力
+3. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --enable <optional ids>`；clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准
+4. `install-*.sh --check` 只输出 merge plan，不写 tracked files
+5. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
+6. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
+7. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项

@@ -21,6 +21,7 @@ ALLOWED_OPTIONAL_CAPABILITIES=(
     "ai.memory"
     "git.commit-format"
     "github.branch-protection"
+    "github.language"
     "github.pr"
     "github.release-please"
     "knowledge.archive"

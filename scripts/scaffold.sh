@@ -8,6 +8,7 @@ SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MANIFEST_DIR="$SKILL_DIR/capabilities"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
 VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/harness/sensors/scripts/validate.sh"
+ENVIRONMENT_SCRIPT="$SCRIPTS_DIR/ensure-environment.sh"
 
 MODE="prompt"
 TARGET=""
@@ -53,12 +54,12 @@ done
 usage() {
     echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip]"
     echo "说明:"
-    echo "  - 无 --enable 时默认仅部署核心能力 core"
-    echo "  - --enable 与 --only 支持逗号分隔"
+    echo "  - default=true 的必选能力始终部署；--enable 在必选集上追加能力"
+    echo "  - --enable 与 --only 支持逗号分隔；--only 保留历史兼容，不会排除必选能力"
     echo "  - --only 兼容历史分类: docs/husky/commitlint/workflows/eslint/prettier/lint-staged/gitignore/release-please"
     echo "  - --enable 兼容旧能力 id，并会展开到新的原子能力或 preset"
     echo "  - --only all 表示部署全部公开能力；内部能力只通过依赖展开"
-    echo "  - --apply 默认不替换已存在文件；安装器能力需通过 --strategy 声明安全策略"
+    echo "  - --apply 默认不替换已存在文件；安装器 clean 时自动 merge，已有配置需通过 --strategy 声明安全策略"
 }
 
 if [ "$MODE" = "help" ] || [ -z "${TARGET:-}" ]; then
@@ -71,11 +72,6 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
     exit 2
 }
 
-if ! command -v jq >/dev/null 2>&1; then
-    echo '{"status":"error","error":"jq is required for capability manifests"}' >&2
-    exit 2
-fi
-
 json_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -85,6 +81,33 @@ json_escape() {
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
 }
+
+if ! command -v jq >/dev/null 2>&1; then
+    if [ -f "$ENVIRONMENT_SCRIPT" ] && [ -x "$ENVIRONMENT_SCRIPT" ]; then
+        environment_json="$(bash "$ENVIRONMENT_SCRIPT" "$TARGET" --check 2>/dev/null || true)"
+    else
+        environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止 docs-governance 部署。"}'
+    fi
+
+    [ -n "$environment_json" ] || environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止 docs-governance 部署。"}'
+    cat <<JSONEOF
+{
+  "mode":"$MODE",
+  "target":"$(json_escape "$TARGET")",
+  "status":"needs_install",
+  "environment":${environment_json},
+  "capabilities":[],
+  "summary":"Environment preparation blocked deployment.",
+  "description_nl":"缺少解析 capability manifest 所需的 jq。请先安装缺失工具；如果用户拒绝安装，应终止 docs-governance 部署。",
+  "total_files":0,
+  "files_new":0,
+  "files_existing":0,
+  "files_missing":0,
+  "capability_count":0
+}
+JSONEOF
+    exit 0
+fi
 
 join_json() {
     local out=""
@@ -191,6 +214,9 @@ map_legacy_category() {
         git.language)
             echo "repo.language"
             ;;
+        github.language)
+            echo "github.language"
+            ;;
         github.branch-release)
             echo "github.branch-protection release.versioning"
             ;;
@@ -213,7 +239,7 @@ map_legacy_category() {
             echo "quality.practices project.gitignore quality.node-tooling"
             ;;
         github.delivery)
-            echo "git.commit-format repo.language github.pr github.branch-protection"
+            echo "git.commit-format repo.language github.language github.pr github.branch-protection"
             ;;
         release.automated)
             echo "release.versioning github.release-please"
@@ -229,6 +255,11 @@ resolve_request_ids() {
     local token
     local token_trimmed
     local mapped
+
+    while IFS= read -r id; do
+        [ -z "$id" ] && continue
+        raw_ids+=( "$id" )
+    done < <(default_manifest_ids)
 
     if [ -n "$ENABLED_CATEGORIES" ]; then
         IFS=',' read -r -a token_list <<< "$ENABLED_CATEGORIES"
@@ -268,10 +299,6 @@ resolve_request_ids() {
                 fi
             done
         fi
-    else
-        while IFS= read -r id; do
-            raw_ids+=( "$id" )
-        done < <(default_manifest_ids)
     fi
 
     local resolved=()
@@ -509,6 +536,7 @@ collect_installer_entry_dry() {
 collect_installer_entry_apply() {
     local manifest_path="$1"
     local cap_id="$2"
+    local effective_strategy="${3:-$STRATEGY}"
     local installer_script safe_strategies status description needs_strategy action installer_result
     installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
     [ -z "$installer_script" ] && return 0
@@ -543,7 +571,7 @@ collect_installer_entry_apply() {
         description="Installer missing or not executable: $installer_script"
         APPLY_ERROR=$((APPLY_ERROR + 1))
         installer_result="error"
-    elif [ -z "$STRATEGY" ]; then
+    elif [ -z "$effective_strategy" ]; then
         status="needs_strategy"
         needs_strategy="true"
         description="Strategy required for installer-backed capability. Use a strategy allowed by that capability manifest."
@@ -553,7 +581,7 @@ collect_installer_entry_apply() {
         local allowed="false"
         for strategy in $safe_strategies; do
             strategy="$(echo "$strategy" | sed "s/^'//;s/'$//")"
-            if [ "$STRATEGY" = "$strategy" ]; then
+            if [ "$effective_strategy" = "$strategy" ]; then
                 allowed="true"
                 break
             fi
@@ -562,13 +590,13 @@ collect_installer_entry_apply() {
         if [ "$allowed" != "true" ]; then
             status="needs_strategy"
             needs_strategy="true"
-            description="Unsafe strategy '$STRATEGY'. Allowed: ${safe_strategies}"
+            description="Unsafe strategy '$effective_strategy'. Allowed: ${safe_strategies}"
             APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
             installer_result="needs_strategy"
         else
             local installer_output installer_rc
             set +e
-            installer_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --apply "$STRATEGY" 2>&1)"
+            installer_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --apply "$effective_strategy" 2>&1)"
             installer_rc=$?
             set -e
 
@@ -600,7 +628,7 @@ collect_installer_entry_apply() {
         fi
     fi
 
-    APPLY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":${safe_array_json},\"action\":\"$(json_escape "$action")\",\"needs_strategy\":${needs_strategy},\"installer_result\":\"$(json_escape "$installer_result")\",\"description_nl\":\"$(json_escape "$description")\"}" )
+    APPLY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":${safe_array_json},\"action\":\"$(json_escape "$action")\",\"effective_strategy\":\"$(json_escape "$effective_strategy")\",\"needs_strategy\":${needs_strategy},\"installer_result\":\"$(json_escape "$installer_result")\",\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
 build_selected_list_summary() {
@@ -615,6 +643,20 @@ build_selected_list_summary() {
         fi
     done
     echo "$out"
+}
+
+run_environment_gate() {
+    local mode="$1"
+    shift
+    local capabilities
+    capabilities="$(build_selected_list_summary "$@")"
+
+    if [ ! -f "$ENVIRONMENT_SCRIPT" ] || [ ! -x "$ENVIRONMENT_SCRIPT" ]; then
+        echo '{"status":"error","description_nl":"Environment preflight script is missing or not executable."}'
+        return 0
+    fi
+
+    bash "$ENVIRONMENT_SCRIPT" "$TARGET" "--$mode" --capabilities "$capabilities"
 }
 
 do_dry_run() {
@@ -637,6 +679,11 @@ do_dry_run() {
         echo "error: no capabilities resolved" >&2
         exit 2
     fi
+
+    local environment_json environment_status environment_desc
+    environment_json="$(run_environment_gate "check" "${capability_ids[@]}" 2>&1)"
+    environment_status="$(echo "$environment_json" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
+    environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment check failed."' 2>/dev/null || echo "Environment check failed.")"
 
     DRY_FILES=0
     DRY_NEW=0
@@ -689,6 +736,9 @@ do_dry_run() {
     if [ "$DRY_MISSING" -gt 0 ] || [ "$DRY_INST_MISSING" -gt 0 ]; then
         top_status="error"
         top_desc="Dry-run found missing source files."
+    elif [ "$environment_status" != "ok" ]; then
+        top_status="$environment_status"
+        top_desc="$environment_desc"
     elif [ "$DRY_EXISTING" -gt 0 ]; then
         top_status="conflict"
         top_desc="Dry-run found existing files. Apply will skip existing targets unless strategy is provided."
@@ -706,6 +756,7 @@ do_dry_run() {
   "mode":"dry-run",
   "target":"$(json_escape "$TARGET")",
   "status":"$top_status",
+  "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "summary":"Selected capabilities: $(json_escape "$summary")",
   "description_nl":"$(json_escape "$top_desc")",
@@ -737,6 +788,32 @@ do_apply() {
     if [ "${#capability_ids[@]}" -eq 0 ]; then
         echo "error: no capabilities resolved" >&2
         exit 2
+    fi
+
+    local environment_json environment_status environment_desc
+    environment_json="$(run_environment_gate "apply" "${capability_ids[@]}" 2>&1)"
+    environment_status="$(echo "$environment_json" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
+    environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment preflight failed."' 2>/dev/null || echo "Environment preflight failed.")"
+    if [ "$environment_status" != "ok" ]; then
+        cat <<JSONEOF
+{
+  "mode":"apply",
+  "target":"$(json_escape "$TARGET")",
+  "status":"$environment_status",
+  "environment":${environment_json},
+  "capabilities":[],
+  "summary":"Environment preparation blocked deployment.",
+  "description_nl":"$(json_escape "$environment_desc")",
+  "applied_count":0,
+  "skipped_count":0,
+  "files_total":0,
+  "files_new":0,
+  "files_existing":0,
+  "validation":"skipped",
+  "validation_description_nl":"Environment is incomplete."
+}
+JSONEOF
+        return 0
     fi
 
     APPLY_FILES=0
@@ -771,14 +848,49 @@ do_apply() {
         local pre_strategy=$APPLY_STRATEGY_REQUIRED
 
         APPLY_ITEMS=()
-        local installer_script strategy_state blocked_desc
+        local installer_script strategy_state blocked_desc effective_strategy
         installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
         strategy_state="allowed"
         blocked_desc=""
+        effective_strategy="$STRATEGY"
         if [ -n "$installer_script" ]; then
             if [ -z "$STRATEGY" ]; then
-                strategy_state="needs_strategy"
-                blocked_desc="Capability has an installer; no files were written because --strategy was not provided."
+                local installer_path installer_check_output installer_check_rc installer_check_status
+                installer_path="$SCRIPTS_DIR/$installer_script"
+                if [ -f "$installer_path" ] && [ -x "$installer_path" ]; then
+                    set +e
+                    installer_check_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --check 2>&1)"
+                    installer_check_rc=$?
+                    set -e
+                    installer_check_status="$(echo "$installer_check_output" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
+                    if [ "$installer_check_rc" -eq 0 ] && [ "$installer_check_status" = "clean" ]; then
+                        effective_strategy="merge"
+                    elif [ "$installer_check_rc" -eq 0 ] && [ "$installer_script" = "install-husky.sh" ] && [ "$installer_check_status" = "conflict" ]; then
+                        local auto_merge_husky hook_file hook_path
+                        auto_merge_husky="true"
+                        while IFS= read -r hook_file; do
+                            [ -z "$hook_file" ] && continue
+                            hook_path="$TARGET/${hook_file#./}"
+                            if [ ! -f "$hook_path" ] || ! grep -qF "hook managed by docs-governance snippets" "$hook_path"; then
+                                auto_merge_husky="false"
+                                break
+                            fi
+                        done < <(echo "$installer_check_output" | jq -r '.items[]? | select(.exists == true) | .file' 2>/dev/null)
+
+                        if [ "$auto_merge_husky" = "true" ]; then
+                            effective_strategy="merge"
+                        else
+                            strategy_state="needs_strategy"
+                            blocked_desc="$(echo "$installer_check_output" | jq -r '.description_nl // "Capability has an installer and existing configuration needs an explicit strategy."' 2>/dev/null || echo "Capability has an installer and existing configuration needs an explicit strategy.")"
+                        fi
+                    else
+                        strategy_state="needs_strategy"
+                        blocked_desc="$(echo "$installer_check_output" | jq -r '.description_nl // "Capability has an installer and existing configuration needs an explicit strategy."' 2>/dev/null || echo "Capability has an installer and existing configuration needs an explicit strategy.")"
+                    fi
+                else
+                    strategy_state="needs_strategy"
+                    blocked_desc="Capability has an installer, but the installer is missing or not executable."
+                fi
             elif [ "$STRATEGY" = "skip" ]; then
                 strategy_state="skip"
                 blocked_desc="Capability strategy is skip; no files were written."
@@ -800,11 +912,11 @@ do_apply() {
         if [ "$strategy_state" = "allowed" ]; then
             collect_file_entries "$manifest_path" "template" "apply"
             collect_file_entries "$manifest_path" "asset" "apply"
-            collect_installer_entry_apply "$manifest_path" "$cap_id"
+            collect_installer_entry_apply "$manifest_path" "$cap_id" "$effective_strategy"
         else
             collect_file_entries_blocked "$manifest_path" "template" "$strategy_state" "$blocked_desc"
             collect_file_entries_blocked "$manifest_path" "asset" "$strategy_state" "$blocked_desc"
-            collect_installer_entry_apply "$manifest_path" "$cap_id"
+            collect_installer_entry_apply "$manifest_path" "$cap_id" "$effective_strategy"
         fi
 
         local cap_new=$((APPLY_NEW - pre_new))
@@ -875,6 +987,7 @@ do_apply() {
   "mode":"apply",
   "target":"$(json_escape "$TARGET")",
   "status":"$overall_status",
+  "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "summary":"Applied capability set: $(json_escape "$summary")",
   "description_nl":"$(json_escape "$top_desc")",

@@ -2,7 +2,7 @@
   "id": "knowledge.archive",
   "description": "Project knowledge archive scaffold",
   "description_nl": "Create archive indexes for historical project records and retired knowledge.",
-  "default": false,
+  "default": true,
   "dependencies": ["core"],
   "template_files": [
     {"src":"templates/docs/archive/AGENTS.md","dst":"docs/archive/AGENTS.md"},

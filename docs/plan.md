@@ -147,6 +147,8 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
 
 ### 部署策略
 
+> 当前实现已调整为 `default=true` 必选能力始终部署，以下为早期设计阶段的历史策略记录。
+
 初始化时，**仅部署用户选择的约束**，未选择的内容不复制到项目中：
 
 - `templates/docs/practices/` 中用户启用的文档 → 部署到项目 `docs/practices/`

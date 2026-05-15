@@ -32,7 +32,8 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 项目已有文档体系但不完整 → 进入融合模式
 - 项目已有完整体系，用户要求增删改约束 → 进入维护模式
 - 项目已有完整体系，用户要求检查完整性 → 进入诊断模式
-- 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问
+- 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问；默认治理与 Git 能力不作为是否启用的问题，只在已有配置需要合并策略时确认
+- 部署/融合前统一执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`；尚未确定可选能力时不传 `--capabilities`，脚本按默认必选能力检查。若返回 `needs_install`、`needs_initialization` 或 `needs_user_action`，先向用户展示安装/初始化建议并确认；若用户拒绝，当前流程终止
 - 任何涉及已有配置的操作，使用脚本获取结构化 merge plan，用户确认后执行
 - **不覆盖已有配置**，必须经用户确认
 - 部署、融合、维护或生成操作完成后，必须执行收尾验证，并按 [docs/completion-report-template.md](docs/completion-report-template.md) 用自然语言向用户汇报结果
@@ -43,11 +44,12 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 触发：项目无 AGENTS.md
 
-1. 分析项目现状（读取文件结构、已有配置）
-2. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 连续提问（基于现状适配，不机械照搬）
-3. 展示确认汇总
-4. 用户确认后：调用 `scaffold.sh --dry-run --enable <capability ids>` 预览变更 → 确认策略 → `scaffold.sh --apply --enable <capability ids>` 复制启用的模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
-5. 按「执行收尾验证」流程检查部署结果，并使用完成报告模板向用户汇报
+1. 前置执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`，处理并确认 Git/Node 初始化需求（见 Q&A 前置问题；尚未确定可选能力时使用默认必选能力检查）
+2. 分析项目现状（读取文件结构、已有配置）
+3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
+4. 展示确认汇总
+5. 用户确认后：调用 `scaffold.sh --dry-run --enable <optional capability ids>` 预览变更 → 对已有配置确认策略 → `scaffold.sh --apply --enable <optional capability ids>`（如有冲突再加 `--strategy`）复制默认与可选模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
+6. 按「执行收尾验证」流程检查部署结果，并使用完成报告模板向用户汇报
 
 ### 2. 诊断
 
@@ -124,8 +126,9 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 ## 部署策略
 
-- 仅部署用户选择启用的文档和资产
-- 未启用的资产不复制到项目
+- 必选默认能力始终部署：`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
+- `--enable` 只表示在必选默认集上追加可选能力；GitHub、发布自动化、Node.js 工具等能力未选择时不复制到项目
+- 未启用的可选资产不复制到项目
 - `docs/harness/sensors/scripts/`（audit.sh、validate.sh、diff-helper.sh、check-consistency.sh）始终部署
 - 后续需要新增约束时，重新安装 Skill 执行
 
@@ -144,13 +147,14 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 关键约定：
 - 所有脚本 `--json` 模式输出纯 JSON 到 stdout，诊断日志到 stderr
 - 每个 JSON 响应必须包含 `description_nl` 字段（自然语言描述，LLM 可直接使用）
+- 环境前置脚本 `ensure-environment.sh --check [--capabilities "<resolved ids>"]` 必须输出统一字段：`status`、`items`、`summary`、`description_nl`；其中 `status` 至少支持 `ok/needs_install/needs_initialization/needs_user_action/error`
 - 退出码：0=成功/无变更，1=检测到冲突/失败，2=脚本自身错误
 - LLM 不应自行解析原始 diff 或文件内容来替代脚本的结构化输出
 
 ## 能力清单约定
 
 - `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。
-- `core` 始终部署短根 `AGENTS.md`、`CLAUDE.md`、`docs/harness/maintenance.md`、harness 索引、exec-plans 索引、generated 索引与维护脚本；guide 文档、Git hooks、GitHub CI、release-please、知识库目录按 capability 启用。
+- `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
 ## 辅助文件
@@ -163,7 +167,7 @@ Skill 目录中的其他文件按需加载：
 - **[references/agent-compatibility.md](references/agent-compatibility.md)**：Claude、Codex 和通用 Agent Skills 客户端的兼容说明。需要安装、分发或调整触发策略时读取。
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
-- **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），按用户选择部署到项目对应位置。
-- **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + install-*.sh），由各模式按需调用。
+- **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），默认 Git 资产和用户选择的可选资产会部署到项目对应位置。
+- **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + install-*.sh + ensure-environment.sh），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
 - **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。
