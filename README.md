@@ -323,6 +323,53 @@ bats tests/unit
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
 - [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
 
+## 🤝 参与贡献
+
+我们非常欢迎各种形式的贡献：修正文档、补充能力清单、完善模板、改进检查脚本、提交兼容性反馈，或者把真实项目里的治理经验沉淀回来。如果你对贡献代码或治理能力感兴趣，可以查看 GitHub [Issues](https://github.com/kinoward/dayu-harness-skill/issues) 和 [Projects](https://github.com/kinoward/dayu-harness-skill/projects)，从小的文档修订到新的能力 manifest 都可以开始。
+
+> [!TIP]
+>
+> 我们希望这个仓库成为一个技术分享型项目：把 AI 协作中的好实践、失败经验、检查脚本和治理约束沉淀下来，让更多项目可以复用。
+> 同时欢迎提交产品功能和使用体验反馈，帮助大禹治库 Skill 更好地服务真实项目。
+>
+> **项目维护者:** [@kinoward](https://github.com/kinoward)
+
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kinoward/dayu-harness-skill/pulls)
+[![Good First Issues](https://img.shields.io/github/issues/kinoward/dayu-harness-skill/good%20first%20issue?label=good%20first%20issue)](https://github.com/kinoward/dayu-harness-skill/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+[![Contributors](https://img.shields.io/github/contributors/kinoward/dayu-harness-skill)](https://github.com/kinoward/dayu-harness-skill/graphs/contributors)
+
+<a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors" target="_blank">
+  <table>
+    <tr>
+      <th colspan="2">
+        <br><img src="https://contrib.rocks/image?repo=kinoward/dayu-harness-skill" alt="Dayu Harness Skill contributors"><br><br>
+      </th>
+    </tr>
+    <tr>
+      <td>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="Active contributors in the past 28 days">
+        </picture>
+      </td>
+      <td rowspan="2">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=4x7&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=4x7&color_scheme=light" alt="Participant growth in the past 28 days">
+        </picture>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&period=past_28_days&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="New contributors in the past 28 days">
+        </picture>
+      </td>
+    </tr>
+  </table>
+</a>
+
 ## ⭐ Star History
 
 <a href="https://www.star-history.com/?repos=kinoward%2Fdayu-harness-skill&type=date&legend=top-left">
