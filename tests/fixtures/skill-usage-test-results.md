@@ -61,6 +61,8 @@ knowledge.research, project.context, knowledge.archive
 
 ## 已有松散项目基线
 
+该场景主要用于验证“治理状态不完整”而非文档语法问题。
+
 用户意图：
 
 - 保留原有 Node CLI 代码、测试、README、CI、Husky hook 和格式化配置。

@@ -1,6 +1,15 @@
-# AGENTS（草稿）
+# AGENTS.md
 
-本项目是一个小型 Node CLI 脚本。治理文档尚在整理中，当前文件不完整。
+本项目已有部分治理与 CI 配置，AGENTS.md 仍故意不完整，用于验证已存在项目的融合修复路径，不是 Markdown 结构错误。
+
+## 目录索引
+
+- [AGENTS.md](AGENTS.md) - 当前索引
+- [docs/harness/guides/commit-guidelines.md](docs/harness/guides/commit-guidelines.md) - 提交规范入口
+- [docs/operations/release-notes.md](docs/operations/release-notes.md) - 发布流程（故意断链，需替换）
+- `[lint]` - 临时说明（当前缺失）
+
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 工程约束
 
@@ -14,6 +23,4 @@
 
 ## 决策记录
 
-- 尚未建立完整目录索引。
-- 当前 AGENTS 文件使用了“草稿”表述，未来会补齐规范。
-
+- 当前仍缺失完整目录索引与维护规范，计划在融合后补齐。
