@@ -6,6 +6,53 @@ setup() {
     TEST_ROOT="${BATS_TEST_DIRNAME}/.tmp/skill-e2e"
     mkdir -p "$TEST_ROOT"
     TEST_DIR="$(mktemp -d "$TEST_ROOT/run.XXXXXX")"
+
+    WRAPPER_DIR="$TEST_DIR/wrapper"
+    mkdir -p "$WRAPPER_DIR"
+    cat > "$WRAPPER_DIR/node" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/node"
+
+    cat > "$WRAPPER_DIR/npm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${1:-}" = "init" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{}}
+JSON
+  exit 0
+fi
+
+if [ "${1:-}" = "install" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
+JSON
+  exit 0
+fi
+
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npm"
+
+    cat > "$WRAPPER_DIR/npx" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npx"
+
+    cat > "$WRAPPER_DIR/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
+  exit 0
+fi
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/gh"
+
+    export PATH="$WRAPPER_DIR:$PATH"
 }
 
 teardown() {
@@ -71,23 +118,26 @@ json_from_output() {
     local enabled="git.commit,git.language,quality.tooling,ai.collaboration,knowledge.adr,knowledge.troubleshooting,knowledge.research,project.docs,archive.project"
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable "$enabled"
-    echo "$output" | jq -e '.status == "clean"'
+    echo "$output" | jq -e '.status == "needs_initialization"'
+    echo "$output" | jq -e '.environment.items | any(.action == "git init")'
+    echo "$output" | jq -e '.environment.items | any(.action == "npm init -y")'
     echo "$output" | jq -e '.capability_count == 14'
     echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","repo.language"]'
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable "$enabled" --strategy merge
     echo "$output" | jq -e '.status == "ok"'
-    echo "$output" | jq -e '.applied_count == 37'
+    echo "$output" | jq -e '.applied_count == 35'
     echo "$output" | jq -e '.validation == "passed"'
 
     assert_path "$project_dir/.husky/commit-msg"
     assert_path "$project_dir/.husky/pre-commit"
     assert_no_path "$project_dir/.husky/pre-push"
+    assert_path "$project_dir/package.json"
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.js"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
-    assert_path "$project_dir/.github/workflows/repo-language-pr-lint.yml"
-    assert_path "$project_dir/.github/workflows/repo-language-issue-lint.yml"
+    assert_no_path "$project_dir/.github/workflows/repo-language-pr-lint.yml"
+    assert_no_path "$project_dir/.github/workflows/repo-language-issue-lint.yml"
     assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
     assert_no_path "$project_dir/.github/rulesets"
     assert_no_path "$project_dir/release-please-config.json"
@@ -127,11 +177,14 @@ json_from_output() {
     # - Enable Git, GitHub PR, branch protection, quality tooling and knowledge/project docs.
     # - Skip github.release-please.
     # - Merge existing Husky hooks and preserve existing config files.
-    local enabled="git.commit,git.language,github.pr,github.branch-release,quality.tooling,ai.collaboration,knowledge.adr,knowledge.troubleshooting,knowledge.research,project.docs,archive.project"
+    local enabled="git.commit,git.language,github.language,github.pr,github.branch-release,quality.tooling,ai.collaboration,knowledge.adr,knowledge.troubleshooting,knowledge.research,project.docs,archive.project"
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable "$enabled"
-    echo "$output" | jq -e '.status == "conflict"'
-    echo "$output" | jq -e '.capability_count == 17'
+    echo "$output" | jq -e '.status == "needs_initialization"'
+    echo "$output" | jq -e '.environment.status == "needs_initialization"'
+    echo "$output" | jq -e '.files_existing == 4'
+    echo "$output" | jq -e '.capabilities | any(.status == "conflict")'
+    echo "$output" | jq -e '.capability_count == 18'
     echo "$output" | jq -e '.capabilities | map(.id) | sort | index("github.release-please") | not'
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable "$enabled" --strategy merge
@@ -145,7 +198,7 @@ json_from_output() {
     # - Index preserved loose docs so progressive disclosure can discover them.
     write_file "$project_dir/CLAUDE.md" "@AGENTS.md"
     perl -0pi -e 's#- 发布流程：\[docs/operations/release-notes.md\]\(docs/operations/release-notes.md\)#- 发布流程已迁移到：[docs/harness/guides/release-versioning.md](docs/harness/guides/release-versioning.md)#' "$project_dir/AGENTS.md"
-    perl -0pi -e 's#(- 可选：`knowledge.archive` \[archive/AGENTS.md\]\(archive/AGENTS.md\) - 历史归档\n)#$1- [notes/decision-log.md](notes/decision-log.md) - 迁移前保留的松散决策记录\n- [practices/commit-guidelines.md](practices/commit-guidelines.md) - 迁移前保留的旧提交规范\n#' "$project_dir/docs/AGENTS.md"
+    perl -0pi -e 's#(- \[archive/AGENTS.md\]\(archive/AGENTS.md\) - 默认：历史归档\n)#$1- [notes/decision-log.md](notes/decision-log.md) - 迁移前保留的松散决策记录\n- [practices/commit-guidelines.md](practices/commit-guidelines.md) - 迁移前保留的旧提交规范\n#' "$project_dir/docs/AGENTS.md"
 
     assert_path "$project_dir/.github/workflows/pr-lint.yml"
     assert_path "$project_dir/.github/workflows/repo-language-pr-lint.yml"

@@ -6,6 +6,53 @@ setup() {
     mkdir -p "$TEST_ROOT"
     TEST_DIR="$(mktemp -d "$TEST_ROOT/audit.XXXXXX")"
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+
+    WRAPPER_DIR="$TEST_DIR/wrapper"
+    mkdir -p "$WRAPPER_DIR"
+    cat > "$WRAPPER_DIR/node" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/node"
+
+    cat > "$WRAPPER_DIR/npm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${1:-}" = "init" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{}}
+JSON
+  exit 0
+fi
+
+if [ "${1:-}" = "install" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
+JSON
+  exit 0
+fi
+
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npm"
+
+    cat > "$WRAPPER_DIR/npx" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npx"
+
+    cat > "$WRAPPER_DIR/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
+  exit 0
+fi
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/gh"
+
+    export PATH="$WRAPPER_DIR:$PATH"
 }
 
 teardown() {
@@ -64,8 +111,8 @@ teardown() {
     [[ "$output" =~ "docs/harness/sensors/scripts/AGENTS.md" ]]
 }
 
-@test "core-only scaffold passes optional-link checks" {
-    local project_dir="$TEST_DIR/core-only"
+@test "default scaffold passes optional-link checks" {
+    local project_dir="$TEST_DIR/default-scaffold"
     mkdir -p "$project_dir"
 
     run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply

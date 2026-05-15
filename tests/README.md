@@ -14,6 +14,10 @@
 - `test-audit.bats`：验证 `audit.sh`、`validate.sh`、`check-consistency.sh` 的核心诊断行为。
 - `test-diff-helper.bats`：验证 diff/merge 描述辅助脚本。
 
+其中新增环境依赖前置断言，覆盖：
+- `scripts/ensure-environment.sh --check` 的标准 JSON 字段契约；
+- `scaffold.sh` 与环境预检脚本的集成引用。
+
 ### 执行测试模板
 
 位置：`tests/fixtures/`
@@ -30,8 +34,8 @@
 
 这是对话回放式 E2E，不驱动真实聊天 UI。它将本次测试过程收束为可重复的 CI 验收：
 
-- 空项目：模拟用户用旧 id 启用 Git 约束、质量能力和知识库能力，验证兼容展开到新原子能力。
-- 已有项目：模拟用户启用 Git/GitHub PR/分支保护/版本保护/质量工具/知识库能力，明确跳过 release-please，并确认 merge 既有 hook。
+- 空项目：模拟用户用旧 id 追加质量能力，验证默认 Git/知识库能力与兼容展开后的新原子能力。
+- 已有项目：模拟用户在默认能力基础上追加 GitHub PR、GitHub 语言 workflow、分支保护、版本保护和质量工具，明确跳过 release-please，并确认 merge 既有 hook。
 - 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg` CJK 拦截、`pre-push` main 分支保护和 release tag 保护。
 - 融合行为：验证已有项目中的 `CLAUDE.md`、根 `AGENTS.md` 断链和孤儿旧文档在用户确认后被修复并纳入渐进式文档索引。
 

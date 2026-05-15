@@ -79,6 +79,49 @@ printf '%s\n' "$path"
 EOF
     chmod +x "$mktemp_script"
 
+    cat > "$WRAPPER_DIR/node" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/node"
+
+    cat > "$WRAPPER_DIR/npm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "${1:-}" = "init" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{}}
+JSON
+  exit 0
+fi
+
+if [ "${1:-}" = "install" ]; then
+  cat > package.json <<'JSON'
+{"name":"docs-governance-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
+JSON
+  exit 0
+fi
+
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npm"
+
+    cat > "$WRAPPER_DIR/npx" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/npx"
+
+    cat > "$WRAPPER_DIR/gh" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
+  exit 0
+fi
+exit 0
+EOF
+    chmod +x "$WRAPPER_DIR/gh"
+
     export BATS_MKTEMP_ROOT="$WORK_DIR/.mktemp"
     mkdir -p "$BATS_MKTEMP_ROOT"
     export WRAPPER_BIN="$WRAPPER_DIR"
@@ -233,14 +276,13 @@ resolve_relative_path() {
     jq -e '.acceptance | index("Maintenance scripts AGENTS index exists")' "$REPO_ROOT/capabilities/core.json"
 }
 
-@test "scaffold --dry-run default only includes core" {
+@test "scaffold --dry-run default includes mandatory governance and git capabilities" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capability_count == 1'
-    echo "$output" | jq -e '.capabilities | length == 1'
-    echo "$output" | jq -e '.capabilities[0].id == "core"'
+    echo "$output" | jq -e '.capability_count == 12'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","repo.language"]'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/maintenance.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/AGENTS.md")] | length == 1'
@@ -250,8 +292,85 @@ resolve_relative_path() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/check-consistency.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/diff-helper.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/validate.sh")] | length == 1'
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/commit-guidelines.md")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/commit-guidelines.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/ai-execution.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/design-docs/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/repo-language-pr-lint.yml")] | length == 0'
+}
+
+@test "environment preflight check script has machine-readable contract" {
+    if [ ! -f "$REPO_ROOT/scripts/ensure-environment.sh" ]; then
+        skip "ensure-environment.sh not available in this branch yet"
+    fi
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$FIXTURE_EMPTY" --check --capabilities "core,git.hooks,git.commit-format,repo.language"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e 'has("status") and has("items") and ( .items | type == "array" ) and has("summary") and has("description_nl")'
+    echo "$output" | jq -e 'has("missing_tools") and has("initializations") and has("installs") and has("user_actions") and has("errors")'
+    echo "$output" | jq -e '.items | all(.status != null)'
+    echo "$output" | jq -e '.status == "ok" or .status == "needs_initialization" or .status == "needs_install" or .status == "needs_user_action" or .status == "error"'
+}
+
+@test "environment preflight without explicit capabilities assumes mandatory defaults" {
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$FIXTURE_EMPTY" --check
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_initialization"'
+    echo "$output" | jq -e '.items | any(.kind == "tool" and .name == "node")'
+    echo "$output" | jq -e '.items | any(.action == "git init")'
+    echo "$output" | jq -e '.items | any(.action == "npm init -y")'
+}
+
+@test "environment preflight reports package dependency gaps as install work" {
+    local target="$WORK_DIR/package-deps-target"
+    mkdir -p "$target"
+    git -C "$target" init >/dev/null
+    git -C "$target" config core.hooksPath .husky
+    write_file "$target/package.json" '{"name":"package-deps-target","version":"1.0.0","devDependencies":{}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --check --capabilities "git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_install"'
+    echo "$output" | jq -e '.initializations == 0'
+    echo "$output" | jq -e '.installs == 1'
+    echo "$output" | jq -e '.items | any(.kind == "npm_dependencies" and .status == "needs_install")'
+}
+
+@test "scaffold dry-run prioritizes mandatory environment blockers over file conflicts" {
+    local target="$WORK_DIR/env-conflict-target"
+    mkdir -p "$target"
+    cp -R "$REPO_ROOT/tests/fixtures/empty-project/." "$target"
+    write_file "$target/CLAUDE.md" "existing project entry"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_initialization"'
+    echo "$output" | jq -e '.environment.status == "needs_initialization"'
+    echo "$output" | jq -e '.files_existing >= 1'
+}
+
+@test "scaffold source references environment preflight integration point" {
+    if [ ! -f "$REPO_ROOT/scripts/ensure-environment.sh" ]; then
+        skip "ensure-environment.sh not available in this branch yet"
+    fi
+
+    run bash -c 'rg -n "ensure-environment\\.sh" "$1"' _ "$REPO_ROOT/scripts/scaffold.sh"
+    [ "$status" -eq 0 ]
+}
+
+@test "environment preflight policy is documented across Q&A/Skill/README/maintenance" {
+    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/SKILL.md"
+    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/README.md"
+    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -q -- '--capabilities' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -q "缺失依赖" "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -q "git init" "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -q "npm init -y" "$REPO_ROOT/templates/docs/harness/maintenance.md"
 }
 
 @test "scaffold --enable github.release-please resolves dependencies" {
@@ -259,23 +378,23 @@ resolve_relative_path() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core", "git.commit-format", "git.hooks", "github.pr", "github.release-please", "release.versioning"]'
-    echo "$output" | jq -e '.capability_count == 6'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning","repo.language"]'
+    echo "$output" | jq -e '.capability_count == 15'
 }
 
 @test "legacy capability ids and presets expand to new capability set" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,github.branch-release,quality.tooling,ai.collaboration,project.docs,archive.project
 
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.archive","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning","repo.language"]'
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.delivery
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core","git.commit-format","git.hooks","github.branch-protection","github.pr","repo.language"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","github.language","github.pr","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","repo.language"]'
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.standard
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core","git.hooks","project.gitignore","quality.node-tooling","quality.practices"]'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","repo.language"]'
 }
 
 @test "split capabilities stay atomic in dry-run output" {
@@ -287,7 +406,7 @@ resolve_relative_path() {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.practices
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "eslint.config.js" or .dst == ".prettierrc" or .dst == ".lintstagedrc.json")] | length == 0'
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.kind == "installer")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.capability == "quality.node-tooling" and .kind == "installer")] | length == 0'
 }
 
 @test "scaffold apply does not overwrite existing target files" {
@@ -305,7 +424,7 @@ resolve_relative_path() {
     [ "$(cat "$target/CLAUDE.md")" = "KEEP_THIS_CONTENT" ]
 }
 
-@test "scaffold apply allows non-installer capabilities when installer strategy is missing" {
+@test "scaffold apply auto-merges clean installer capabilities when strategy is missing" {
     local target="$WORK_DIR/strat-scoped-target"
     mkdir -p "$target"
     cp -R "$REPO_ROOT/tests/fixtures/empty-project/." "$target"
@@ -314,14 +433,14 @@ resolve_relative_path() {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.release-please
 
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.status == "needs_strategy"'
-    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").status == "needs_strategy"'
-    echo "$output" | jq -e '.capabilities[] | select(.id=="release.versioning").status == "needs_strategy"'
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items[] | select(.kind=="installer").effective_strategy == "merge"'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="release.versioning").items[] | select(.kind=="installer").effective_strategy == "merge"'
     echo "$output" | jq -e '.capabilities[] | select(.id=="github.pr").status == "ok"'
     echo "$output" | jq -e '.capabilities[] | select(.id=="github.release-please").status == "ok"'
     [ -f "$target/.github/workflows/pr-lint.yml" ]
     [ -f "$target/.github/workflows/release-please.yml" ]
-    [ ! -f "$target/commitlint.config.cjs" ]
+    [ -f "$target/commitlint.config.cjs" ]
 }
 
 @test "AGENTS.md uses directory index convention and non-target AGENTS keeps structure marker absent" {
@@ -415,11 +534,18 @@ resolve_relative_path() {
     done
 
     allowed_file="$WORK_DIR/check_allowed.txt"
+    default_file="$WORK_DIR/default_capabilities.txt"
     extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" | sort -u > "$allowed_file"
+    jq -r 'select(.default == true).id' "$REPO_ROOT/capabilities/"*.json | sort -u > "$default_file"
     is_allowed_capability() {
         local capability="$1"
         [ -z "$capability" ] && return 1
         grep -Fxq "$capability" "$allowed_file" 2>/dev/null
+    }
+    is_default_capability() {
+        local capability="$1"
+        [ -z "$capability" ] && return 1
+        grep -Fxq "$capability" "$default_file" 2>/dev/null
     }
 
     for file in "${TARGET_AGENTS_FILES[@]}"; do
@@ -441,11 +567,15 @@ resolve_relative_path() {
             target_capability="$(lookup_capability_for_path "$resolved")"
 
             if [ "$current_capability" = "core" ] && [ -n "$target_capability" ] && [ "$target_capability" != "core" ]; then
-                if [ -z "$optional_capability" ]; then
+                if is_default_capability "$target_capability"; then
+                    if [ -n "$optional_capability" ]; then
+                        echo "核心 AGENTS 指向默认能力时不应标可选: $relative 链接 $resolved，能力 $target_capability"
+                        return 1
+                    fi
+                elif [ -z "$optional_capability" ]; then
                     echo "核心 AGENTS 指向非 core 能力时必须标可选: $relative 链接 $resolved，期望 $target_capability"
                     return 1
-                fi
-                if [ "$optional_capability" != "$target_capability" ]; then
+                elif [ "$optional_capability" != "$target_capability" ]; then
                     echo "核心 AGENTS 的可选能力应匹配目标能力: $relative 链接 $resolved 标记 $optional_capability，期望 $target_capability"
                     return 1
                 fi

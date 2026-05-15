@@ -4,7 +4,7 @@
 
 ## 使用效果模板
 
-- `skill-empty-template/`：空项目模板。目录内仅保留 `.gitkeep` 以便 Git 追踪；复制为运行实例后应删除 `.gitkeep`，确保实例目录实际为空。当前执行基线用它验证空项目启用 Git 约束、质量工具和非 GitHub 文档能力，同时明确不部署 GitHub 相关资产。
+- `skill-empty-template/`：空项目模板。目录内仅保留 `.gitkeep` 以便 Git 追踪；复制为运行实例后应删除 `.gitkeep`，确保实例目录实际为空。当前执行基线用它验证空项目默认启用 Git 约束和非 GitHub 文档能力，可追加质量工具，同时明确不部署 GitHub 相关资产。
 - `skill-messy-template/`：已有项目模板。它包含小型 Node CLI 代码、松散文档、不完整治理入口以及已有 hooks/CI/config，用于验证 Skill 在融合、诊断和 merge 策略下不会覆盖原项目内容。
 
 ## 既有单元测试夹具
