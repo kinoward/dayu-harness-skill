@@ -1,4 +1,4 @@
-# exec-plans/AGENTS.md
+# docs/exec-plans/AGENTS.md
 
 本目录记录执行计划。活跃计划用于交接当前任务，完成计划用于复盘和追踪已完成工作。
 
@@ -8,7 +8,7 @@
 - [active/AGENTS.md](active/AGENTS.md) - 正在执行或待执行的计划
 - [completed/AGENTS.md](completed/AGENTS.md) - 已完成的计划
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 子目录
 

@@ -9,7 +9,7 @@ Skill 自身文档索引。
 - [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 - [completion-report-template.md](completion-report-template.md) - Skill 执行完成后的验证与自然语言收尾模板
 
-Skill 自身 `docs/` 目录变化时，必须同步更新本区块以及根 [AGENTS.md](../AGENTS.md) 和 [README.md](../README.md) 中对应的 `## 目录索引` 与 `## 目录结构` 描述。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化，并同步根 [AGENTS.md](../AGENTS.md) 和 [README.md](../README.md) 中对应的 `## 目录索引` 与 `## 目录结构` 描述。
 
 ## 设计
 

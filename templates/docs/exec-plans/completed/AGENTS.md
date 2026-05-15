@@ -1,4 +1,4 @@
-# exec-plans/completed/AGENTS.md
+# docs/exec-plans/completed/AGENTS.md
 
 本目录包含已完成的执行计划。完成计划保留供复盘、审计和后续 AI 接手时查阅。
 
@@ -7,7 +7,7 @@
 - [AGENTS.md](AGENTS.md) - 当前索引
 - `*.md` - 已完成执行计划
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 已完成计划
 

@@ -183,6 +183,7 @@ LangChain、LangGraph、向量库或 AI 产品内置 memory 可以用于运行�
 ## 参考引用
 
 - [OpenAI — Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/) — 本 Skill 的设计哲学来源
+- [deusyu/harness-engineering](https://github.com/deusyu/harness-engineering) — 中文 Harness Engineering 学习归档，AGENTS.md 渐进式披露实践参考
 - [Martin Fowler — Harness Engineering](https://martinfowler.com/articles/harness-engineering.html) — Guides × Sensors 控制论框架
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md) — AGENTS.md 开放格式规范，本项目的文档体系根节点遵循此标准
 - [microsoft/skills](https://github.com/microsoft/skills) — 微软官方的 Skills、MCP servers、Agents.md 集合

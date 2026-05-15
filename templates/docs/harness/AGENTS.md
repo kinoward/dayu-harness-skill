@@ -1,4 +1,4 @@
-# harness/AGENTS.md
+# docs/harness/AGENTS.md
 
 本目录包含治理体系本身：AI 行动前读取的规则、行动后使用的反馈检查，以及维护这些内容的流程。
 
@@ -9,7 +9,7 @@
 - [guides/AGENTS.md](guides/AGENTS.md) - 行动前规则卡片入口
 - [sensors/AGENTS.md](sensors/AGENTS.md) - 行动后检查与反馈入口
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 核心入口
 

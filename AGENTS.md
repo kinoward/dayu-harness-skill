@@ -18,7 +18,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
 
-目录、文件或能力部署清单变化导致结构变化时，必须同步更新本区块与 [README.md](README.md) 中对应的 `## 目录结构` 描述。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化，并同步 [README.md](README.md) 中对应的 `## 目录结构` 描述。
 
 ## 理解 Skill
 

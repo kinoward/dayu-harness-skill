@@ -1,4 +1,4 @@
-# harness/sensors/scripts/AGENTS.md
+# docs/harness/sensors/scripts/AGENTS.md
 
 本目录包含文档治理体系的维护脚本。脚本负责确定性检查和结构化输出，AI 负责解释结果并与用户确认。
 
@@ -10,7 +10,7 @@
 - [diff-helper.sh](diff-helper.sh) - 变更差异与 merge plan 描述
 - [validate.sh](validate.sh) - 初始化或维护后的 smoke test
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 下一步看什么
 

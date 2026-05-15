@@ -1,4 +1,4 @@
-# design-docs/AGENTS.md
+# docs/design-docs/AGENTS.md
 
 本目录包含架构与设计决策记录。每个 ADR 记录一个影响项目结构或技术方向的关键决策。
 
@@ -8,7 +8,7 @@
 - [adr-template.md](adr-template.md) - ADR 模板
 - `ADR-*.md` - 项目新增决策记录
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## ADR 模板
 

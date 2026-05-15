@@ -4,7 +4,7 @@
 
 ## 目录索引
 
-- [AGENTS.md](AGENTS.md) - 当前入口
+- [AGENTS.md](AGENTS.md) - 当前索引
 - [harness/AGENTS.md](harness/AGENTS.md) - core：治理规则、反馈检查和维护流程
 - [design-docs/AGENTS.md](design-docs/AGENTS.md) - 默认：架构与设计决策
 - [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - core：执行计划
@@ -14,9 +14,7 @@
 - [troubleshooting/AGENTS.md](troubleshooting/AGENTS.md) - 默认：排障知识库
 - [archive/AGENTS.md](archive/AGENTS.md) - 默认：历史归档
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
-
-## 核心入口
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ### [harness/](harness/AGENTS.md)
 

@@ -1,4 +1,4 @@
-# archive/AGENTS.md
+# docs/archive/AGENTS.md
 
 本目录是历史归档的入口。已废弃、已完成历史使命或不应再作为当前规则使用的内容移入此处。
 
@@ -7,7 +7,7 @@
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [product-specs/AGENTS.md](product-specs/AGENTS.md) - 已归档产品规格和项目内容入口
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 子目录
 

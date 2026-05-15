@@ -22,7 +22,13 @@
 - `.github/` - 可选：GitHub workflows、rulesets、辅助脚本
 - `*` - 默认：commitlint、.gitignore；可选：ESLint、Prettier、release-please 等配置（仅示例）
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
+
+## 机械化检查
+
+- 文档治理完整性诊断：`docs/harness/sensors/scripts/audit.sh`
+- 变更后状态校验：`docs/harness/sensors/scripts/validate.sh`
+- AGENTS 索引一致性检查：`docs/harness/sensors/scripts/check-consistency.sh`
 
 ## 使用顺序
 

@@ -1,4 +1,4 @@
-# references/AGENTS.md
+# docs/references/AGENTS.md
 
 本目录包含外部资料、研究记录和长期参考来源。这里的内容为 AI 提供背景，但不直接作为行为规范。
 
@@ -7,7 +7,7 @@
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [research/AGENTS.md](research/AGENTS.md) - 版本化研究目录索引
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 子目录
 

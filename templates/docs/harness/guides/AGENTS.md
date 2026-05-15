@@ -1,4 +1,4 @@
-# harness/guides/AGENTS.md
+# docs/harness/guides/AGENTS.md
 
 本目录索引 AI 行动前读取的规则卡片。默认治理与 Git 规则在部署时必须启用；GitHub、发布和代码工具类规则仍由对应 capability manifest 控制。
 
@@ -16,7 +16,7 @@
 - [ai-execution.md](ai-execution.md) - 默认：AI 执行方式
 - [ai-memory.md](ai-memory.md) - 默认：AI 记忆边界
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 文档与能力
 

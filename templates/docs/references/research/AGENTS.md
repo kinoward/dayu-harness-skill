@@ -1,4 +1,4 @@
-# references/research/AGENTS.md
+# docs/references/research/AGENTS.md
 
 本目录是版本化研究院。产品研究、技术选型、设计原则等内容按版本化目录组织。
 
@@ -9,7 +9,7 @@
 - `YYYY-MM-DD-vN/AGENTS.md` - 对应版本研究索引
 - `YYYY-MM-DD-vN/*.md` - 版本化研究产出
 
-目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
+目录索引变化时，必须同步更新本区块；含目录、文件或能力部署清单变化。
 
 ## 目录命名
 
