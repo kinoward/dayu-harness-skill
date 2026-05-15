@@ -38,6 +38,29 @@ DEFAULT_SECTIONS = [
     "## Test plan",
 ]
 
+SECTION_MARKER_BY_SECTION = {
+    "## Summary": "<!-- docs-governance:summary -->",
+    "## Implementation notes": "<!-- docs-governance:implementation-notes -->",
+    "## Test plan": "<!-- docs-governance:test-plan -->",
+}
+
+SECTION_HEADER_PATTERNS = {
+    "## Summary": re.compile(r"^##\s*Summary\b", re.MULTILINE),
+    "## Implementation notes": re.compile(r"^##\s*Implementation\s+notes\b", re.MULTILINE),
+    "## Test plan": re.compile(r"^##\s*Test\s+plan\b", re.MULTILINE),
+}
+
+SECTION_MARKER_PATTERNS = {
+    "## Summary": re.compile(r"<!--\s*docs-governance:summary\s*-->"),
+    "## Implementation notes": re.compile(r"<!--\s*docs-governance:implementation-notes\s*-->"),
+    "## Test plan": re.compile(r"<!--\s*docs-governance:test-plan\s*-->"),
+}
+
+SECTION_BOUNDARY_RE = re.compile(
+    r"^(?:##\s+.+|<!--\s*docs-governance:(?:summary|implementation-notes|test-plan)\s*-->)",
+    re.MULTILINE,
+)
+
 CLOSING_TRAILER_RE = re.compile(
     r"^(?:\s*(?:Closes|Fixes|Resolves)\s+#\d+\s*)$",
     re.IGNORECASE | re.MULTILINE,
@@ -118,18 +141,84 @@ def gather_body() -> str:
 # Checks
 # ---------------------------------------------------------------------------
 
+
+def _consume_adjacent_same_section_tokens(body: str, section: str, pos: int) -> int:
+    """Advance `pos` past immediately-adjacent same-section heading/marker pairs."""
+    header_re = SECTION_HEADER_PATTERNS.get(section)
+    marker_re = SECTION_MARKER_PATTERNS.get(section)
+
+    while pos < len(body):
+        # Allow optional whitespace between the section heading and marker variant.
+        while pos < len(body) and body[pos].isspace():
+            pos += 1
+
+        if header_re is not None:
+            header_match = header_re.match(body, pos)
+            if header_match is not None:
+                pos = header_match.end()
+                continue
+
+        if marker_re is not None:
+            marker_match = marker_re.match(body, pos)
+            if marker_match is not None:
+                pos = marker_match.end()
+                continue
+
+        break
+
+    return pos
+
+
 def check_sections(body: str, required: List[str]) -> None:
-    """Verify required sections appear and are in the configured order."""
+    """Verify required sections appear and are in the configured order.
+
+    A required section is satisfied by either its legacy H2 heading or the
+    corresponding marker comment.
+    """
     indices = {}
     for section in required:
-        idx = body.find(section)
+        header_re = SECTION_HEADER_PATTERNS.get(section)
+        marker_re = SECTION_MARKER_PATTERNS.get(section)
+
+        matches = []
+        if header_re is not None:
+            matches.extend((m.start(), m.end()) for m in header_re.finditer(body))
+        if marker_re is not None:
+            matches.extend((m.start(), m.end()) for m in marker_re.finditer(body))
+        if header_re is None and marker_re is None:
+            literal_idx = body.find(section)
+            if literal_idx != -1:
+                matches.append((literal_idx, literal_idx + len(section)))
+
+        idx = -1
+        end = -1
+        if matches:
+            idx, end = min(matches, key=lambda item: item[0])
         if idx == -1:
             die(f"Missing required section in PR body: {section}")
-        indices[section] = idx
+        indices[section] = (idx, end)
 
-    ordered = [indices[s] for s in required]
+    ordered = [indices[s][0] for s in required]
     if ordered != sorted(ordered):
         die("PR body sections must appear in order: " + " -> ".join(required))
+
+
+def section_span(body: str, section: str) -> tuple[int, int]:
+    """Return start and end positions for a section marker or heading."""
+    header_re = SECTION_HEADER_PATTERNS.get(section)
+    marker_re = SECTION_MARKER_PATTERNS.get(section)
+
+    matches = []
+    if header_re is not None:
+        matches.extend((m.start(), m.end()) for m in header_re.finditer(body))
+    if marker_re is not None:
+        matches.extend((m.start(), m.end()) for m in marker_re.finditer(body))
+
+    if not matches:
+        return -1, -1
+
+    start, end = min(matches, key=lambda item: item[0])
+    return start, _consume_adjacent_same_section_tokens(body, section, end)
 
 
 def check_closing_trailer(body: str) -> None:
@@ -147,15 +236,13 @@ def check_test_plan(body: str) -> None:
     Every line that looks like a checkbox bullet (`- [ ]` / `- [x]`)
     must contain at least one backtick-enclosed command.
     """
-    # Locate the Test plan section.
-    idx = body.find("## Test plan")
+    idx, idx_end = section_span(body, "## Test plan")
     if idx == -1:
         return  # absence is already reported by check_sections
 
-    # Grab text from the heading to the next `## ` heading (or EOF).
-    tail = body[idx + len("## Test plan"):]
-    next_heading = re.search(r"^## ", tail, re.MULTILINE)
-    section_text = tail[: next_heading.start()] if next_heading else tail
+    # Grab text from the heading/marker to the next section boundary (or EOF).
+    boundary = SECTION_BOUNDARY_RE.search(body, idx_end)
+    section_text = body[idx_end:boundary.start()] if boundary else body[idx_end:]
 
     # Find checkbox bullets.
     lines = section_text.splitlines()
@@ -208,7 +295,12 @@ Options:
   --config CONFIG    Path to a JSON config file that specifies custom
                      required sections.  Expected format:
 
-                       {{ "sections": ["## Summary", "## Test plan", ...] }}
+                      {{ "sections": ["## Summary", "## Test plan", ...] }}
+
+                 Also accepted per section:
+                   Summary:           <!-- docs-governance:summary -->
+                   Implementation:    <!-- docs-governance:implementation-notes -->
+                   Test plan:         <!-- docs-governance:test-plan -->
 
                      When omitted the default sections are used:
                        {DEFAULT}
