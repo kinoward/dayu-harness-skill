@@ -348,22 +348,22 @@ bats tests/unit
     <tr>
       <td>
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="Active contributors">
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="Active contributors">
         </picture>
       </td>
       <td rowspan="2">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&repo_ids=1240202235&image_size=4x7&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&repo_ids=1240202235&image_size=4x7&color_scheme=light" alt="Participant growth">
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=4x7&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-participants-growth/thumbnail.png?activity=active&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=4x7&color_scheme=light" alt="Participant growth">
         </picture>
       </td>
     </tr>
     <tr>
       <td>
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
-          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="New contributors">
+          <source media="(prefers-color-scheme: dark)" srcset="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=dark">
+          <img src="https://next.ossinsight.io/widgets/official/compose-org-active-contributors/thumbnail.png?activity=new&owner_id=33886943&period=past_28_days&repo_ids=1240202235&image_size=2x3&color_scheme=light" alt="New contributors">
         </picture>
       </td>
     </tr>
