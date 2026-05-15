@@ -609,6 +609,8 @@ collect_installer_entry_apply() {
                 elif [ "$status" = "ok" ] || [ "$status" = "needs_strategy" ] || [ "$status" = "skip" ] || [ "$status" = "clean" ]; then
                     if [ "$status" = "needs_strategy" ]; then
                         APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
+                    elif [ "$action" = "skip" ]; then
+                        APPLY_SKIPPED=$((APPLY_SKIPPED + 1))
                     else
                         APPLY_INSTALLED=$((APPLY_INSTALLED + 1))
                     fi
@@ -886,8 +888,10 @@ JSONEOF
                     blocked_desc="Capability has an installer, but the installer is missing or not executable."
                 fi
             elif [ "$STRATEGY" = "skip" ]; then
-                strategy_state="skip"
-                blocked_desc="Capability strategy is skip; no files were written."
+                # A skip strategy applies to the installer-managed component
+                # only. Static templates/assets in the same capability remain
+                # safe to copy when the target path is new.
+                effective_strategy="skip"
             else
                 local allowed_strategy="false"
                 local candidate
@@ -964,7 +968,11 @@ JSONEOF
     if [ "$overall_status" = "needs_strategy" ]; then
         top_desc="Apply required a strategy for installer-backed capabilities. Re-run with an allowed --strategy value."
     elif [ "$overall_status" = "partial" ]; then
-        top_desc="Apply completed with partial changes. Existing targets were skipped by default."
+        if [ "$STRATEGY" = "skip" ]; then
+            top_desc="Apply completed with partial changes. Installer-managed components were skipped, while static files were still processed."
+        else
+            top_desc="Apply completed with partial changes. Existing targets were skipped by default."
+        fi
     elif [ "$overall_status" = "error" ]; then
         top_desc="Apply encountered errors. Resolve conflicts and retry."
     fi

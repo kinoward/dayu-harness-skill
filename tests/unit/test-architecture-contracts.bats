@@ -488,6 +488,26 @@ expected_agents_h1() {
     [ "$(cat "$target/CLAUDE.md")" = "KEEP_THIS_CONTENT" ]
 }
 
+@test "scaffold apply --strategy skip only skips installer-managed components" {
+    local target="$WORK_DIR/skip-installer-target"
+    mkdir -p "$target"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.branch-protection --strategy skip
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.mode == "apply" and .status == "partial"'
+    echo "$output" | jq -e '.description_nl | contains("Installer-managed components were skipped")'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items[] | select(.kind=="installer").action == "skip"'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="github.branch-protection").items[] | select(.kind=="installer").action == "skip"'
+
+    [ -f "$target/commitlint.config.cjs" ]
+    [ -f "$target/docs/harness/guides/commit-guidelines.md" ]
+    [ -f "$target/docs/harness/guides/branch-protection.md" ]
+    [ -f "$target/.github/rulesets/protect-main.json" ]
+    [ ! -f "$target/.husky/commit-msg" ]
+    [ ! -f "$target/.husky/pre-push" ]
+}
+
 @test "scaffold apply auto-merges clean installer capabilities when strategy is missing" {
     local target="$WORK_DIR/strat-scoped-target"
     mkdir -p "$target"
