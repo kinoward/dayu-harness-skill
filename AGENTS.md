@@ -7,7 +7,9 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [SKILL.md](SKILL.md) - Skill 行为定义
 - [README.md](README.md) - 人类阅读概述
+- [.gitignore](.gitignore) - 本仓库临时测试产物忽略规则
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
+- [LICENSE](LICENSE) - MIT 许可文件
 - [agents/](agents/) - Codex UI 与触发策略元数据
 - [references/agent-compatibility.md](references/agent-compatibility.md) - 跨 Agent 兼容说明
 - [capabilities/](capabilities/) - 治理能力 manifest，部署清单单一事实源
