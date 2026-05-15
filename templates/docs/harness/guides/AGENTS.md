@@ -6,7 +6,6 @@
 
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [commit-guidelines.md](commit-guidelines.md) - 默认：提交格式约束
-- [git-language-policy.md](git-language-policy.md) - 默认：仓库协作语言约束
 - 可选：`github.pr` [pr-guidelines.md](pr-guidelines.md) - PR 工作流规范
 - 可选：`github.branch-protection` [branch-protection.md](branch-protection.md) - 分支保护流程
 - 可选：`release.versioning` [release-versioning.md](release-versioning.md) - 版本与标签规则
@@ -21,7 +20,6 @@
 ## 文档与能力
 
 - `git.commit-format`：`commit-guidelines.md`
-- `repo.language`：`git-language-policy.md`
 - `github.pr`：`pr-guidelines.md`，review checklist 见 `../sensors/reviews/`
 - `github.branch-protection`：`branch-protection.md`
 - `release.versioning`：`release-versioning.md`

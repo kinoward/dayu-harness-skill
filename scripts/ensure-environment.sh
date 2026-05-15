@@ -59,7 +59,6 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
 DEFAULT_CAPABILITIES=(
     "core"
     "git.commit-format"
-    "repo.language"
     "project.gitignore"
     "ai.execution"
     "ai.memory"
@@ -170,9 +169,6 @@ install_hint_for_tool() {
         node|npm|npx)
             echo "安装 Node.js LTS（npm/npx 随 Node.js 提供），例如使用 mise/nvm/brew 或系统包管理器。"
             ;;
-        perl)
-            echo "安装 Perl 5。macOS 通常自带；Ubuntu/Debian: sudo apt-get install perl。"
-            ;;
         python3)
             echo "安装 Python 3。macOS: brew install python；Ubuntu/Debian: sudo apt-get install python3。"
             ;;
@@ -197,7 +193,6 @@ need_tool() {
 }
 
 requires_node=false
-requires_perl=false
 requires_python3=false
 requires_gh=false
 requires_hook_path=false
@@ -206,19 +201,12 @@ if contains_capability "git.commit-format"; then
     requires_node=true
     requires_hook_path=true
 fi
-if contains_capability "repo.language"; then
-    requires_perl=true
-    requires_hook_path=true
-fi
 if contains_capability "quality.node-tooling"; then
     requires_node=true
     requires_hook_path=true
 fi
 if contains_capability "github.branch-protection" || contains_capability "release.versioning"; then
     requires_hook_path=true
-fi
-if contains_capability "github.language"; then
-    requires_perl=true
 fi
 if contains_capability "github.pr"; then
     requires_python3=true
@@ -233,9 +221,6 @@ if [ "$requires_node" = true ]; then
     need_tool "node" "默认提交约束和 Node 工具链要求 Node.js"
     need_tool "npm" "初始化 Node 项目和安装 package.json 依赖需要 npm"
     need_tool "npx" "本地 hook 通过 npx --no-install 调用项目内工具"
-fi
-if [ "$requires_perl" = true ]; then
-    need_tool "perl" "仓库语言 CJK 检测需要 Perl Unicode 正则"
 fi
 if [ "$requires_python3" = true ]; then
     need_tool "python3" "PR body 结构校验脚本需要 Python 3"

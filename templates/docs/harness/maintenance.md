@@ -24,7 +24,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 目标项目通过能力清单（capability manifest）定义可用能力，并以 `default + optional module` 方式部署：
 
-- `default`：无须用户选择的必选治理能力，包括 `core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
+- `default`：无须用户选择的必选治理能力，包括 `core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
 - `optional module`：被部署到目标项目的可选治理能力模块（GitHub CI、release-please、Node.js 工具、分支/标签保护等）
 
 联动组件是治理能力部署出的文件、hook、CI、脚本等。
@@ -77,7 +77,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 ### 新增约束
 
 1. 确定归属目录（`harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/` 或 `product-specs/`）
-2. 创建文档文件（遵循本规范的语言和命名规则）
+2. 创建文档文件（遵循本规范的目录和命名规则）
 3. 如需联动治理能力，更新能力清单并部署对应能力模块
 4. 更新该目录的 `AGENTS.md`，添加文件条目，并同步相关 `## 目录索引` 区块（含 `README.md` 的 `## 目录结构`）
 5. 更新「文档与脚本联动关系」节（如涉及）
@@ -140,14 +140,12 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
 | `git.commit-format` | 提交信息格式校验 | husky snippet + commitlint | commit-msg snippet + commitlint config | 默认启用 |
-| `repo.language` | Git commit 内容语言规范 | husky snippet | commit-msg CJK snippet | 默认启用 |
 | `project.gitignore` | 忽略文件管理 | gitignore installer | .gitignore | 默认启用 |
 
 ### GitHub 与发布可选能力
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `github.language` | GitHub PR/Issue 内容语言规范 | GitHub workflows | repo-language-pr-lint.yml + repo-language-issue-lint.yml | GitHub 项目 |
 | `github.pr` | PR 工作流规范 | 文档约定 + 可选 CI | pr-lint.yml（仅 GitHub） | GitHub 项目 |
 | `github.branch-protection` | 分支保护 | 文档约定 + ruleset + hook snippet | protect-main ruleset + pre-push snippet | GitHub 项目 |
 | `release.versioning` | 版本与标签保护 | 文档约定 + tag ruleset + hook snippet | protect-tags ruleset + pre-push snippet | 发布项目 |
@@ -182,8 +180,6 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | capability | 联动组件 | 说明 |
 |------|---------|------|
 | `git.commit-format` | commit-msg commitlint snippet + commitlint config | 仅安装提交格式校验 |
-| `repo.language` | commit-msg CJK snippet | 默认 Git 语言校验，不部署 GitHub workflow |
-| `github.language` | repo-language-pr-lint.yml + repo-language-issue-lint.yml | 可选 GitHub PR/Issue 语言校验 |
 | `github.pr` | PR 本体化检查（pr-lint.yml + pr_body_structure.py） | 仅 GitHub 项目联动 CI |
 | `github.branch-protection` | protect-main ruleset + pre-push branch snippet | GitHub ruleset（远程）+ pre-push snippet（本地）双重保护 |
 | `release.versioning` | protect-tags ruleset + pre-push tag snippet | 标签保护和版本规范 |
@@ -232,8 +228,6 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | 约束 | 提问措辞建议 |
 |------|------------|
 | 提交信息格式校验 | 「每次 git commit 时自动检查提交信息是否符合 Conventional Commits 格式。启用后会安装 husky 和 commitlint 作为本地检查工具。」 |
-| Git 内容语言规范 | 「要求 commit 等 Git 协作内容使用指定语言。默认启用后会在 commit-msg hook 中拦截 CJK 内容。」 |
-| GitHub 内容语言规范 | 「如果项目使用 GitHub，可以额外要求 PR、issue 等文本也接受 CI 语言检查。」 |
 | PR 工作流规范 | 「为 PR 建立标题、正文模板和 Test plan 格式标准。如果使用 GitHub，还可以安装自动 CI 检查。」 |
 | 代码风格与质量 | 「可以只安装通用开发/测试实践，也可以额外安装 Node.js 的 ESLint + Prettier + lint-staged。」 |
 | AI 执行与记忆 | 「建立 AI 和人类的分工规则、自主执行约定，以及经验沉淀和项目记忆边界。」 |
@@ -247,7 +241,6 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 启用的约束
 - 提交信息格式校验 → 安装 commit-msg 格式校验 snippet + commitlint
-- Git 内容语言规范 → 安装 CJK 检测 commit-msg hook
 - AI 执行与记忆 → 部署 ai-execution.md 与 ai-memory.md 文档
 - 知识库与项目上下文 → 部署 ADR、排障、研究、产品规格和归档入口
 
@@ -270,13 +263,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 > 检测到你的项目已有 `.husky/commit-msg`（包含 Conventional Commits 校验）。你希望如何处理？
 > [1] 保留现有配置，不做任何修改
 > [2] 替换为新的模板配置
-> [3] 合并——保留你现有的校验逻辑，补充 CJK 检测等新增功能（我将展示具体变更内容）
+> [3] 合并——保留你现有的校验逻辑，并展示具体变更内容（我将展示对比摘要）
 > [4] 跳过此项，不做任何操作
-
-## 语言规则
-
-- `docs/**` 下所有文档使用**中文**
-- git 与 GitHub 远程仓库相关内容（commit / PR / issue / release notes / branch 名）使用**英文**
 
 ## 文件命名规则
 

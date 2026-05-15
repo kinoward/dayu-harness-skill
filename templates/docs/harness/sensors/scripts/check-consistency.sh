@@ -21,7 +21,6 @@ ALLOWED_OPTIONAL_CAPABILITIES=(
     "ai.memory"
     "git.commit-format"
     "github.branch-protection"
-    "github.language"
     "github.pr"
     "github.release-please"
     "knowledge.archive"
@@ -33,7 +32,6 @@ ALLOWED_OPTIONAL_CAPABILITIES=(
     "quality.node-tooling"
     "quality.practices"
     "release.versioning"
-    "repo.language"
 )
 
 for arg in "$@"; do

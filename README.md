@@ -16,7 +16,7 @@
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
-- **自动化约束资产**：默认部署 Git 提交格式（husky + commitlint）、仓库语言和 .gitignore 约束；按需追加 GitHub、分支/标签保护等 hook/CI 片段
+- **自动化约束资产**：默认部署 Git 提交格式（husky + commitlint）和 .gitignore 约束；按需追加 GitHub、分支/标签保护等 hook/CI 片段
 - **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
 ## 目录结构
@@ -45,7 +45,7 @@ docs-governance/
 
 ### 部署到目标项目后的结构
 
-目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、知识库和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
+目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、知识库和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
 
 ```
 <target-project>/
@@ -59,7 +59,6 @@ docs-governance/
 │   │   ├── guides/                   # 行动前规则卡片
 │   │   │   ├── AGENTS.md
 │   │   │   ├── commit-guidelines.md      # default：git.commit-format
-│   │   │   ├── git-language-policy.md    # default：repo.language
 │   │   │   ├── pr-guidelines.md          # optional：github.pr
 │   │   │   ├── branch-protection.md      # optional：github.branch-protection
 │   │   │   ├── release-versioning.md     # optional：release.versioning
@@ -92,7 +91,7 @@ docs-governance/
 │   ├── troubleshooting/              # default：knowledge.troubleshooting
 │   └── archive/                      # default：knowledge.archive
 ├── .husky/                           # default：git.hooks + hook-backed Git capabilities
-├── .github/                          # optional：github.language / github.pr / github.branch-protection / release.versioning / github.release-please
+├── .github/                          # optional：github.pr / github.branch-protection / release.versioning / github.release-please
 ├── commitlint.config.cjs             # default：git.commit-format
 ├── eslint.config.js                  # quality.node-tooling
 ├── .prettierrc                       # quality.node-tooling

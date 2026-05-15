@@ -33,7 +33,6 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 - `core`
 - `git.commit-format`
-- `repo.language`
 - `project.gitignore`
 - `ai.execution`
 - `ai.memory`
@@ -64,7 +63,6 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
 | `git.commit-format` | 每次提交必须可追溯、可自动审查，减少后续 review 与回溯成本。 | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
-| `repo.language` | commit 等仓库协作文字必须有统一语言约束。 | 通过 commit-msg hook snippet 做 CJK 校验；GitHub PR/Issue workflow 已拆到 `github.language`。 | Git 项目；已有 hook 逐文件确认 |
 | `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 按 universal / Node.js / Python 模板检测并 merge。 | Git 项目；已有 `.gitignore` 走 merge plan |
 | `ai.execution` | AI 执行方式、自动重试和汇报规则必须沉淀到项目文档中。 | 部署 AI 执行实践文档。 | 默认启用 |
 | `ai.memory` | 项目长期记忆边界和经验沉淀规则必须写入仓库。 | 部署 AI 记忆边界文档并将 `AGENTS.md` 作为长期记忆锚点。 | 默认启用 |
@@ -78,7 +76,6 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.language` | 是否希望 GitHub PR/Issue 文本也被 CI 检查语言规范？ | 部署 `repo-language-pr-lint.yml` 与 `repo-language-issue-lint.yml`。 | GitHub 项目；依赖 `repo.language` |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？ | 通过 GitHub 工作流实现 PR body 结构、closing trailer 与 AI watermark 检查（`Summary` / `Implementation notes` / `Test plan`）。 | GitHub 项目 |
 | `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？ | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
 | `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？ | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
@@ -94,7 +91,7 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 ## 确认汇总
 
 ### 启用的治理能力
-- 默认必选 → core、Git 提交/语言/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
+- 默认必选 → core、Git 提交/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
 - github.pr → 用户选择启用 PR 协作检查与交付结构约束
 
 ### 需要确认策略的已有文件

@@ -2,10 +2,6 @@
 
 > 触发时机：创建或修改 commit 时读取
 
-## 语言
-
-Commit message（subject + body + trailer）必须遵守仓库语言规约。
-
 ## Commit Message 格式
 
 遵循 Conventional Commits 格式：
@@ -16,7 +12,7 @@ type(scope): description
 
 - **type**（必选）：`feat` | `fix` | `docs` | `style` | `refactor` | `perf` | `test` | `build` | `ci` | `chore` | `revert`
 - **scope**（可选）：模块名
-- **description**：小写字母开头，不以句号结尾，祈使语气
+- **description**：简洁可读即可，不要求特定语言或大小写风格。
 
 示例：
 - `feat(transcribe): add YouTube auto-caption download`
@@ -44,5 +40,5 @@ type(scope): description
 1. 读取错误输出
 2. 根据错误类型修正：
    - **格式错误**（type 不合法 / 缺 description）→ 改写符合 Conventional Commits
-   - **语言规约失败** → 按仓库语言规约修正违规行，保留 type(scope) 前缀与语义
+   - **格式错误**（subject 为空 / 标点或空行问题）→ 调整 subject 与 body，使格式可被 commitlint 校验通过
 3. 重新执行 `git commit`

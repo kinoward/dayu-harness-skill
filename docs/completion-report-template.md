@@ -66,8 +66,6 @@
 | --- | --- |
 | `core` | 项目入口索引、文档维护说明和基础检查脚本 |
 | `git.commit-format` | Git 提交格式约束和提交信息检查 |
-| `repo.language` | Git commit 与协作文本语言约束 |
-| `github.language` | GitHub PR/Issue 语言约束 workflow |
 | `quality.practices` | 通用开发纪律和测试策略 |
 | `quality.node-tooling` | Node.js 代码质量与格式化工具 |
 | `project.gitignore` | 忽略文件配置 |

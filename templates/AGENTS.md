@@ -43,7 +43,6 @@
 
 > 触发：每次 git commit 前或 hook 拒绝时
 - 读取 `docs/harness/guides/commit-guidelines.md`
-- 读取 `docs/harness/guides/git-language-policy.md`
 - 读取 `docs/harness/guides/ai-execution.md`
 
 ## 当你准备创建或修改 PR

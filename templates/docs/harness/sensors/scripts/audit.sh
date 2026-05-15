@@ -12,7 +12,6 @@ ALLOWED_OPTIONAL_CAPABILITIES=(
     "ai.memory"
     "git.commit-format"
     "github.branch-protection"
-    "github.language"
     "github.pr"
     "github.release-please"
     "knowledge.archive"
@@ -24,7 +23,6 @@ ALLOWED_OPTIONAL_CAPABILITIES=(
     "quality.node-tooling"
     "quality.practices"
     "release.versioning"
-    "repo.language"
 )
 
 is_allowed_optional_capability() {
@@ -344,7 +342,7 @@ path_exists() {
     return 1
 }
 
-if path_exists ".husky/commit-msg" "docs/harness/guides/commit-guidelines.md" "docs/harness/guides/git-language-policy.md"; then
+if path_exists ".husky/commit-msg" "docs/harness/guides/commit-guidelines.md"; then
     check_script ".husky/commit-msg" "commit-msg hook"
 else
     log_text "  - commit-msg hook 未启用，跳过"

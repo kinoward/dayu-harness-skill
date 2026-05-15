@@ -46,9 +46,6 @@ fragment_entries() {
         git.commit-format)
             echo "commit-msg|git.commit-format|assets/husky/snippets/commit-format.sh"
             ;;
-        repo.language)
-            echo "commit-msg|repo.language|assets/husky/snippets/repo-language.sh"
-            ;;
         quality.node-tooling)
             echo "pre-commit|quality.node-tooling|assets/husky/snippets/quality-node-tooling.sh"
             ;;

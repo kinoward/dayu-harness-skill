@@ -130,7 +130,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 ## 部署策略
 
-- 必选默认能力始终部署：`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
+- 必选默认能力始终部署：`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、ADR、排障、研究、项目上下文和归档入口
 - `--enable` 只表示在必选默认集上追加可选能力；GitHub、发布自动化、Node.js 工具等能力未选择时不复制到项目
 - 未启用的可选资产不复制到项目
 - `docs/harness/sensors/scripts/`（audit.sh、validate.sh、diff-helper.sh、check-consistency.sh）始终部署
@@ -158,7 +158,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 ## 能力清单约定
 
 - `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。
-- `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/语言/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
+- `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
 ## 辅助文件

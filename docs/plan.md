@@ -93,7 +93,6 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
         dev-hygiene.md              # ~80行
         ai-execution.md             # AI 执行规则
         ai-memory.md                # AI 经验沉淀与记忆边界
-        git-language-policy.md      # ~100行
       decisions/                    # [工程约束] ADR
         AGENTS.md + adr-template.md
       troubleshooting/              # [工程约束] 排障
@@ -119,7 +118,6 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
     github/
       workflows/
         pr-lint.yml
-        repo-language-issue-lint.yml
     eslint/
       eslint.config.js
     prettier/
@@ -225,9 +223,9 @@ Q2: 是否使用 GitHub 远程托管？
 
 Q3: 「提交信息格式校验」— git commit 时自动校验 Conventional Commits 格式
     实施：husky + commitlint 本地 hook
-    说明：启用后会安装 husky 和 commitlint。Q4 的语言检测将集成到同一个 husky hook 中
+    说明：启用后会安装 husky 和 commitlint。历史阶段 Q4 的语言检测曾计划与该 hook 共享；该规则已退役
 
-Q4: 「Git 内容语言规范」— commit/PR/issue/release notes/branch 名使用英文
+Q4: （已退役历史设计）「Git 内容语言规范」— commit/PR/issue/release notes/branch 名使用英文
     （仅 Q1=[1] 时）
     实施：husky hook 本地拦截 + 可选 GitHub CI 校验
     说明：需要 Q3 启用（共用 husky hook 载体），但不强制自动启用
@@ -274,7 +272,7 @@ Q15: 「历史归档」— 废弃项目内容的归档目录
 | 约束 | 联动资产 | 说明 |
 |------|---------|------|
 | 提交信息格式校验 | husky + commitlint | — |
-| Git 内容语言规范 | commit-msg 中 CJK 检测 | 需要 Q3 的 husky hook 作为载体 |
+| 已退役：Git 内容语言规范 | commit-msg 中 CJK 检测 | 需要 Q3 的 husky hook 作为载体 |
 | PR 工作流规范 | pr-lint.yml | 仅 GitHub 项目联动 CI，文档部分不受影响 |
 | 分支与发布管理 | assets/github/rulesets/protect-main.json / protect-tags.json | 仅 GitHub 项目联动 CI，文档部分不受影响 |
 
@@ -327,7 +325,7 @@ AI 读取 ai-memory.md 中的「经验沉淀」章节，自行判断何时沉淀
 | 4 | `testing-strategy.md` | ~60 | 提炼通用原则 |
 | 5 | `dev-hygiene.md` | ~80 | 规则2 改为通用模板 |
 | 6 | `ai-execution.md` + `ai-memory.md` | ~110 | 分拆执行规则与经验沉淀章节 |
-| 7 | `git-language-policy.md` | ~100 | GitHub 绑定改为可选 |
+| 7 | `git-language-policy.md`（已退役） | ~100 | 该能力已移除，历史说明保留在 plan/archive 中 |
 
 ## 实施步骤（本次仅执行阶段 1）
 
@@ -467,16 +465,16 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 新增内容：
 - **Auto-Retry 通用约定**：
-  - Commit 被 hook 拒绝 → 翻译 CJK 内容 → 重新提交
+  - Commit 被 hook 拒绝 → 优先按可复现实验修复并重试提交（历史版本曾要求翻译 CJK 内容，已退役）
   - PR 创建被 CI 拒绝 → 修正格式 → 重新推送
   - 不假设失败是最终结果，主动尝试修复
 - **Test plan 执行与报告**（当前仅占 10 行，展开为完整流程）
 - **结构化输出消费模式**：解释 LLM 应如何消费脚本的 `--json` 输出 → 翻译 → 呈现给用户
 - **Code review 自检**：6 项从 TypeScript 改为通用模式（资源释放、输入校验、错误处理、并发安全、边界条件、日志敏感信息），原有 TS 条目标注为参考示例
 
-#### 4.3 git-language-policy.md（67→~100 行）
+#### 4.3 git-language-policy.md（67→~100 行）（已退役）
 
-新增内容：
+新增内容（已退役）：
 - CJK 检测的 hook 实现细节和正则原理
 - CI 层双重校验逻辑（local hook + remote CI）
 - 例外处理：Escape hatch 机制（如 `<!-- skip-cjk-check -->` 注释标记）
@@ -514,7 +512,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 2. **SKILL.md 修改**：frontmatter + 仅显式激活 + 结构化输出约定章节
 3. **脚本改造**：`diff-helper.sh merge-plan <existing> <incoming>` → installer `--check` / `--apply` → audit.sh --json → validate.sh --json → scaffold.sh 编排
 4. **新增资产**：pre-push → rulesets JSON → pr_body_structure.py → check-consistency.sh
-5. **文档扩展**：branch-protection.md / release-versioning.md → ai-execution.md / ai-memory.md → git-language-policy.md
+5. **文档扩展**：branch-protection.md / release-versioning.md → ai-execution.md / ai-memory.md → git-language-policy.md（已退役，保留历史记载）
 6. **清理与修正**：project/ 子目录 → 行数标注 → Q4 依赖说明 → dev-hygiene 通用化
 7. **doc-maintenance.md Q&A 补全**
 8. **最终验证**：fixture 项目上验证 5 个模式

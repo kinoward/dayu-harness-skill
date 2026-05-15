@@ -7,7 +7,7 @@
 - 禁止直接提交到 `main` / `master`
 - 从主分支创建功能分支，使用 `feat/`、`fix/`、`docs/`、`chore/` 等前缀
 - 所有变更通过 PR 合并到主分支
-- 分支名使用英文，遵守仓库语言规约
+- 分支名遵循 Git 规范（可见字符、无空白、无特殊字符），推荐使用工具友好的 slug（如 `feat/xxx`、`fix/xxx`）。
 
 默认推荐 GitHub Flow：从主分支创建短命 feature branch → PR → 合并 → 删除分支。
 

@@ -211,12 +211,6 @@ map_legacy_category() {
         git.commit)
             echo "git.commit-format"
             ;;
-        git.language)
-            echo "repo.language"
-            ;;
-        github.language)
-            echo "github.language"
-            ;;
         github.branch-release)
             echo "github.branch-protection release.versioning"
             ;;
@@ -239,7 +233,7 @@ map_legacy_category() {
             echo "quality.practices project.gitignore quality.node-tooling"
             ;;
         github.delivery)
-            echo "git.commit-format repo.language github.language github.pr github.branch-protection"
+            echo "git.commit-format github.pr github.branch-protection"
             ;;
         release.automated)
             echo "release.versioning github.release-please"

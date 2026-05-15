@@ -32,7 +32,7 @@ AI 可自主决定：
 
 Commit 被 hook 拒绝：
 1. 读取 hook 输出定位违规内容
-2. 修正提交信息格式、语言或 issue trailer 位置
+2. 修正提交信息格式或 issue trailer 位置
 3. 重新执行 commit
 
 PR 或 CI 被拒绝：

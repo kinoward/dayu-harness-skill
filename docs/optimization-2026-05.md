@@ -152,5 +152,5 @@
 
 1. **单元测试**：`tests/unit/` 下 bats 测试确保 audit.sh / diff-helper.sh 行为不变
 2. **fixture 测试**：对 5 个 fixture 项目分别 dry-run 验证
-3. **端到端**：空项目 scaffold.sh --apply，验证 CJK 拦截、issue 引用拦截、AI 署名剥离
+3. **端到端**：空项目 scaffold.sh --apply，验证 issue 引用拦截与 AI 署名剥离。`CJK` 拦截为该阶段历史行为，当前已退役。
 4. **渐进式披露验证**：确认 AI 读取 AGENTS.md 后对不同任务只加载对应文档子集
