@@ -1,23 +1,23 @@
 <div align="center">
 
-<h1>🌊 Dayu Harness Skill（大禹治库）</h1>
+<h1>🌊 Dayu Harness Skill（大禹治库.skill）</h1>
 
 <p><strong><em>“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”</em></strong></p>
 
 <p>
   <a href="LICENSE"><img alt="许可证: MIT" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-MIT-2E8B57"></a>
-  <img alt="大禹治库 Skill" src="https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B">
-  <img alt="AgentSkills Compatible" src="https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A">
-  <img alt="AGENTS.md 根索引" src="https://img.shields.io/badge/AGENTS.md-%E6%A0%B9%E7%B4%A2%E5%BC%95-4B5D67">
   <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?label=Stars&amp;logo=github&amp;style=flat">
+  <img alt="AgentSkills Compatible" src="https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A">
+  <img alt="Harness Engineering" src="https://img.shields.io/badge/Harness-Engineering-0E7C86">
+  <img alt="Project Governance" src="https://img.shields.io/badge/Project-Governance-4B5D67">
 </p>
 
 <p>
-  <img alt="命令 /dayu-harness" src="https://img.shields.io/badge/%E5%91%BD%E4%BB%A4-%2Fdayu--harness-6C5CE7">
-  <img alt="Harness Engineering" src="https://img.shields.io/badge/Harness-Engineering-0E7C86">
+  <img alt="大禹治库 Skill" src="https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B">
+  <img alt="One-shot Deploy" src="https://img.shields.io/badge/One--shot-Deploy-6C5CE7">
+  <img alt="Repo Native" src="https://img.shields.io/badge/Repo-Native-2563EB">
   <img alt="Claude Code Skill" src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet">
   <img alt="Codex Skill" src="https://img.shields.io/badge/Codex-Skill-111827">
-  <img alt="Bats tests" src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-Bats-1F6FEB">
 </p>
 
 <br>
@@ -55,7 +55,10 @@
   <a href="#一句话理解">⚡ 一句话理解</a> ·
   <a href="#核心观念">🧱 核心观念</a> ·
   <a href="#快速开始">🚀 快速开始</a> ·
-  <a href="#能力清单">📦 能力清单</a> ·
+  <a href="#能力清单">📦 能力清单</a>
+</p>
+
+<p>
   <a href="#工作模式">🛠️ 工作模式</a> ·
   <a href="#生成内容">📚 生成内容</a> ·
   <a href="#目录结构">🗂️ 目录结构</a> ·
@@ -336,10 +339,6 @@ bats tests/unit
 - 运行时检索系统、向量库、上下文缓存或外部智能体记忆可以提升效率，但不能替代仓库内可审查的治理事实。
 - 外部知识有价值时，应整理成决策、排障、研究、项目上下文或约束文档后回写项目，并同步对应 `AGENTS.md` 索引。
 
-## 许可证
-
-本项目使用 MIT 许可证，详见 [LICENSE](LICENSE)。
-
 ## 参考引用
 
 - [OpenAI: Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：本 Skill 的设计哲学来源。
@@ -347,3 +346,25 @@ bats tests/unit
 - [Martin Fowler: Harness Engineering](https://martinfowler.com/articles/harness-engineering.html)：Guides 与 Sensors 控制论框架参考。
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
 - [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
+
+## ⭐ Star History
+
+<div align="center">
+
+<p>
+  <a href="https://github.com/kinoward/dayu-harness-skill/stargazers">
+    <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?label=GitHub%20Stars&amp;logo=github&amp;style=for-the-badge">
+  </a>
+</p>
+
+<a href="https://www.star-history.com/#kinoward/dayu-harness-skill&amp;Date">
+  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kinoward/dayu-harness-skill&amp;type=Date&amp;theme=dark">
+</a>
+
+<hr>
+
+<p><strong>MIT License</strong> © <a href="https://github.com/kinoward">kinoward</a></p>
+
+<p>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</p>
+
+</div>
