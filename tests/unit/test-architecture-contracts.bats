@@ -24,6 +24,16 @@ setup() {
         "$REPO_ROOT/templates/docs/references/research/AGENTS.md"
         "$REPO_ROOT/templates/docs/troubleshooting/AGENTS.md"
     )
+    ALL_AGENTS_FILES=()
+    while IFS= read -r agents_file; do
+        ALL_AGENTS_FILES+=("$agents_file")
+    done < <(
+        find "$REPO_ROOT" \
+            -path "$REPO_ROOT/.git" -prune \
+            -o -path "$REPO_ROOT/tests/unit/.tmp" -prune \
+            -o -name AGENTS.md -type f -print |
+            sort
+    )
     WORK_ROOT="${BATS_TEST_DIRNAME}/.tmp"
     mkdir -p "$WORK_ROOT"
     WORK_DIR="${WORK_ROOT}/contract_$$"
@@ -211,6 +221,41 @@ resolve_relative_path() {
     resolved="${resolved#./}"
 
     echo "$resolved"
+}
+
+expected_agents_h1() {
+    local file="$1"
+    local relative="${file#"$REPO_ROOT/"}"
+
+    if [ "$relative" = "AGENTS.md" ]; then
+        echo "# AGENTS.md"
+        return
+    fi
+
+    if [ "$relative" = "docs/AGENTS.md" ]; then
+        echo "# docs/AGENTS.md"
+        return
+    fi
+
+    if [[ "$relative" == templates/* ]]; then
+        relative="${relative#templates/}"
+        echo "# ${relative}"
+        return
+    fi
+
+    if [[ "$relative" == tests/fixtures/* ]]; then
+        local fixture_path="${relative#tests/fixtures/}"
+        local fixture_suffix="${fixture_path#*/}"
+
+        if [ "$fixture_path" = "$fixture_suffix" ]; then
+            echo "# AGENTS.md"
+        else
+            echo "# ${fixture_suffix}"
+        fi
+        return
+    fi
+
+    echo "# ${relative}"
 }
 
 @test "canonical SKILL.md uses Codex-compatible frontmatter" {
@@ -443,20 +488,25 @@ resolve_relative_path() {
     [ -f "$target/commitlint.config.cjs" ]
 }
 
-@test "AGENTS.md uses directory index convention and non-target AGENTS keeps structure marker absent" {
-    local count=0
-
-    for file in "${TARGET_AGENTS_FILES[@]}"; do
+@test "AGENTS.md uses directory index convention and avoids legacy structure marker" {
+    for file in "${ALL_AGENTS_FILES[@]}"; do
         if [ ! -f "$file" ]; then
-            echo "缺失目标 AGENTS 文件: $file"
+            echo "未发现 AGENTS 文件: $file"
             return 1
         fi
-        grep -q '^## 目录索引' "$file"
-        count=$((count + 1))
+        first_line="$(sed -n '1p' "$file")"
+        expected_h1="$(expected_agents_h1 "$file")"
+        if [ "$first_line" != "$expected_h1" ]; then
+            echo "AGENTS 标题不符合要求: $file"
+            echo "  当前: $first_line"
+            echo "  期望: $expected_h1"
+            return 1
+        fi
+        grep -q '^## 目录索引$' "$file"
+        grep -Fqx -- '- [AGENTS.md](AGENTS.md) - 当前索引' "$file"
+        grep -q '目录索引变化时，必须同步更新本区块' "$file"
+        ! grep -q '^## 目录结构' "$file"
     done
-    [ "$count" -eq 20 ]
-    ! rg -n '^## 目录结构' -g 'AGENTS.md' "$REPO_ROOT" > /dev/null 2>&1
-    ! grep -q '^## 目录索引' "$REPO_ROOT/tests/fixtures/messy-project/AGENTS.md"
 }
 
 @test "optional capability ids align with manifest and script allowlist" {

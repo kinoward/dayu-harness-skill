@@ -197,8 +197,11 @@ json_from_output() {
     # - Replace the stale release-notes link with the deployed release versioning guide.
     # - Index preserved loose docs so progressive disclosure can discover them.
     write_file "$project_dir/CLAUDE.md" "@AGENTS.md"
-    perl -0pi -e 's#- 发布流程：\[docs/operations/release-notes.md\]\(docs/operations/release-notes.md\)#- 发布流程已迁移到：[docs/harness/guides/release-versioning.md](docs/harness/guides/release-versioning.md)#' "$project_dir/AGENTS.md"
+    perl -0pi -e 's#^\s*-\s*.*\(docs/operations/release-notes\.md\).*$#- [docs/harness/guides/release-versioning.md](docs/harness/guides/release-versioning.md)#mg' "$project_dir/AGENTS.md"
     perl -0pi -e 's#(- \[archive/AGENTS.md\]\(archive/AGENTS.md\) - 默认：历史归档\n)#$1- [notes/decision-log.md](notes/decision-log.md) - 迁移前保留的松散决策记录\n- [practices/commit-guidelines.md](practices/commit-guidelines.md) - 迁移前保留的旧提交规范\n#' "$project_dir/docs/AGENTS.md"
+    ! grep -q '故意断链' "$project_dir/AGENTS.md"
+    ! grep -q '需替换' "$project_dir/AGENTS.md"
+    grep -Fq '[docs/harness/guides/release-versioning.md](docs/harness/guides/release-versioning.md)' "$project_dir/AGENTS.md"
 
     assert_path "$project_dir/.github/workflows/pr-lint.yml"
     assert_path "$project_dir/.github/workflows/repo-language-pr-lint.yml"
