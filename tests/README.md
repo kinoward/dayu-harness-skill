@@ -30,9 +30,9 @@
 
 这是对话回放式 E2E，不驱动真实聊天 UI。它将本次测试过程收束为可重复的 CI 验收：
 
-- 空项目：模拟用户启用 Git 约束和非 GitHub 多数能力，明确跳过 GitHub 能力。
-- 已有项目：模拟用户启用 Git/GitHub PR/分支保护/质量工具/知识库能力，明确跳过 release-please，并确认 merge 既有 hook。
-- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg` CJK 拦截、issue trailer 拦截、`pre-push` main 分支保护。
+- 空项目：模拟用户用旧 id 启用 Git 约束、质量能力和知识库能力，验证兼容展开到新原子能力。
+- 已有项目：模拟用户启用 Git/GitHub PR/分支保护/版本保护/质量工具/知识库能力，明确跳过 release-please，并确认 merge 既有 hook。
+- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg` CJK 拦截、`pre-push` main 分支保护和 release tag 保护。
 - 融合行为：验证已有项目中的 `CLAUDE.md`、根 `AGENTS.md` 断链和孤儿旧文档在用户确认后被修复并纳入渐进式文档索引。
 
 ## 运行方式
@@ -49,10 +49,10 @@ bats tests/unit/test-skill-interaction-e2e.bats
 bats tests/unit
 ```
 
-当前基线结果：
+当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。
 
 - `bats tests/unit/test-skill-interaction-e2e.bats`：2/2 通过。
-- `bats tests/unit`：41/41 通过。
+- `bats tests/unit`：完整维护者测试套件通过。
 
 ## 迭代维护规则
 

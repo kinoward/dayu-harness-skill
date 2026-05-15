@@ -178,6 +178,7 @@ resolve_relative_path() {
 
     local quick_validate="${CODEX_QUICK_VALIDATE:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
     [ -f "$quick_validate" ] || skip "Codex quick_validate.py not available"
+    python3 -c 'import yaml' 2>/dev/null || skip "python yaml dependency not available"
 
     run python3 "$quick_validate" "$REPO_ROOT"
     [ "$status" -eq 0 ]
@@ -258,8 +259,35 @@ resolve_relative_path() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core", "git.commit", "github.pr", "github.release-please"]'
-    echo "$output" | jq -e '.capability_count == 4'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core", "git.commit-format", "git.hooks", "github.pr", "github.release-please", "release.versioning"]'
+    echo "$output" | jq -e '.capability_count == 6'
+}
+
+@test "legacy capability ids and presets expand to new capability set" {
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,github.branch-release,quality.tooling,ai.collaboration,project.docs,archive.project
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.archive","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning"]'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.delivery
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core","git.commit-format","git.hooks","github.branch-protection","github.pr","repo.language"]'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.standard
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["core","git.hooks","project.gitignore","quality.node-tooling","quality.practices"]'
+}
+
+@test "split capabilities stay atomic in dry-run output" {
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit-format
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".husky/pre-commit" or .dst == ".husky/pre-push")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.capability == "git.commit-format" and .script == "install-husky.sh")] | length == 1'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.practices
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "eslint.config.js" or .dst == ".prettierrc" or .dst == ".lintstagedrc.json")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.kind == "installer")] | length == 0'
 }
 
 @test "scaffold apply does not overwrite existing target files" {
@@ -287,7 +315,8 @@ resolve_relative_path() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "needs_strategy"'
-    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit").status == "needs_strategy"'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").status == "needs_strategy"'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="release.versioning").status == "needs_strategy"'
     echo "$output" | jq -e '.capabilities[] | select(.id=="github.pr").status == "ok"'
     echo "$output" | jq -e '.capabilities[] | select(.id=="github.release-please").status == "ok"'
     [ -f "$target/.github/workflows/pr-lint.yml" ]
@@ -316,7 +345,7 @@ resolve_relative_path() {
     local check_list="$WORK_DIR/check_allowed.txt"
     local audit_list="$WORK_DIR/audit_allowed.txt"
 
-    jq -r 'select(.id != "core").id' "$REPO_ROOT/capabilities/"*.json | sort -u > "$expected"
+    jq -r 'select(.id != "core" and (.internal != true)).id' "$REPO_ROOT/capabilities/"*.json | sort -u > "$expected"
     extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" | sort -u > "$check_list"
     extract_allowed_capabilities "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" | sort -u > "$audit_list"
 
@@ -444,11 +473,23 @@ resolve_relative_path() {
 
 @test "all install-*.sh --check endpoints return JSON contract" {
     for script in "$REPO_ROOT"/scripts/install-*.sh; do
-        run_with_wrapper bash "$script" "$FIXTURE_EMPTY" --check
+        if [ "$(basename "$script")" = "install-husky.sh" ]; then
+            run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$script" "$FIXTURE_EMPTY" --check
+        else
+            run_with_wrapper bash "$script" "$FIXTURE_EMPTY" --check
+        fi
         [ "$status" -eq 0 ]
         echo "$output" | jq -e 'has("status") and (has("items") and (.items | type == "array") and has("summary") and has("description_nl"))'
         echo "$output" | jq -e '.status == "clean"'
     done
+}
+
+@test "install-husky requires an explicit capability selection" {
+    run_with_wrapper bash "$REPO_ROOT/scripts/install-husky.sh" "$FIXTURE_EMPTY" --check
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "error"'
+    echo "$output" | jq -e '.items | any(.capability == "<unset>")'
 }
 
 @test "audit --json returns expected schema" {
@@ -551,14 +592,31 @@ resolve_relative_path() {
     [[ "$output" == *"OK: PR body passes all structure checks."* ]]
 }
 
+@test "PR lint workflow explicitly skips release-please PRs" {
+    grep -q 'Detect release-please PR' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'release-please--' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q "steps.detect-release-please.outputs.skip != 'true'" "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+}
+
+@test "GitHub workflows do not shell-interpolate user-controlled PR or issue text" {
+    ! rg -n '\$\{\{ github\.event\.(pull_request|issue)\.(title|body)' "$REPO_ROOT/assets/github/workflows"
+    grep -q 'jq -r' "$REPO_ROOT/assets/github/workflows/repo-language-pr-lint.yml"
+    grep -q 'jq -r' "$REPO_ROOT/assets/github/workflows/repo-language-issue-lint.yml"
+}
+
 @test "commit-msg hook honors skip-cjk-check marker" {
+    local target="$WORK_DIR/repo-language-skip"
+    mkdir -p "$target"
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=repo.language bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+
     local msg_file="$WORK_DIR/commit-msg-with-marker.txt"
     write_file "$msg_file" \
         "feat: add commit message policy checks" \
         "添加中文描述" \
         "<!-- skip-cjk-check -->"
 
-    run bash -c 'cd "$1" && "$2" "$3"' _ "$WORK_DIR" "$REPO_ROOT/assets/husky/commit-msg" "$msg_file"
+    run bash -c 'cd "$1" && .husky/commit-msg "$2"' _ "$target" "$msg_file"
     [ "$status" -eq 0 ]
 }
 
@@ -567,9 +625,49 @@ resolve_relative_path() {
         skip "commit-msg CJK check requires perl support"
     fi
 
+    local target="$WORK_DIR/repo-language-cjk"
+    mkdir -p "$target"
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=repo.language bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+
     local msg_file="$WORK_DIR/commit-msg-cjk.txt"
     write_file "$msg_file" "feat: 添加中文提交信息"
 
-    run bash -c 'cd "$1" && "$2" "$3"' _ "$WORK_DIR" "$REPO_ROOT/assets/husky/commit-msg" "$msg_file"
+    run bash -c 'cd "$1" && .husky/commit-msg "$2"' _ "$target" "$msg_file"
     [ "$status" -eq 1 ]
+}
+
+@test "hook installer installs only selected capability snippets" {
+    local target="$WORK_DIR/hook-atomicity"
+    mkdir -p "$target"
+
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+    [ -f "$target/.husky/commit-msg" ]
+    [ ! -f "$target/.husky/pre-commit" ]
+    [ ! -f "$target/.husky/pre-push" ]
+    grep -q 'docs-governance:git.commit-format' "$target/.husky/commit-msg"
+    ! grep -q 'docs-governance:repo.language' "$target/.husky/commit-msg"
+}
+
+@test "pre-push snippets can share the same hook stdin" {
+    local target="$WORK_DIR/pre-push-snippets"
+    mkdir -p "$target"
+
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=github.branch-protection bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=release.versioning bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/main 0000000000000000000000000000000000000000 refs/heads/main 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "deleting main is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/main 2222222222222222222222222222222222222222 refs/heads/main 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "direct push to main is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/tags/v1.0.0 0000000000000000000000000000000000000000 refs/tags/v1.0.0 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "deleting release tag v1.0.0 is not allowed" ]]
 }
