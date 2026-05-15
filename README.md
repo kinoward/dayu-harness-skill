@@ -325,18 +325,21 @@ bats tests/unit
 
 ## 🤝 参与贡献
 
-我们非常欢迎各种形式的贡献：修正文档、补充能力清单、完善模板、改进检查脚本、提交兼容性反馈，或者把真实项目里的治理经验沉淀回来。如果你对贡献代码或治理能力感兴趣，可以查看 GitHub [Issues](https://github.com/kinoward/dayu-harness-skill/issues) 和 [Projects](https://github.com/kinoward/dayu-harness-skill/projects)，从小的文档修订到新的能力 manifest 都可以开始。
+我们非常欢迎各种形式的贡献。如果你对贡献代码感兴趣，可以查看我们的 GitHub [Issues][github-issues-link] 和 [Projects][github-project-link]，大展身手，向我们展示你的奇思妙想。
 
 > [!TIP]
 >
 > 我们希望这个仓库成为一个技术分享型项目：把 AI 协作中的好实践、失败经验、检查脚本和治理约束沉淀下来，让更多项目可以复用。
-> 同时欢迎提交产品功能和使用体验反馈，帮助大禹治库 Skill 更好地服务真实项目。
+> 同时欢迎联系我们提供产品功能和使用体验反馈，帮助我们将 Dayu Harness Skill 建设得更好。
 >
-> **项目维护者:** [@kinoward](https://github.com/kinoward)
+> **组织维护者:** [@kinoward](https://github.com/kinoward)
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kinoward/dayu-harness-skill/pulls)
 [![Good First Issues](https://img.shields.io/github/issues/kinoward/dayu-harness-skill/good%20first%20issue?label=good%20first%20issue)](https://github.com/kinoward/dayu-harness-skill/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 [![Contributors](https://img.shields.io/github/contributors/kinoward/dayu-harness-skill)](https://github.com/kinoward/dayu-harness-skill/graphs/contributors)
+
+[github-issues-link]: https://github.com/kinoward/dayu-harness-skill/issues
+[github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
 <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors" target="_blank">
   <table>
