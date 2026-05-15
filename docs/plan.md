@@ -2,9 +2,9 @@
 
 ## Context
 
-从 youtube-translate-tools 提炼经验，构建一个完整的项目治理 Skill `docs-governance`。在当前项目中实现并验证，未来独立成 git 仓库分发。
+从内部参考项目提炼经验，构建一个完整的项目治理 Skill `dayu-harness-skill`。在当前项目中实现并验证，未来独立成 git 仓库分发。
 
-> 历史说明：本文保留早期设计追溯。当前行为以 `SKILL.md`、`README.md`、`capabilities/*.json` 为准；Skill 仅通过 `/docs-governance` 显式激活；自然语言维护意图由项目 `AGENTS.md` 与 `docs/harness/maintenance.md` 体系处理；部署清单以 capability manifest 为单一事实源。
+> 历史说明：本文保留早期设计追溯。当前行为以 `SKILL.md`、`README.md`、`capabilities/*.json` 为准；Skill 仅通过 `/dayu-harness` 显式激活；自然语言维护意图由项目 `AGENTS.md` 与 `docs/harness/maintenance.md` 体系处理；部署清单以 capability manifest 为单一事实源。
 >
 > 当前路径映射：早期设计中的 `doc-maintenance.md` 现为 `docs/harness/maintenance.md`；`docs/practices/` 现为 `docs/harness/guides/`；`docs/decisions/` 现为 `docs/design-docs/`；`docs/research/` 现为 `docs/references/research/`；`docs/project/` 现为 `docs/product-specs/`；`docs/scripts/` 现为 `docs/harness/sensors/scripts/`。
 
@@ -52,7 +52,7 @@ Skill 删除后：
 > Skill 是管理和维护项目治理体系的工具，不是治理体系本身。项目中以 AGENTS.md 为根的渐进式披露文档体系是最终权威。Skill 帮助创建和维护这套体系，但不替代或凌驾于它。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
 
 **模板 CLAUDE.md 中**：
-> 本文件是项目级权威入口。外部工具和模板（包括 docs-governance skill）仅作为创建和维护本体系的辅助参考。如发生冲突，以本文件及 docs/ 下的项目文档为准。
+> 本文件是项目级权威入口。外部工具和模板（包括 大禹治库 Skill）仅作为创建和维护本体系的辅助参考。如发生冲突，以本文件及 docs/ 下的项目文档为准。
 
 ### 激活方式
 
@@ -60,7 +60,7 @@ Skill 删除后：
 
 以下激活方式仅在 Skill 存在时有效：
 
-- **显式**：`/docs-governance`（初始化、大改动时）
+- **显式**：`/dayu-harness`（初始化、大改动时）
 - **隐式**：自然语言触发。Skill 识别以下意图并自动激活：
   - 添加/删除/修改某种约束或规范
   - 更新项目文档内容
@@ -71,7 +71,7 @@ Skill 删除后，上述意图由 AI 读取项目中的 `docs/harness/maintenanc
 ## Skill 完整结构
 
 ```
-.claude/skills/docs-governance/
+.claude/skills/dayu-harness/
   README.md                         # 人类阅读：功能说明、项目结构、使用与删除建议
   skill.md                          # Skill 定义 + 5 模式 + 边界规则 + 激活条件
   Q&A-TEMPLATE.md                   # Q&A 参考模板（skill 根据项目实际状态适配）
@@ -333,7 +333,7 @@ AI 读取 ai-memory.md 中的「经验沉淀」章节，自行判断何时沉淀
 
 ### 阶段 1：构建 Skill
 
-1. 创建 `.claude/skills/docs-governance/` 目录
+1. 创建 `.claude/skills/dayu-harness/` 目录
 2. 将本计划文件复制到 `docs/plan.md`（供后续 Skill 维护参考）
 3. 编写 `README.md`（人类阅读：功能、结构、安装与删除建议）
 3. 编写 `skill.md`（5 模式 + 边界规则 + 优先级声明 + 激活条件 + 分阶段经验沉淀行为）
@@ -346,7 +346,7 @@ AI 读取 ai-memory.md 中的「经验沉淀」章节，自行判断何时沉淀
 
 ### 阶段 2：应用到当前项目（后续手动触发）
 
-Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按 Q&A 模板连续提问，完成当前项目的治理体系迁移。迁移内容包括：文章大纲/设计风格/写作草稿 → `docs/project/`，废弃文档 → `docs/archive/project/`，已有 husky + commitlint 的兼容合并。
+Skill 构建完成后，通过 `/dayu-harness` 显式触发融合模式，按 Q&A 模板连续提问，完成当前项目的治理体系迁移。迁移内容包括：文章大纲/设计风格/写作草稿 → `docs/project/`，废弃文档 → `docs/archive/project/`，已有 husky + commitlint 的兼容合并。
 
 ## Verification（阶段 1）
 
@@ -361,7 +361,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 ## 阶段 1 优化（2026-05-12）
 
-基于三方审计（计划合规 + youtube-translate-tools 实践 + harness-engineering 设计理念）的优化计划。
+基于三方审计（计划合规 + 内部参考项目实践 + harness-engineering 设计理念）的优化计划。
 
 ### 一、架构决策
 
@@ -371,7 +371,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 **Skill 仅显式激活**
 
-- 移除 SKILL.md 中所有隐式激活条件，仅保留 `/docs-governance` 显式命令
+- 移除 SKILL.md 中所有隐式激活条件，仅保留 `/dayu-harness` 显式命令
 - SKILL.md frontmatter 添加 `disable-model-invocation: true`
 - 边界规则不再有矛盾：Skill 只在用户显式调用时工作
 
@@ -485,7 +485,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 ### 五、SKILL.md 关键修改
 
 1. **frontmatter**：添加 `disable-model-invocation: true`
-2. **激活条件**：移除隐式激活，仅保留显式 `/docs-governance`
+2. **激活条件**：移除隐式激活，仅保留显式 `/dayu-harness`
 3. **边界规则**：移除矛盾规则，简化为「Skill 仅在用户显式调用时工作」
 4. **融合模式步骤**：明确 LLM 必须先调 manifest 关联 installer `--check` 获取结构化 merge plan
 5. **诊断模式步骤**：明确 LLM 优先调 `audit.sh --json`

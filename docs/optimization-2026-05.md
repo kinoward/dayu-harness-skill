@@ -1,4 +1,4 @@
-# docs-governance Skill 优化记录
+# 大禹治库 Skill 优化记录
 
 > **日期**: 2026-05-13
 > **实施状态**: 已完成
@@ -7,7 +7,7 @@
 
 ## 用户确认的决策
 
-- **AGENTS.md 路由**：采用任务触发路由（task-trigger-based），与 youtube-translate-tools 一致
+- **AGENTS.md 路由**：采用任务触发路由（task-trigger-based），与内部参考项目一致
 - **Release-please**：作为 Q&A 独立可选资产，用户可选择启用或跳过
 - **编排系统（orchestrator）**：暂不纳入 skill，聚焦治理体系脚手架
 
@@ -15,7 +15,7 @@
 
 ## Context
 
-当前 `docs-governance` skill 是将 harness-engineering 工程理念（以 AGENTS.md 为根的渐进式披露文档体系 + 机械强制执行）落地为可复用的项目脚手架工具。通过对比参考项目（harness-engineering 学习仓库）和实践产物（youtube-translate-tools），发现 skill 的核心架构良好，但在以下方面与 harness-engineering 理念存在偏差：
+当前大禹治库 Skill（`dayu-harness-skill`）是将 harness-engineering 工程理念（以 AGENTS.md 为根的渐进式披露文档体系 + 机械强制执行）落地为可复用的项目脚手架工具。通过对比参考项目（harness-engineering 学习仓库）和内部参考项目实践产物，发现该 Skill 的核心架构良好，但在以下方面与 harness-engineering 理念存在偏差：
 
 **核心问题**：AGENTS.md 模板采用"类别路由"（工程约束/决策与经验/项目内容），而非 harness-engineering 倡导的"任务触发路由"（当你准备 commit 时读什么、当你准备创建 PR 时读什么）。这导致 AI 每次需要加载过多无关上下文。
 
@@ -23,7 +23,7 @@
 
 参考来源：
 - harness-engineering 六大核心概念（尤其 #2 Map Not Manual、#3 Mechanical Enforcement）
-- youtube-translate-tools 的实际实施模式（task-router AGENTS.md、3 层强制执行、ADR 追溯）
+- 内部参考项目的实际实施模式（task-router AGENTS.md、3 层强制执行、ADR 追溯）
 
 ---
 
@@ -48,7 +48,7 @@
 - 在 AGENTS.md 标题后插入状态横幅（INIT / ACTIVE / MAINTENANCE / ARCHIVED）
 - 脚手架时通过 Q0 询问填充
 
-**为什么**：youtube-translate-tools 的 AGENTS.md 顶部有状态快照，AI 第一眼就知道项目处于什么阶段。
+**为什么**：内部参考项目的 AGENTS.md 顶部有状态快照，AI 第一眼就知道项目处于什么阶段。
 
 #### 变更 3：拆分 code-review-checklist 为独立文档
 
@@ -96,7 +96,7 @@
 
 - 增加后台执行 + Monitor 流式追进度、并行工具调用、遇错从 raw 输出诊断
 
-**为什么**：youtube-translate-tools 的 AI 协作说明有明确的操作模式描述，当前 skill 模板较抽象。
+**为什么**：内部参考项目的 AI 协作说明有明确的操作模式描述，当前 skill 模板较抽象。
 
 #### 变更 8：pr-lint.yml CI 增强——整合 pr_body_structure.py
 
@@ -122,7 +122,7 @@
 - `**TL;DR**` 为必需字段，必须出现在文件最前面
 - 格式模板：`TL;DR: <一句话 — 症状 + 根因 + 修复>`
 
-**为什么**：youtube-translate-tools 的 ADR-0016 Rule #14 强制 TL;DR，让 AI 无需读完整文件即可判断是否相关。
+**为什么**：内部参考项目的 ADR 规则强制 TL;DR，让 AI 无需读完整文件即可判断是否相关。
 
 ---
 
