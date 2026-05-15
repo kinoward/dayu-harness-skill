@@ -9,6 +9,7 @@ MANIFEST_DIR="$SKILL_DIR/capabilities"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
 VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/harness/sensors/scripts/validate.sh"
 ENVIRONMENT_SCRIPT="$SCRIPTS_DIR/ensure-environment.sh"
+OUTPUT_BASE="$(pwd)"
 
 MODE="prompt"
 TARGET=""
@@ -82,23 +83,50 @@ json_escape() {
     printf '%s' "$s"
 }
 
+relative_output_path() {
+    local path="${1%/}"
+    local base="${OUTPUT_BASE%/}"
+    local common="$base"
+    local up=""
+
+    if [ "$path" = "$base" ]; then
+        printf '.'
+        return
+    fi
+
+    while [ "$common" != "/" ] && [ "$path" != "$common" ] && [ "${path#"$common"/}" = "$path" ]; do
+        common="${common%/*}"
+        up="../$up"
+    done
+
+    if [ "$path" = "$common" ]; then
+        printf '%s' "${up%/}"
+    elif [ "$common" = "/" ]; then
+        printf '%s%s' "$up" "${path#/}"
+    else
+        printf '%s%s' "$up" "${path#"$common"/}"
+    fi
+}
+
+TARGET_DISPLAY="$(relative_output_path "$TARGET")"
+
 if ! command -v jq >/dev/null 2>&1; then
     if [ -f "$ENVIRONMENT_SCRIPT" ] && [ -x "$ENVIRONMENT_SCRIPT" ]; then
         environment_json="$(bash "$ENVIRONMENT_SCRIPT" "$TARGET" --check 2>/dev/null || true)"
     else
-        environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止 docs-governance 部署。"}'
+        environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止大禹治库 Skill 部署。"}'
     fi
 
-    [ -n "$environment_json" ] || environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止 docs-governance 部署。"}'
+    [ -n "$environment_json" ] || environment_json='{"status":"needs_install","items":[{"kind":"tool","name":"jq","status":"missing","required":true,"action":"install","description_nl":"解析 capability manifest 需要 jq，缺失时不能继续部署。"}],"summary":"Missing required environment tools.","description_nl":"缺少必需工具 jq。请先安装；如果用户拒绝安装，应终止大禹治库 Skill 部署。"}'
     cat <<JSONEOF
 {
   "mode":"$MODE",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"needs_install",
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
-  "description_nl":"缺少解析 capability manifest 所需的 jq。请先安装缺失工具；如果用户拒绝安装，应终止 docs-governance 部署。",
+  "description_nl":"缺少解析 capability manifest 所需的 jq。请先安装缺失工具；如果用户拒绝安装，应终止大禹治库 Skill 部署。",
   "total_files":0,
   "files_new":0,
   "files_existing":0,
@@ -590,7 +618,7 @@ collect_installer_entry_apply() {
         else
             local installer_output installer_rc
             set +e
-            installer_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --apply "$effective_strategy" 2>&1)"
+            installer_output="$(DAYU_HARNESS_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --apply "$effective_strategy" 2>&1)"
             installer_rc=$?
             set -e
 
@@ -750,7 +778,7 @@ do_dry_run() {
     cat <<JSONEOF
 {
   "mode":"dry-run",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$top_status",
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
@@ -794,7 +822,7 @@ do_apply() {
         cat <<JSONEOF
 {
   "mode":"apply",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$environment_status",
   "environment":${environment_json},
   "capabilities":[],
@@ -855,7 +883,7 @@ JSONEOF
                 installer_path="$SCRIPTS_DIR/$installer_script"
                 if [ -f "$installer_path" ] && [ -x "$installer_path" ]; then
                     set +e
-                    installer_check_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --check 2>&1)"
+                    installer_check_output="$(DAYU_HARNESS_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --check 2>&1)"
                     installer_check_rc=$?
                     set -e
                     installer_check_status="$(echo "$installer_check_output" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
@@ -867,7 +895,7 @@ JSONEOF
                         while IFS= read -r hook_file; do
                             [ -z "$hook_file" ] && continue
                             hook_path="$TARGET/${hook_file#./}"
-                            if [ ! -f "$hook_path" ] || ! grep -qF "hook managed by docs-governance snippets" "$hook_path"; then
+                            if [ ! -f "$hook_path" ] || ! grep -qF "hook managed by dayu-harness snippets" "$hook_path"; then
                                 auto_merge_husky="false"
                                 break
                             fi
@@ -987,7 +1015,7 @@ JSONEOF
     cat <<JSONEOF
 {
   "mode":"apply",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$overall_status",
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],

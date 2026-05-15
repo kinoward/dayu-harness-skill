@@ -17,7 +17,7 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 
 ```markdown
 ## 概要
-<!-- docs-governance:summary -->
+<!-- dayu-harness:summary -->
 
 可见标题可使用任意语言；machine-check 兼容旧有英文形式。
 
@@ -26,14 +26,14 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 -
 
 ## 实施说明
-<!-- docs-governance:implementation-notes -->
+<!-- dayu-harness:implementation-notes -->
 
 <!-- Key decisions, trade-offs, discovered TODOs. -->
 
 -
 
 ## 测试计划
-<!-- docs-governance:test-plan -->
+<!-- dayu-harness:test-plan -->
 
 <!-- Each bullet MUST start with - [ ] and contain a backtick-enclosed
      command on the same line. -->
@@ -44,7 +44,7 @@ Closes #<issue-number>  # 或 Fixes/Resolves
 ```
 
 关键规则：
-- **按顺序保留 H2 section 或 marker**：`## Summary` / `<!-- docs-governance:summary -->`，`## Implementation notes` / `<!-- docs-governance:implementation-notes -->`，`## Test plan` / `<!-- docs-governance:test-plan -->`
+- **按顺序保留 H2 section 或 marker**：`## Summary` / `<!-- dayu-harness:summary -->`，`## Implementation notes` / `<!-- dayu-harness:implementation-notes -->`，`## Test plan` / `<!-- dayu-harness:test-plan -->`
 - **Machine check 兼容旧模板**：允许旧英文标题或新 marker 形式。机器校验以本顺序识别。
 - **`Closes #N` / `Fixes #N` / `Resolves #N` 之一必须作为单独行**
 - **Test plan 至少一条 bullet**，每条以 `- [ ]` 开头，并在同一行包含反引号包裹的可执行命令

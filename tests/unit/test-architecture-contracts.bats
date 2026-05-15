@@ -101,14 +101,14 @@ set -euo pipefail
 
 if [ "${1:-}" = "init" ]; then
   cat > package.json <<'JSON'
-{"name":"docs-governance-test","version":"1.0.0","devDependencies":{}}
+{"name":"dayu-harness-skill-test","version":"1.0.0","devDependencies":{}}
 JSON
   exit 0
 fi
 
 if [ "${1:-}" = "install" ]; then
   cat > package.json <<'JSON'
-{"name":"docs-governance-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
+{"name":"dayu-harness-skill-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
 JSON
   exit 0
 fi
@@ -265,7 +265,7 @@ expected_agents_h1() {
     ! grep -q '^disable-model-invocation:' "$REPO_ROOT/SKILL.md"
     grep -q '^metadata:' "$REPO_ROOT/SKILL.md"
     grep -q 'invocation_policy: "explicit-command-only"' "$REPO_ROOT/SKILL.md"
-    grep -q 'command: "/docs-governance"' "$REPO_ROOT/SKILL.md"
+    grep -q 'command: "/dayu-harness"' "$REPO_ROOT/SKILL.md"
 
     local quick_validate="${CODEX_QUICK_VALIDATE:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
     [ -f "$quick_validate" ] || skip "Codex quick_validate.py not available"
@@ -277,8 +277,8 @@ expected_agents_h1() {
 
 @test "Codex sidecar disables implicit invocation" {
     [ -f "$REPO_ROOT/agents/openai.yaml" ]
-    grep -q 'display_name: "Docs Governance"' "$REPO_ROOT/agents/openai.yaml"
-    grep -q 'default_prompt: "Use $docs-governance' "$REPO_ROOT/agents/openai.yaml"
+    grep -q 'display_name: "Dayu Harness Skill"' "$REPO_ROOT/agents/openai.yaml"
+    grep -q 'default_prompt: "Use $dayu-harness' "$REPO_ROOT/agents/openai.yaml"
     grep -q '^  allow_implicit_invocation: false$' "$REPO_ROOT/agents/openai.yaml"
 }
 
@@ -368,6 +368,22 @@ expected_agents_h1() {
     echo "$output" | jq -e '.items | any(.kind == "tool" and .name == "node")'
     echo "$output" | jq -e '.items | any(.action == "git init")'
     echo "$output" | jq -e '.items | any(.action == "npm init -y")'
+}
+
+@test "machine-readable reports use relative target paths" {
+    local target="$WORK_DIR/relative-target-output"
+    mkdir -p "$target"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --check
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.target | startswith("/") | not'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.target | startswith("/") | not'
+    echo "$output" | jq -e '.environment.target | startswith("/") | not'
 }
 
 @test "environment preflight reports package dependency gaps as install work" {
@@ -705,7 +721,7 @@ expected_agents_h1() {
         fi
 
         if [ "$installer_script" = "install-husky.sh" ]; then
-            run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY="${capability:-git.commit-format}" bash "$script" "$FIXTURE_EMPTY" --check
+            run_with_wrapper env DAYU_HARNESS_CAPABILITY="${capability:-git.commit-format}" bash "$script" "$FIXTURE_EMPTY" --check
         else
             run_with_wrapper bash "$script" "$FIXTURE_EMPTY" --check
         fi
@@ -779,11 +795,11 @@ expected_agents_h1() {
 @test "PR body validator accepts marker-only sections" {
     local body_file="$WORK_DIR/pr-body-markers.md"
     write_file "$body_file" \
-        "<!-- docs-governance:summary -->" \
+        "<!-- dayu-harness:summary -->" \
         "- adjust release notes and hook checks" \
-        "<!-- docs-governance:implementation-notes -->" \
+        "<!-- dayu-harness:implementation-notes -->" \
         "- [x] \`npm test\`" \
-        "<!-- docs-governance:test-plan -->" \
+        "<!-- dayu-harness:test-plan -->" \
         "- [x] \`npm run lint\`" \
         "Closes #222"
 
@@ -800,7 +816,7 @@ expected_agents_h1() {
         "## Implementation notes" \
         "- [x] \`npm test\`" \
         "## Test plan" \
-        "<!-- docs-governance:test-plan -->" \
+        "<!-- dayu-harness:test-plan -->" \
         "- [ ] \`npm run lint\`" \
         "Closes #654"
 
@@ -832,13 +848,13 @@ expected_agents_h1() {
     local body_file="$WORK_DIR/pr-body-localized-boundary.md"
     write_file "$body_file" \
         "## 概要" \
-        "<!-- docs-governance:summary -->" \
+        "<!-- dayu-harness:summary -->" \
         "- adjust release notes and hook checks" \
         "## 实施说明" \
-        "<!-- docs-governance:implementation-notes -->" \
+        "<!-- dayu-harness:implementation-notes -->" \
         "- [x] \`npm test\`" \
         "## 测试计划" \
-        "<!-- docs-governance:test-plan -->" \
+        "<!-- dayu-harness:test-plan -->" \
         "- [ ] \`npm run lint\`" \
         "## 风险" \
         "- [ ] 需要和 release 负责人确认文案边界" \
@@ -928,7 +944,7 @@ expected_agents_h1() {
 @test "commit-msg hook accepts Chinese commit messages" {
     local target="$WORK_DIR/repo-commit-msg"
     mkdir -p "$target"
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    run_with_wrapper env DAYU_HARNESS_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
     [ "$status" -eq 0 ]
 
     local msg_file="$WORK_DIR/commit-msg-zh.txt"
@@ -943,21 +959,21 @@ expected_agents_h1() {
     local target="$WORK_DIR/hook-atomicity"
     mkdir -p "$target"
 
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    run_with_wrapper env DAYU_HARNESS_CAPABILITY=git.commit-format bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
     [ "$status" -eq 0 ]
     [ -f "$target/.husky/commit-msg" ]
     [ ! -f "$target/.husky/pre-commit" ]
     [ ! -f "$target/.husky/pre-push" ]
-    grep -q 'docs-governance:git.commit-format' "$target/.husky/commit-msg"
+    grep -q 'dayu-harness:git.commit-format' "$target/.husky/commit-msg"
 }
 
 @test "pre-push snippets can share the same hook stdin" {
     local target="$WORK_DIR/pre-push-snippets"
     mkdir -p "$target"
 
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=github.branch-protection bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    run_with_wrapper env DAYU_HARNESS_CAPABILITY=github.branch-protection bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
     [ "$status" -eq 0 ]
-    run_with_wrapper env DOCS_GOVERNANCE_CAPABILITY=release.versioning bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    run_with_wrapper env DAYU_HARNESS_CAPABILITY=release.versioning bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
     [ "$status" -eq 0 ]
 
     run bash -c 'cd "$1" && printf "%s\n" "refs/heads/main 0000000000000000000000000000000000000000 refs/heads/main 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"

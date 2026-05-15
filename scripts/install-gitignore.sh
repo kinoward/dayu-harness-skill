@@ -229,7 +229,7 @@ if [ "$MODE" = "apply" ]; then
                         missing_count="$(printf '%s\n' "$missing_patterns" | wc -l | tr -d ' ')"
                         {
                             echo ""
-                            echo "# === Added by docs-governance: $type.gitignore ==="
+                            echo "# === Added by dayu-harness: $type.gitignore ==="
                             printf '%s\n' "$missing_patterns"
                         } >> "$GITIGNORE_PATH"
                         added_count=$((added_count + missing_count))

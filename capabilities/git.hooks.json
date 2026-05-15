@@ -1,6 +1,6 @@
 {
   "id": "git.hooks",
-  "description": "Internal Git hook carrier for docs-governance hook snippets",
+  "description": "Internal Git hook carrier for dayu-harness hook snippets",
   "description_nl": "Provide the internal Git hook carrier used by hook-backed capabilities.",
   "default": false,
   "internal": true,

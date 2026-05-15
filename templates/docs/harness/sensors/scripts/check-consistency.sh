@@ -71,10 +71,10 @@ PROJECT_ROOT="$(cd "$_input_root" 2>/dev/null && pwd)" || {
 # ---------------------------------------------------------------------------
 TMP_WORKDIR=""
 if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
-    TMP_WORKDIR="$(mktemp -d "${TMPDIR%/}/docs-governance.XXXXXX" 2>/dev/null || true)"
+    TMP_WORKDIR="$(mktemp -d "${TMPDIR%/}/dayu-harness.XXXXXX" 2>/dev/null || true)"
 fi
 if [ -z "$TMP_WORKDIR" ]; then
-    TMP_WORKDIR="$PROJECT_ROOT/.docs-governance-tmp.$$"
+    TMP_WORKDIR="$PROJECT_ROOT/.dayu-harness-tmp.$$"
     mkdir -p "$TMP_WORKDIR" || {
         echo "错误: 无法创建临时目录 '$TMP_WORKDIR'" >&2
         exit 2

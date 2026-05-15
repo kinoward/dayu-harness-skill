@@ -1,25 +1,25 @@
 ---
-name: docs-governance
-description: 帮助项目低成本接入 Harness Engineering 理念的一次性部署工具。将以 AGENTS.md 为根的渐进式披露治理体系部署到目标项目。仅通过 /docs-governance 显式命令激活。
+name: dayu-harness
+description: 大禹治库 Skill（Dayu Harness Skill）是帮助项目低成本接入 Harness Engineering 理念的一次性部署工具。将以 AGENTS.md 为根的渐进式披露治理体系部署到目标项目。仅通过 /dayu-harness 显式命令激活。
 metadata:
   invocation_policy: "explicit-command-only"
-  command: "/docs-governance"
+  command: "/dayu-harness"
   compatible_agents: "agent-skills-common, claude-code, codex"
 ---
 
-# docs-governance
+# Dayu Harness Skill
 
 ## 定位
 
-本 Skill 是管理和维护项目治理体系的**一次性部署工具**，不是治理体系本身。Skill 目录中的模板、脚本和资产只是部署来源；被部署到目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本，才是 Harness Engineering 治理体系的实际载体。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
+大禹治库 Skill 是管理和维护项目治理体系的**一次性部署工具**，不是治理体系本身。Skill 目录中的模板、脚本和资产只是部署来源；被部署到目标项目中的 AGENTS.md、docs/ 文档、hooks、CI 与维护脚本，才是 Harness Engineering 治理体系的实际载体。以 AGENTS.md 为根的渐进式披露文档体系是最终权威。初始化完成后，Skill 可安全删除——项目的治理体系已独立运行。
 
-被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + `docs/harness/maintenance.md` 是「熵管理」、ai-execution.md + ai-memory.md 是「人类掌舵，智能体执行，并把经验沉淀回项目」。
+“大禹”取自大禹治水：不把洪流堵在一处，而是疏导、分流并建立长期秩序。被部署到目标项目的治理体系，其设计哲学源自 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：工程师不再手写每行代码，而是设计约束环境、明确意图边界、构建反馈回路，让 AI 智能体可靠工作。目标项目内的文档和资产对应 HE 六大概念——AGENTS.md 是「地图而非手册」、docs/ 目录是「仓库即记录系统」、hooks + CI 是「机械化执行」、CLAUDE.md 渐进式路由是「智能体可读性」、archive/ + `docs/harness/maintenance.md` 是「熵管理」、ai-execution.md + ai-memory.md 是「人类掌舵，智能体执行，并把经验沉淀回项目」。
 
-直接把治理规则只做成 Skill，只能让某个 Agent 在当前环境中按规则工作，属于 Agent-centric 约束。docs-governance 的目标是 Project-centric：把长期规则、项目知识/经验和机械化反馈部署进目标仓库，使它们可版本化、可 review、可迁移，并且不依赖某个 Skill、会话或工具长期存在。
+直接把治理规则只做成 Skill，只能让某个 Agent 在当前环境中按规则工作，属于 Agent-centric 约束。大禹治库 Skill 的目标是 Project-centric：把长期规则、项目知识/经验和机械化反馈部署进目标仓库，使它们可版本化、可审查、可迁移，并且不依赖某个 Skill、会话或工具长期存在。
 
 ## 激活条件
 
-Skill 仅通过显式命令激活：用户输入 `/docs-governance`。
+Skill 仅通过显式命令激活：用户输入 `/dayu-harness`。
 
 Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的维护由 AI 读取项目中的 `docs/harness/maintenance.md` 自行处理。
 
@@ -27,7 +27,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 ## 边界规则
 
-- Skill 仅在用户显式调用 `/docs-governance` 时工作
+- Skill 仅在用户显式调用 `/dayu-harness` 时工作
 - 项目无 AGENTS.md → 进入脚手架模式
 - 项目已有文档体系但不完整 → 进入融合模式
 - 项目已有完整体系，用户要求增删改约束 → 进入维护模式

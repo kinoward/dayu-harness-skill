@@ -26,7 +26,7 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
 }
 
 HOOKS_DIR="$TARGET/.husky"
-CAPABILITY="${DOCS_GOVERNANCE_CAPABILITY:-}"
+CAPABILITY="${DAYU_HARNESS_CAPABILITY:-}"
 
 json_escape() {
     local s="$1"
@@ -70,7 +70,7 @@ ensure_hook_file() {
         mkdir -p "$HOOKS_DIR"
         {
             echo "#!/usr/bin/env bash"
-            echo "# $hook hook managed by docs-governance snippets"
+            echo "# $hook hook managed by dayu-harness snippets"
             if [ "$hook" = "commit-msg" ]; then
                 echo 'COMMIT_MSG_FILE="$1"'
             fi
@@ -86,8 +86,8 @@ append_fragment() {
     local src_rel="$3"
     local src="$SKILL_DIR/$src_rel"
     local dst="$HOOKS_DIR/$hook"
-    local marker_start="# >>> docs-governance:${id} >>>"
-    local marker_end="# <<< docs-governance:${id} <<<"
+    local marker_start="# >>> dayu-harness:${id} >>>"
+    local marker_end="# <<< dayu-harness:${id} <<<"
 
     [ -f "$src" ] || return 2
     ensure_hook_file "$hook"
@@ -99,7 +99,7 @@ append_fragment() {
     {
         echo ""
         echo "$marker_start"
-        echo "# The following snippet is added by docs-governance."
+        echo "# The following snippet is added by dayu-harness."
         echo "# Remove this marked section to revert this capability."
         cat "$src"
         echo "$marker_end"
@@ -122,7 +122,7 @@ if [ "$MODE" = "check" ]; then
         if [ "$hook" = "error" ]; then
             ERROR_COUNT=$((ERROR_COUNT + 1))
             [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{\"file\":\".husky\",\"capability\":\"$(json_escape "$id")\",\"status\":\"error\",\"recommendation\":\"skip\",\"strategies\":[\"skip\"],\"description_nl\":\"Unknown docs-governance hook capability: $(json_escape "$id")\"}"
+            ITEMS+="{\"file\":\".husky\",\"capability\":\"$(json_escape "$id")\",\"status\":\"error\",\"recommendation\":\"skip\",\"strategies\":[\"skip\"],\"description_nl\":\"Unknown dayu-harness hook capability: $(json_escape "$id")\"}"
             continue
         fi
 
@@ -142,7 +142,7 @@ if [ "$MODE" = "check" ]; then
             exists=true
             ANY_CONFLICT="true"
             TOTAL_EXISTING=$((TOTAL_EXISTING + 1))
-            if grep -qF "# >>> docs-governance:${id} >>>" "$HOOKS_DIR/$hook"; then
+            if grep -qF "# >>> dayu-harness:${id} >>>" "$HOOKS_DIR/$hook"; then
                 status="clean"
                 description="Hook snippet already present."
             else
@@ -170,7 +170,7 @@ if [ "$MODE" = "check" ]; then
         DESC_NL="No conflicting husky hook snippets found for capability ${CAPABILITY}."
     elif [ "$TOP_STATUS" = "conflict" ]; then
         SUMMARY="Found existing hook(s). Review merge plan for capability ${CAPABILITY}."
-        DESC_NL="Some husky hooks already exist. Merge appends only the selected docs-governance snippet and preserves existing content."
+        DESC_NL="Some husky hooks already exist. Merge appends only the selected dayu-harness snippet and preserves existing content."
     else
         SUMMARY="Errors encountered during hook check."
         DESC_NL="Errors occurred while checking husky hook snippets."
@@ -238,5 +238,5 @@ if [ "$MODE" = "apply" ]; then
 fi
 
 echo "--- 安装 husky snippets ---"
-echo "提示：请通过 DOCS_GOVERNANCE_CAPABILITY 指定能力，再使用 --check 或 --apply merge。"
+echo "提示：请通过 DAYU_HARNESS_CAPABILITY 指定能力，再使用 --check 或 --apply merge。"
 "$0" "$TARGET" --check

@@ -21,14 +21,14 @@ set -euo pipefail
 
 if [ "${1:-}" = "init" ]; then
   cat > package.json <<'JSON'
-{"name":"docs-governance-test","version":"1.0.0","devDependencies":{}}
+{"name":"dayu-harness-skill-test","version":"1.0.0","devDependencies":{}}
 JSON
   exit 0
 fi
 
 if [ "${1:-}" = "install" ]; then
   cat > package.json <<'JSON'
-{"name":"docs-governance-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
+{"name":"dayu-harness-skill-test","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0","eslint":"0.0.0","@eslint/js":"0.0.0","prettier":"0.0.0","lint-staged":"0.0.0"}}
 JSON
   exit 0
 fi

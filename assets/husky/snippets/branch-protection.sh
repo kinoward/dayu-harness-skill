@@ -1,9 +1,9 @@
 # Protect main/master branches from destructive pushes.
-if [ -z "${DOCS_GOVERNANCE_PRE_PUSH_INPUT:-}" ]; then
-    DOCS_GOVERNANCE_PRE_PUSH_INPUT="$(mktemp "${TMPDIR:-/tmp}/docs-governance-pre-push.XXXXXX")"
-    cat > "$DOCS_GOVERNANCE_PRE_PUSH_INPUT"
-    export DOCS_GOVERNANCE_PRE_PUSH_INPUT
-    trap 'rm -f "$DOCS_GOVERNANCE_PRE_PUSH_INPUT"' EXIT
+if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
+    DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "${TMPDIR:-/tmp}/dayu-harness-pre-push.XXXXXX")"
+    cat > "$DAYU_HARNESS_PRE_PUSH_INPUT"
+    export DAYU_HARNESS_PRE_PUSH_INPUT
+    trap 'rm -f "$DAYU_HARNESS_PRE_PUSH_INPUT"' EXIT
 fi
 
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -20,4 +20,4 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         echo "Use a feature branch and pull request workflow."
         exit 1
     fi
-done < "$DOCS_GOVERNANCE_PRE_PUSH_INPUT"
+done < "$DAYU_HARNESS_PRE_PUSH_INPUT"

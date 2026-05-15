@@ -39,9 +39,9 @@ DEFAULT_SECTIONS = [
 ]
 
 SECTION_MARKER_BY_SECTION = {
-    "## Summary": "<!-- docs-governance:summary -->",
-    "## Implementation notes": "<!-- docs-governance:implementation-notes -->",
-    "## Test plan": "<!-- docs-governance:test-plan -->",
+    "## Summary": "<!-- dayu-harness:summary -->",
+    "## Implementation notes": "<!-- dayu-harness:implementation-notes -->",
+    "## Test plan": "<!-- dayu-harness:test-plan -->",
 }
 
 SECTION_HEADER_PATTERNS = {
@@ -51,13 +51,13 @@ SECTION_HEADER_PATTERNS = {
 }
 
 SECTION_MARKER_PATTERNS = {
-    "## Summary": re.compile(r"<!--\s*docs-governance:summary\s*-->"),
-    "## Implementation notes": re.compile(r"<!--\s*docs-governance:implementation-notes\s*-->"),
-    "## Test plan": re.compile(r"<!--\s*docs-governance:test-plan\s*-->"),
+    "## Summary": re.compile(r"<!--\s*dayu-harness:summary\s*-->"),
+    "## Implementation notes": re.compile(r"<!--\s*dayu-harness:implementation-notes\s*-->"),
+    "## Test plan": re.compile(r"<!--\s*dayu-harness:test-plan\s*-->"),
 }
 
 SECTION_BOUNDARY_RE = re.compile(
-    r"^(?:##\s+.+|<!--\s*docs-governance:(?:summary|implementation-notes|test-plan)\s*-->)",
+    r"^(?:##\s+.+|<!--\s*dayu-harness:(?:summary|implementation-notes|test-plan)\s*-->)",
     re.MULTILINE,
 )
 
@@ -298,9 +298,9 @@ Options:
                       {{ "sections": ["## Summary", "## Test plan", ...] }}
 
                  Also accepted per section:
-                   Summary:           <!-- docs-governance:summary -->
-                   Implementation:    <!-- docs-governance:implementation-notes -->
-                   Test plan:         <!-- docs-governance:test-plan -->
+                   Summary:           <!-- dayu-harness:summary -->
+                   Implementation:    <!-- dayu-harness:implementation-notes -->
+                   Test plan:         <!-- dayu-harness:test-plan -->
 
                      When omitted the default sections are used:
                        {DEFAULT}

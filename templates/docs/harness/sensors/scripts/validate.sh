@@ -96,7 +96,7 @@ log_text() {
 # ---- 主逻辑 ----
 
 if [ "$JSON_MODE" = false ]; then
-    echo "=== docs-governance 校验 ==="
+    echo "=== 大禹治库 Skill 校验 ==="
     echo "项目路径: $PROJECT_ROOT"
     echo ""
 fi

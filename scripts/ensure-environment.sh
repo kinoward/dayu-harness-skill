@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ensure-environment.sh — 检查并准备 docs-governance 运行/部署后的必需环境
+# ensure-environment.sh — 检查并准备 大禹治库 Skill 运行/部署后的必需环境
 # 用法: ensure-environment.sh <target-root> [--check|--apply] --capabilities "id,id"
 set -euo pipefail
 
@@ -10,6 +10,7 @@ SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
 [ "$SCRIPT_DIR" = "${BASH_SOURCE[0]}" ] && SCRIPT_DIR="."
 SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 MANIFEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/capabilities"
+OUTPUT_BASE="$(pwd)"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -46,6 +47,31 @@ json_escape() {
     printf '%s' "$s"
 }
 
+relative_output_path() {
+    local path="${1%/}"
+    local base="${OUTPUT_BASE%/}"
+    local common="$base"
+    local up=""
+
+    if [ "$path" = "$base" ]; then
+        printf '.'
+        return
+    fi
+
+    while [ "$common" != "/" ] && [ "$path" != "$common" ] && [ "${path#"$common"/}" = "$path" ]; do
+        common="${common%/*}"
+        up="../$up"
+    done
+
+    if [ "$path" = "$common" ]; then
+        printf '%s' "${up%/}"
+    elif [ "$common" = "/" ]; then
+        printf '%s%s' "$up" "${path#/}"
+    else
+        printf '%s%s' "$up" "${path#"$common"/}"
+    fi
+}
+
 if [ -z "$TARGET" ]; then
     echo '{"status":"error","error":"target root is required","description_nl":"必须提供目标项目目录。"}'
     exit 2
@@ -55,6 +81,7 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
     echo '{"status":"error","error":"target not found","description_nl":"目标项目目录不存在或无法访问。"}'
     exit 2
 }
+TARGET_DISPLAY="$(relative_output_path "$TARGET")"
 
 DEFAULT_CAPABILITIES=(
     "core"
@@ -234,7 +261,7 @@ if [ "$MISSING_TOOLS" -gt 0 ]; then
     cat <<JSONEOF
 {
   "mode":"$MODE",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"needs_install",
   "summary":"Missing required environment tools.",
   "items":[${items_json}],
@@ -243,7 +270,7 @@ if [ "$MISSING_TOOLS" -gt 0 ]; then
   "installs":0,
   "user_actions":0,
   "errors":0,
-  "description_nl":"缺少必需工具。请先安装缺失工具；如果用户拒绝安装，应终止 docs-governance 部署。"
+  "description_nl":"缺少必需工具。请先安装缺失工具；如果用户拒绝安装，应终止大禹治库 Skill 部署。"
 }
 JSONEOF
     exit 0
@@ -374,7 +401,7 @@ items_json="$(join_json "${ITEMS[@]}")"
 cat <<JSONEOF
 {
   "mode":"$MODE",
-  "target":"$(json_escape "$TARGET")",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$TOP_STATUS",
   "summary":"$(json_escape "$DESC")",
   "items":[${items_json}],
