@@ -35,6 +35,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问
 - 任何涉及已有配置的操作，使用脚本获取结构化 merge plan，用户确认后执行
 - **不覆盖已有配置**，必须经用户确认
+- 部署、融合、维护或生成操作完成后，必须执行收尾验证，并按 [docs/completion-report-template.md](docs/completion-report-template.md) 用自然语言向用户汇报结果
 
 ## 5 个模式
 
@@ -46,7 +47,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 2. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 连续提问（基于现状适配，不机械照搬）
 3. 展示确认汇总
 4. 用户确认后：调用 `scaffold.sh --dry-run --enable <capability ids>` 预览变更 → 确认策略 → `scaffold.sh --apply --enable <capability ids>` 复制启用的模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
-5. 执行 `validate.sh` smoke test
+5. 按「执行收尾验证」流程检查部署结果，并使用完成报告模板向用户汇报
 
 ### 2. 诊断
 
@@ -66,7 +67,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 3. 将 merge plan 中的 `description_nl` 以自然语言呈现给用户
 4. 逐项询问：[1] 保留现有 [2] 替换 [3] 合并 [4] 跳过
 5. 用户逐项确认后，调用 `install-*.sh --apply <merge|replace|skip>` 执行
-6. `validate.sh` 验证
+6. 按「执行收尾验证」流程检查融合结果，并使用完成报告模板向用户汇报
 
 ### 4. 维护
 
@@ -83,6 +84,25 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 触发：需要特定文档或配置
 
 根据项目特征和 `docs/harness/maintenance.md` 中的 Q&A 决策参考，智能生成适配内容。
+
+## 执行收尾验证
+
+Skill 完成任何写入类操作后，不能只告诉用户“已完成”。必须先验证目标项目中的治理体系是否能正常使用，再用自然语言收尾。
+
+收尾验证优先使用目标项目内已部署的脚本：
+
+1. `docs/harness/sensors/scripts/validate.sh --json <project-root>`：检查已启用的 hooks、配置和 workflow 是否可用。
+2. `docs/harness/sensors/scripts/audit.sh --json <project-root>`：检查 `AGENTS.md`、`CLAUDE.md`、docs 索引和维护脚本是否完整。
+3. `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`：检查文档链接、索引和孤儿文档。
+
+如果脚本不存在或暂时不可执行，按目标项目中的 `docs/harness/maintenance.md` 手动检查关键路径。
+
+验证后处理规则：
+
+- 检查通过：按 [docs/completion-report-template.md](docs/completion-report-template.md) 汇报已启用能力、已确认事项和未启用事项。
+- 检查发现可确定修复的问题：先修复，再重新运行检查。
+- 检查发现需要用户取舍的问题：说明影响，用自然语言询问用户选择，不输出大段原始日志。
+- 未启用的能力出现 skip 或可选缺失时，不作为失败汇报，只说明这次没有安装相关内容。
 
 ## 部署后的经验沉淀约定
 
@@ -119,7 +139,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 | 生成 diff 和行数统计 | 将 `description_nl` 以自然语言呈现给用户 |
 | 输出结构化 JSON（含 `description_nl`） | 确认用户选择 |
 | 执行写入操作（--apply 模式） | 调用脚本执行 |
-| smoke test 验证 | 呈现验证结果 |
+| smoke test / audit / consistency 验证 | 按完成报告模板呈现自然语言结果 |
 
 关键约定：
 - 所有脚本 `--json` 模式输出纯 JSON 到 stdout，诊断日志到 stderr
@@ -139,6 +159,7 @@ Skill 目录中的其他文件按需加载：
 
 - **[AGENTS.md](AGENTS.md)**：Skill 自身渐进式披露入口，路由到各模块。
 - **[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)**：Q&A 参考模板，提问内容以 `capabilities/*.json` 为准，包含融合模式提问和兼容化处理流程。脚手架和融合模式时读取。
+- **[docs/completion-report-template.md](docs/completion-report-template.md)**：Skill 执行完成后的验证流程和自然语言收尾模板。部署、融合、维护或生成操作完成后读取。
 - **[references/agent-compatibility.md](references/agent-compatibility.md)**：Claude、Codex 和通用 Agent Skills 客户端的兼容说明。需要安装、分发或调整触发策略时读取。
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。

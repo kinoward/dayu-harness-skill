@@ -88,3 +88,4 @@ Merge plan:
 3. `install-*.sh --check` 只输出 merge plan，不写 tracked files
 4. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
 5. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
+6. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项

@@ -34,11 +34,11 @@ docs-governance/
 ├── agents/                   # Codex UI 与触发策略元数据
 ├── references/               # Claude / Codex / 通用 Agent Skills 兼容说明
 ├── capabilities/             # 治理能力 manifest，部署清单单一事实源
-├── docs/                     # Skill 自身设计与优化记录
+├── docs/                     # Skill 自身设计、优化记录与执行完成报告模板
 ├── templates/                # 部署到目标项目的文档模板来源
 ├── assets/                   # 按能力部署的 hook、CI、配置资产来源
 ├── scripts/                  # Skill 内部初始化和安装脚本
-└── tests/                    # Skill 自身 bats 测试与 fixture 项目
+└── tests/                    # Skill 自身 bats 测试、fixture 模板与执行测试基线
 ```
 
 维护 Skill 自身目录、模板或能力清单时，必须同步更新本结构图和根 [AGENTS.md](AGENTS.md) 中对应的 `## 目录索引`（以及 `README.md` 的 `## 目录结构`）区块。
@@ -104,6 +104,7 @@ docs-governance/
 ## 依赖与测试（维护者）
 
 - 本 Skill 在目标项目中的运行与安装**不依赖** `bats`。
+- `tests/README.md` 是 Skill 自身执行测试基线入口，记录 fixture 模板、对话回放式 E2E 和运行方式。
 - `tests/unit/` 是维护者专用测试套件，依赖 `bats`；该依赖为可选维护依赖，仅用于本仓库验证，不是 Skill 运行时依赖。
 - 部署到目标项目时不会安装或携带 `bats`，也不会携带测试目录。
 

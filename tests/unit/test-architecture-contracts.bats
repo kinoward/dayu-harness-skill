@@ -196,6 +196,14 @@ resolve_relative_path() {
     grep -q 'references/agent-compatibility.md' "$REPO_ROOT/AGENTS.md"
 }
 
+@test "completion report template is a Skill-only runtime aid" {
+    [ -f "$REPO_ROOT/docs/completion-report-template.md" ]
+    grep -q 'docs/completion-report-template.md' "$REPO_ROOT/SKILL.md"
+    grep -q 'docs/completion-report-template.md' "$REPO_ROOT/AGENTS.md"
+    grep -q 'completion-report-template.md' "$REPO_ROOT/docs/AGENTS.md"
+    ! jq -e -s 'any(.[]; any(.template_files[]?.src; . == "docs/completion-report-template.md") or any(.asset_files[]?.src; . == "docs/completion-report-template.md"))' "$REPO_ROOT"/capabilities/*.json >/dev/null
+}
+
 @test "capability manifest source paths resolve" {
     while IFS= read -r source_path; do
         [ -e "$REPO_ROOT/$source_path" ] || {
