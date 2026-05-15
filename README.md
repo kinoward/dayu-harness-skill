@@ -9,7 +9,7 @@
   <img alt="大禹治库 Skill" src="https://img.shields.io/badge/%E5%A4%A7%E7%A6%B9%E6%B2%BB%E5%BA%93-Skill-B8860B">
   <img alt="AgentSkills Compatible" src="https://img.shields.io/badge/AgentSkills-Compatible-3C7D5A">
   <img alt="AGENTS.md 根索引" src="https://img.shields.io/badge/AGENTS.md-%E6%A0%B9%E7%B4%A2%E5%BC%95-4B5D67">
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social">
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?label=Stars&amp;logo=github&amp;style=flat">
 </p>
 
 <p>
@@ -27,12 +27,12 @@
   <strong>显式命令：</strong><code>/dayu-harness</code>
 </p>
 
-<table>
+<table width="100%">
   <tr>
     <td align="left">
-      🤖 你的项目已经开始让智能体参与开发、审查、排障和文档维护？<br>
-      📚 你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？<br>
-      🧭 你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？
+      <strong>🤖 你的项目已经开始让智能体参与开发、审查、排障和文档维护？</strong><br>
+      <strong>📚 你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？</strong><br>
+      <strong>🧭 你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？</strong>
     </td>
   </tr>
 </table>
@@ -46,16 +46,16 @@
 </p>
 
 <p>
-  <a href="#前言">前言</a> ·
-  <a href="#一句话理解">一句话理解</a> ·
-  <a href="#核心观念">核心观念</a> ·
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#能力清单">能力清单</a> ·
-  <a href="#工作模式">工作模式</a> ·
-  <a href="#生成内容">生成内容</a> ·
-  <a href="#目录结构">目录结构</a> ·
-  <a href="#维护测试">维护测试</a> ·
-  <a href="#参考引用">参考引用</a>
+  <a href="#前言">🧭 前言</a> ·
+  <a href="#一句话理解">⚡ 一句话理解</a> ·
+  <a href="#核心观念">🧱 核心观念</a> ·
+  <a href="#快速开始">🚀 快速开始</a> ·
+  <a href="#能力清单">📦 能力清单</a> ·
+  <a href="#工作模式">🛠️ 工作模式</a> ·
+  <a href="#生成内容">📚 生成内容</a> ·
+  <a href="#目录结构">🗂️ 目录结构</a> ·
+  <a href="#维护测试">✅ 维护测试</a> ·
+  <a href="#参考引用">🔗 参考引用</a>
 </p>
 
 </div>
