@@ -38,4 +38,15 @@ git push origin v1.0.0
 
 实施方式：
 - 本地：`.husky/pre-push` 中的 release versioning snippet
-- 远程：GitHub ruleset `protect-tags.json`
+- 远程：GitHub ruleset `.github/rulesets/protect-tags.json`
+
+### 规则集应用方式
+
+```bash
+gh auth login
+gh api -X POST "repos/$OWNER/$REPO/rulesets" --input .github/rulesets/protect-tags.json
+```
+
+Web UI：Settings → Rules → Rulesets → New ruleset → Import a ruleset → 上传 `protect-tags.json`。
+
+如规则更新，重新导入新的 JSON 即可替换版本；建议保留文件提交到仓库用于团队复用。

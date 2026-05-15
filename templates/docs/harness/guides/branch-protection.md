@@ -37,4 +37,15 @@ git pull origin main
 
 实施方式：
 - 本地：`.husky/pre-push` 中的 branch protection snippet 拦截 `main` / `master` 直推
-- 远程：GitHub ruleset `protect-main.json`
+- 远程：GitHub ruleset `.github/rulesets/protect-main.json`
+
+### 规则集应用方式
+
+```bash
+gh auth login
+gh api -X POST "repos/$OWNER/$REPO/rulesets" --input .github/rulesets/protect-main.json
+```
+
+Web UI：Settings → Rules → Rulesets → New ruleset → Import a ruleset → 上传 `protect-main.json`。
+
+建议将该 ruleset 文件放入仓库版本控制，并在更改主干保护策略后重新导入更新版本。
