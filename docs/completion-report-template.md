@@ -40,16 +40,16 @@
 
 这次已经启用：
 - {能力的自然语言名称，例如“项目入口索引和文档维护说明”}
-- {能力的自然语言名称，例如“Git 提交约束和提交信息检查”}
-- {能力的自然语言名称，例如“AI 协作规则和项目长期记忆边界”}
+- {能力的自然语言名称，例如“提交规范与协作轨迹约束”}
+- {能力的自然语言名称，例如“AI 协作边界与长期记忆沉淀”}
 
 我已经确认：
 - 从 `AGENTS.md` 可以顺利进入项目文档。
 - 关键文档之间的链接是通的。
 - 这次启用的自动检查可以运行。
-- {如启用 Git 约束：提交信息检查和推送保护已经生效。}
-- {如启用质量工具：格式化和代码质量配置已经放好。}
-- {如启用 GitHub 能力：PR、issue、分支或发布相关设置已经放好。}
+- {如启用 Git 约束：提交规范检查和推送前保护已经生效。}
+- {如启用质量工具：提交前质量与格式化配置已经就绪。}
+- {如启用 GitHub 能力：PR/Issue、分支与发布协作检查已经就位。}
 
 这次没有启用：
 - {未启用能力的自然语言说明，例如“GitHub 发布自动化”，如果没有则省略本段。}
@@ -68,12 +68,12 @@
 | `git.commit` | Git 提交约束和提交信息检查 |
 | `git.language` | 提交和协作内容的语言约束 |
 | `quality.tooling` | 代码质量、格式化和忽略文件配置 |
-| `github.pr` | PR 和 issue 的协作检查 |
-| `github.branch-release` | 分支、标签和推送保护 |
-| `github.release-please` | 自动发布配置 |
-| `ai.collaboration` | AI 协作方式和项目长期记忆边界 |
-| `knowledge.adr` | 重要技术决策记录 |
-| `knowledge.troubleshooting` | 排障记录 |
+| `github.pr` | PR/Issue 协作质量护栏 |
+| `github.branch-release` | 分支与发布保护 |
+| `github.release-please` | 自动化版本发布流程 |
+| `ai.collaboration` | AI 协作边界与长期记忆 |
+| `knowledge.adr` | 重要架构决策记录 |
+| `knowledge.troubleshooting` | 可复用排障知识 |
 | `knowledge.research` | 研究资料记录 |
 | `project.docs` | 项目背景和产品规格文档区 |
 | `archive.project` | 历史内容归档区 |
