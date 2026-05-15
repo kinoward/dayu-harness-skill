@@ -4,7 +4,7 @@
 
 ## 语言
 
-Commit message（subject + body + trailer）一律使用英文。详见 [git-language-policy.md](git-language-policy.md)。
+若启用 `repo.language`，commit message（subject + body + trailer）必须遵守仓库语言规约。
 
 ## Commit Message 格式
 
@@ -44,5 +44,5 @@ type(scope): description
 1. 读取错误输出
 2. 根据错误类型修正：
    - **格式错误**（type 不合法 / 缺 description）→ 改写符合 Conventional Commits
-   - **含中文字符** → 将违规行翻译为英文，保留 type(scope) 前缀与语义
+   - **语言规约失败** → 按仓库语言规约修正违规行，保留 type(scope) 前缀与语义
 3. 重新执行 `git commit`

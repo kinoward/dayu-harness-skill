@@ -8,18 +8,22 @@ set -euo pipefail
 JSON_MODE=false
 PROJECT_ROOT="."
 ALLOWED_OPTIONAL_CAPABILITIES=(
-    "ai.collaboration"
-    "archive.project"
-    "git.commit"
-    "git.language"
-    "github.branch-release"
+    "ai.execution"
+    "ai.memory"
+    "git.commit-format"
+    "github.branch-protection"
     "github.pr"
     "github.release-please"
+    "knowledge.archive"
     "knowledge.adr"
     "knowledge.research"
     "knowledge.troubleshooting"
-    "project.docs"
-    "quality.tooling"
+    "project.context"
+    "project.gitignore"
+    "quality.node-tooling"
+    "quality.practices"
+    "release.versioning"
+    "repo.language"
 )
 
 is_allowed_optional_capability() {
@@ -331,17 +335,41 @@ check_script() {
     fi
 }
 
-check_script ".husky/commit-msg" "commit-msg hook"
-check_script ".husky/pre-commit" "pre-commit hook"
-check_script ".husky/pre-push" "pre-push hook"
+path_exists() {
+    local path
+    for path in "$@"; do
+        [ -e "$PROJECT_ROOT/$path" ] && return 0
+    done
+    return 1
+}
+
+if path_exists ".husky/commit-msg" "docs/harness/guides/commit-guidelines.md" "docs/harness/guides/git-language-policy.md"; then
+    check_script ".husky/commit-msg" "commit-msg hook"
+else
+    log_text "  - commit-msg hook 未启用，跳过"
+fi
+
+if path_exists ".husky/pre-commit" ".lintstagedrc.json" "eslint.config.js" ".prettierrc"; then
+    check_script ".husky/pre-commit" "pre-commit hook"
+else
+    log_text "  - pre-commit hook 未启用，跳过"
+fi
+
+if path_exists ".husky/pre-push" "docs/harness/guides/branch-protection.md" "docs/harness/guides/release-versioning.md" ".github/rulesets/protect-main.json" ".github/rulesets/protect-tags.json"; then
+    check_script ".husky/pre-push" "pre-push hook"
+else
+    log_text "  - pre-push hook 未启用，跳过"
+fi
 
 # commitlint
 if [ -f "$PROJECT_ROOT/commitlint.config.cjs" ]; then
     record_result "commitlint.config.cjs" "pass" "commitlint.config.cjs 存在"
     log_text "  ✓ commitlint.config.cjs 存在"
-else
-    record_result "commitlint.config.cjs" "warn" "commitlint.config.cjs 未安装"
+elif path_exists "docs/harness/guides/commit-guidelines.md"; then
+    record_result "commitlint.config.cjs" "warn" "已启用提交格式指南但 commitlint.config.cjs 未安装"
     log_text "  - commitlint.config.cjs 未安装"
+else
+    log_text "  - commitlint 未启用，跳过"
 fi
 
 # docs/harness/sensors/scripts/ 维护脚本

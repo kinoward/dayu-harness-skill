@@ -1,7 +1,7 @@
 {
   "id": "github.pr",
-  "description": "GitHub pull request hygiene workflows",
-  "description_nl": "Deploy PR lint workflows and helper script for CI-side checks.",
+  "description": "GitHub pull request structure and review hygiene",
+  "description_nl": "Deploy PR structure workflow, helper script, PR guide, and review checklist.",
   "default": false,
   "dependencies": ["core"],
   "template_files": [
@@ -10,13 +10,11 @@
   ],
   "asset_files": [
     {"src":"assets/github/workflows/pr-lint.yml","dst":".github/workflows/pr-lint.yml"},
-    {"src":"assets/github/workflows/issue-lint.yml","dst":".github/workflows/issue-lint.yml"},
     {"src":"assets/github/scripts/pr_body_structure.py","dst":".github/scripts/pr_body_structure.py"}
   ],
   "installer": null,
   "acceptance": [
     "PR lint workflow exists",
-    "Issue lint workflow exists",
     "PR body validator script exists"
   ],
   "suggested_when": "Enable when project uses GitHub pull requests."

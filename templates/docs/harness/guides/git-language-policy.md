@@ -57,14 +57,14 @@ hook 与 CI 均使用同一字符区间，确保一致性。
 
 ### 层一：本地 hook
 
-`.husky/commit-msg` 在 commit 时检测 CJK 字符，拦截含中文的 commit message。CJK 检测与 Conventional Commits 校验共享同一个 hook 文件。
+`.husky/commit-msg` 在 commit 时检测 CJK 字符，拦截含中文的 commit message。CJK 检测由 `repo.language` 能力安装，不依赖 Conventional Commits 校验。
 
 ### 层二：CI 远程校验（GitHub Actions 可用时）
 
 | CI 检查 | 文件 | 作用 |
 |--------|------|------|
-| PR 标题/body | `.github/workflows/pr-lint.yml` | 检测 CJK 字符，含中文则 fail check |
-| Issue 标题/body | `.github/workflows/issue-lint.yml` | 检测 CJK 字符，含中文则 fail check |
+| PR 标题/body | `.github/workflows/repo-language-pr-lint.yml` | 检测 CJK 字符，含中文则 fail check |
+| Issue 标题/body | `.github/workflows/repo-language-issue-lint.yml` | 检测 CJK 字符，含中文则 fail check |
 
 ### 无 CI 环境
 

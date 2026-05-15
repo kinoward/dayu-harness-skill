@@ -1,0 +1,15 @@
+{
+  "id": "git.hooks",
+  "description": "Internal Git hook carrier for docs-governance hook snippets",
+  "description_nl": "Provide the internal Git hook carrier used by hook-backed capabilities.",
+  "default": false,
+  "internal": true,
+  "dependencies": ["core"],
+  "template_files": [],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "Hook-backed capabilities can safely merge their own snippets"
+  ],
+  "suggested_when": "Internal dependency only; do not ask users to enable directly."
+}

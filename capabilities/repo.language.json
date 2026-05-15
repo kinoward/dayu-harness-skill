@@ -1,0 +1,26 @@
+{
+  "id": "repo.language",
+  "description": "Repository collaboration language policy",
+  "description_nl": "Enable CJK language checks for commit messages and GitHub PR/Issue text.",
+  "default": false,
+  "dependencies": ["core", "git.hooks"],
+  "template_files": [
+    {"src":"templates/docs/harness/guides/git-language-policy.md","dst":"docs/harness/guides/git-language-policy.md"}
+  ],
+  "asset_files": [
+    {"src":"assets/github/workflows/repo-language-pr-lint.yml","dst":".github/workflows/repo-language-pr-lint.yml"},
+    {"src":"assets/github/workflows/repo-language-issue-lint.yml","dst":".github/workflows/repo-language-issue-lint.yml"}
+  ],
+  "installer": {
+    "script": "install-husky.sh",
+    "safe_strategies": ["merge", "skip"],
+    "notes": "Installs only the commit-msg CJK language-policy snippet."
+  },
+  "acceptance": [
+    "commit-msg hook includes CJK checks",
+    "Repository language policy is documented",
+    "GitHub PR/Issue language workflows exist when GitHub assets are used"
+  ],
+  "requires": ["Git repository context"],
+  "suggested_when": "Enable when repository language policy is required."
+}

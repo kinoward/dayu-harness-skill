@@ -17,18 +17,22 @@ set -euo pipefail
 PROJECT_ROOT="."
 JSON_MODE=false
 ALLOWED_OPTIONAL_CAPABILITIES=(
-    "ai.collaboration"
-    "archive.project"
-    "git.commit"
-    "git.language"
-    "github.branch-release"
+    "ai.execution"
+    "ai.memory"
+    "git.commit-format"
+    "github.branch-protection"
     "github.pr"
     "github.release-please"
+    "knowledge.archive"
     "knowledge.adr"
     "knowledge.research"
     "knowledge.troubleshooting"
-    "project.docs"
-    "quality.tooling"
+    "project.context"
+    "project.gitignore"
+    "quality.node-tooling"
+    "quality.practices"
+    "release.versioning"
+    "repo.language"
 )
 
 for arg in "$@"; do

@@ -9,10 +9,10 @@
 - 可选：`knowledge.adr` [design-docs/AGENTS.md](design-docs/AGENTS.md) - 架构与设计决策
 - [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - core：执行计划
 - [generated/AGENTS.md](generated/AGENTS.md) - core：自动生成资料索引
-- 可选：`project.docs` [product-specs/AGENTS.md](product-specs/AGENTS.md) - 产品规格与项目上下文
+- 可选：`project.context` [product-specs/AGENTS.md](product-specs/AGENTS.md) - 产品规格与项目上下文
 - 可选：`knowledge.research` [references/AGENTS.md](references/AGENTS.md) - 外部资料和研究索引
 - 可选：`knowledge.troubleshooting` [troubleshooting/AGENTS.md](troubleshooting/AGENTS.md) - 排障知识库
-- 可选：`archive.project` [archive/AGENTS.md](archive/AGENTS.md) - 历史归档
+- 可选：`knowledge.archive` [archive/AGENTS.md](archive/AGENTS.md) - 历史归档
 
 目录索引变化（含目录、文件或能力部署清单变化）时，必须同步更新本区块。
 

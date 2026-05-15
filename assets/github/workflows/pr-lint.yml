@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, edited, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   pr-lint:
     runs-on: ubuntu-latest
@@ -15,8 +19,25 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Detect release-please PR
+        id: detect-release-please
+        run: |
+          HEAD_REF="$(jq -r '.pull_request.head.ref // ""' "$GITHUB_EVENT_PATH")"
+          AUTHOR="$(jq -r '.pull_request.user.login // ""' "$GITHUB_EVENT_PATH")"
+          LABELS="$(jq -r '[.pull_request.labels[]?.name] | join("\n")' "$GITHUB_EVENT_PATH")"
+
+          SKIP="false"
+          if [ "${HEAD_REF#release-please--}" != "$HEAD_REF" ]; then
+            SKIP="true"
+          elif [ "$AUTHOR" = "github-actions[bot]" ] && printf '%s\n' "$LABELS" | grep -Eq '^autorelease:'; then
+            SKIP="true"
+          fi
+
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
       - name: Check PR body structure
         id: pr-body-structure
+        if: steps.detect-release-please.outputs.skip != 'true'
         continue-on-error: true
         run: |
           BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
@@ -26,48 +47,12 @@ jobs:
           fi
           printf '%s\n' "$BODY" | python3 .github/scripts/pr_body_structure.py
 
-      - name: Check PR title for CJK characters
-        id: pr-title-cjk
-        continue-on-error: true
-        env:
-          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
-        run: |
-          TITLE="${{ github.event.pull_request.title }}"
-          if echo "$TITLE" | grep -P "$CJK_RE"; then
-            echo "ERROR: PR title contains CJK characters. Use English."
-            echo "See docs/harness/guides/git-language-policy.md"
-            exit 1
-          fi
-
-      - name: Check PR body for CJK characters
-        id: pr-body-cjk
-        continue-on-error: true
-        env:
-          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
-        run: |
-          BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
-          if echo "$BODY" | grep -q '<!-- skip-cjk-check -->'; then
-            echo "SKIP: PR body contains <!-- skip-cjk-check --> marker."
-            exit 0
-          fi
-          if echo "$BODY" | grep -P "$CJK_RE"; then
-            echo "ERROR: PR body contains CJK characters. Use English."
-            echo "See docs/harness/guides/git-language-policy.md"
-            exit 1
-          fi
-
       - name: Aggregate lint results
         if: always()
         run: |
           FAILED=""
-          if [ "${{ steps.pr-body-structure.outcome }}" != "success" ]; then
+          if [ "${{ steps.detect-release-please.outputs.skip }}" != "true" ] && [ "${{ steps.pr-body-structure.outcome }}" != "success" ]; then
             FAILED="$FAILED pr-body-structure"
-          fi
-          if [ "${{ steps.pr-title-cjk.outcome }}" != "success" ]; then
-            FAILED="$FAILED pr-title-cjk"
-          fi
-          if [ "${{ steps.pr-body-cjk.outcome }}" != "success" ]; then
-            FAILED="$FAILED pr-body-cjk"
           fi
           if [ -n "$FAILED" ]; then
             echo "::error::The following PR lint checks failed:$FAILED"

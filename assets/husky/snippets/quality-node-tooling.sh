@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-# pre-commit hook: lint-staged runner
-# 安装路径: .husky/pre-commit
-
+# lint-staged runner for Node.js projects.
 if command -v npx &> /dev/null && [ -f ".lintstagedrc.json" ]; then
     npx --no-install lint-staged
 fi

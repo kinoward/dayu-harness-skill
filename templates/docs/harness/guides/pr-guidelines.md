@@ -4,7 +4,7 @@
 
 ## 语言
 
-PR 标题、body、评论一律使用英文。详见 [git-language-policy.md](git-language-policy.md)。
+若启用 `repo.language`，PR 标题、body、评论必须遵守仓库语言规约。
 
 ## PR 标题
 
@@ -77,8 +77,8 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## 创建后
 
-- Test plan 执行：参见 [ai-collaboration.md](ai-collaboration.md) 中的「Test plan 执行与汇报」章节
-- 合并策略：参见 [branch-and-release.md](branch-and-release.md) 中的「合并策略」章节
+- Test plan 执行：若启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
+- 合并策略：若启用 `github.branch-protection`，按分支保护规约中的合并策略执行
 
 ## PR 合并
 

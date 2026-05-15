@@ -1,9 +1,9 @@
 {
-  "id": "git.commit",
-  "description": "Commit message validation and hook integration",
-  "description_nl": "Enable Husky hooks for commit validation and write commitlint.config.cjs.",
+  "id": "git.commit-format",
+  "description": "Conventional Commits validation and commit format guidance",
+  "description_nl": "Enable Conventional Commits guidance, commitlint config, and commit-msg format validation.",
   "default": false,
-  "dependencies": ["core"],
+  "dependencies": ["core", "git.hooks"],
   "template_files": [
     {"src":"templates/docs/harness/guides/commit-guidelines.md","dst":"docs/harness/guides/commit-guidelines.md"}
   ],
@@ -13,10 +13,10 @@
   "installer": {
     "script": "install-husky.sh",
     "safe_strategies": ["merge", "skip"],
-    "notes": "Husky install should not replace existing hooks by default."
+    "notes": "Installs only the commit-msg Conventional Commits snippet."
   },
   "acceptance": [
-    "Husky hooks include commit-msg and pre-commit",
+    "commit-msg hook includes Conventional Commits validation",
     "commitlint.config.cjs exists",
     "No existing hooks replaced by default"
   ],

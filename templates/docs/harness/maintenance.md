@@ -58,7 +58,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | 方向 | 含义 | 目录 |
 |------|------|------|
 | **工程约束** | AI 读取的规则、经验和决策，跨项目可复用 | `harness/guides/`、`design-docs/`、`troubleshooting/`、`references/research/`、`harness/sensors/`、各级 `AGENTS.md` |
-| **项目内容** | 项目强相关的产物，非 AI 规则 | `product-specs/`、`archive/product-specs/` |
+| **项目内容** | 项目强相关的产物，非 AI 规则 | `product-specs/`、`archive/` |
 
 工程约束文档描述 AI 应遵守的规范和积累的经验。项目内容文档是 AI 需要了解的上下文，但不是行为规范。
 
@@ -139,23 +139,27 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `git.commit` | 提交信息格式校验 | husky + commitlint | husky hook + commitlint config | Git 项目 |
-| `git.language` | Git 内容语言规范 | husky hook + 可选 CI | commit-msg 中 CJK 检测 | Git 项目（需 `git.commit` 的 hook 载体） |
+| `git.commit-format` | 提交信息格式校验 | husky snippet + commitlint | commit-msg snippet + commitlint config | Git 项目 |
+| `repo.language` | Git/GitHub 内容语言规范 | husky snippet + 可选 CI | commit-msg CJK snippet + language workflows | Git 或 GitHub 项目 |
 | `github.pr` | PR 工作流规范 | 文档约定 + 可选 CI | pr-lint.yml（仅 GitHub） | GitHub 项目 |
-| `github.branch-release` | 分支与发布管理 | 文档约定 + 可选 rulesets | rulesets JSON（仅 GitHub） | GitHub 项目 |
+| `github.branch-protection` | 分支保护 | 文档约定 + ruleset + hook snippet | protect-main ruleset + pre-push snippet | GitHub 项目 |
+| `release.versioning` | 版本与标签保护 | 文档约定 + tag ruleset + hook snippet | protect-tags ruleset + pre-push snippet | 发布项目 |
 
 ### 代码质量
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `quality.tooling` | 代码风格、质量与测试策略 | ESLint + Prettier + lint-staged + 文档指引 | eslint config + prettier config + lint-staged config + .gitignore | 含代码项目 |
+| `quality.practices` | 开发纪律与测试策略 | 文档指引 | dev-hygiene + testing-strategy | 含代码项目 |
+| `quality.node-tooling` | Node.js 代码风格与格式化 | ESLint + Prettier + lint-staged + hook snippet | eslint config + prettier config + lint-staged config + pre-commit snippet | Node.js 项目 |
+| `project.gitignore` | 忽略文件管理 | gitignore installer | .gitignore | Git 项目 |
 
 ### 开发规范
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `quality.tooling` | 开发环境纪律 | 文档指引 + validate.sh | — | 含代码项目 |
-| `ai.collaboration` | AI 协作风格 | 文档约定 | — | AI 经常参与实现的项目 |
+| `quality.practices` | 开发环境纪律 | 文档指引 + validate.sh | — | 含代码项目 |
+| `ai.execution` | AI 执行风格 | 文档约定 | — | AI 经常参与实现的项目 |
+| `ai.memory` | AI 记忆边界 | 文档约定 | — | 需要长期经验沉淀的项目 |
 
 ### 知识管理
 
@@ -164,22 +168,24 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `knowledge.adr` | 决策记录 (ADR) | `docs/design-docs/` 目录 + 模板 | adr-template.md | 通用 |
 | `knowledge.troubleshooting` | 排障知识库 | `docs/troubleshooting/` 目录 | — | 通用 |
 | `knowledge.research` | 版本化研究院 | `docs/references/research/` 目录 | — | 有持续研究需求 |
-| `project.docs` | 产品规格与项目上下文 | `docs/product-specs/` 目录 | — | 有项目专属内容 |
-| `archive.project` | 历史归档 | `docs/archive/` 目录 | — | 有已废弃的历史内容 |
+| `project.context` | 产品规格与项目上下文 | `docs/product-specs/` 目录 | — | 有项目专属内容 |
+| `knowledge.archive` | 历史归档 | `docs/archive/` 目录 | — | 有已废弃的历史内容 |
 
 ### 文档与脚本联动关系
 
 | capability | 联动组件 | 说明 |
 |------|---------|------|
-| `git.commit` | husky + commitlint | `install-husky.sh` + commitlint config |
-| `git.language` | commit-msg 中 CJK 检测 | 必须依赖 `git.commit` 的 husky hook 载体 |
+| `git.commit-format` | commit-msg commitlint snippet + commitlint config | 仅安装提交格式校验 |
+| `repo.language` | commit-msg CJK snippet + repo-language workflows | 仅安装语言校验 |
 | `github.pr` | PR 本体化检查（pr-lint.yml + pr_body_structure.py） | 仅 GitHub 项目联动 CI |
-| `github.branch-release` | rulesets JSON + pre-push hook | GitHub rulesets（远程）+ pre-push hook（本地）双重保护 |
-| `quality.tooling` | ESLint + Prettier + lint-staged + .gitignore + validate.sh | 复杂配置默认人工确认 |
-| `github.release-please` | release-please.yml + config + manifest | 仅 GitHub 项目；依赖 `git.commit` + `github.pr`；需要 PAT |
+| `github.branch-protection` | protect-main ruleset + pre-push branch snippet | GitHub ruleset（远程）+ pre-push snippet（本地）双重保护 |
+| `release.versioning` | protect-tags ruleset + pre-push tag snippet | 标签保护和版本规范 |
+| `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | 复杂配置默认人工确认 |
+| `project.gitignore` | .gitignore installer | 按项目类型合并 universal/node/python 模板 |
+| `github.release-please` | release-please.yml + guide + config + manifest | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr`；需要 PAT |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
-> 纯文档能力（如 `ai.collaboration`、知识库目录）仍由 manifest 控制启用，不通过脚本资产隐式部署。
+> 纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）仍由 manifest 控制启用，不通过脚本资产隐式部署。
 
 ## 兼容化处理参考
 
@@ -211,10 +217,10 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | 约束 | 提问措辞建议 |
 |------|------------|
 | 提交信息格式校验 | 「每次 git commit 时自动检查提交信息是否符合 Conventional Commits 格式。启用后会安装 husky 和 commitlint 作为本地检查工具。」 |
-| Git 内容语言规范 | 「要求 commit、PR、issue 等 Git 相关内容全部使用英文。启用后会在 commit 时自动拦截中文内容。需要注意的是，这个功能需要和提交信息格式校验一起使用。」 |
+| Git/GitHub 内容语言规范 | 「要求 commit、PR、issue 等协作内容使用指定语言。启用后会在 commit 和 GitHub 检查中拦截 CJK 内容。」 |
 | PR 工作流规范 | 「为 PR 建立标题、正文模板和 Test plan 格式标准。如果使用 GitHub，还可以安装自动 CI 检查。」 |
-| 代码风格与质量 | 「安装 ESLint + Prettier，在 commit 前自动检查和格式化代码。」 |
-| AI 协作风格 | 「建立 AI 和人类的分工规则，包括自主执行、review 自检、经验沉淀等约定。推荐所有项目启用。」 |
+| 代码风格与质量 | 「可以只安装通用开发/测试实践，也可以额外安装 Node.js 的 ESLint + Prettier + lint-staged。」 |
+| AI 执行与记忆 | 「建立 AI 和人类的分工规则、自主执行约定，以及经验沉淀和项目记忆边界。」 |
 
 ### 确认汇总格式
 
@@ -224,9 +230,9 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 ## 确认汇总
 
 ### 启用的约束
-- 提交信息格式校验 → 安装 husky + commitlint
-- Git 内容语言规范 → CJK 检测将在 commit-msg hook 中配置
-- AI 协作风格 → 部署 ai-collaboration.md 文档
+- 提交信息格式校验 → 安装 commit-msg 格式校验 snippet + commitlint
+- Git/GitHub 内容语言规范 → 安装 CJK 检测 hook/CI
+- AI 执行与记忆 → 部署 ai-execution.md 与 ai-memory.md 文档
 
 ### 联动组件
 - .husky/commit-msg

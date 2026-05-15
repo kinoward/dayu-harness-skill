@@ -1,0 +1,19 @@
+{
+  "id": "quality.practices",
+  "description": "General engineering quality and testing practices",
+  "description_nl": "Deploy general development hygiene and testing strategy documents without installing Node.js tooling.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [
+    {"src":"templates/docs/harness/guides/dev-hygiene.md","dst":"docs/harness/guides/dev-hygiene.md"},
+    {"src":"templates/docs/harness/guides/testing-strategy.md","dst":"docs/harness/guides/testing-strategy.md"}
+  ],
+  "asset_files": [],
+  "installer": null,
+  "acceptance": [
+    "Development hygiene guide exists",
+    "Testing strategy guide exists",
+    "No Node.js tooling is installed by this capability"
+  ],
+  "suggested_when": "Enable for any code project that needs general development and testing practices."
+}

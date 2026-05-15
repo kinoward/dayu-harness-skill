@@ -1,20 +1,25 @@
-name: Issue Lint
+name: Repository Language Issue Lint
 
 on:
   issues:
     types: [opened, edited]
 
+permissions:
+  contents: read
+  issues: read
+
 jobs:
-  issue-lint:
+  issue-language-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Check issue for CJK characters
-        env:
-          CJK_RE: '[\x{4e00}-\x{9fff}\x{3040}-\x{309f}\x{30a0}-\x{30ff}\x{ac00}-\x{d7af}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]'
         run: |
-          TITLE="${{ github.event.issue.title }}"
+          TITLE="$(jq -r '.issue.title // ""' "$GITHUB_EVENT_PATH")"
           BODY="$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH")"
-          if echo "$TITLE" | grep -P "$CJK_RE"; then
+          contains_cjk() {
+            perl -Mutf8 -e 'binmode STDIN, ":encoding(UTF-8)"; local $/; exit(<STDIN> =~ /[\x{4E00}-\x{9FFF}\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{AC00}-\x{D7AF}\x{3000}-\x{303F}\x{FF00}-\x{FFEF}]/ ? 0 : 1);'
+          }
+          if printf '%s\n' "$TITLE" | contains_cjk; then
             echo "ERROR: Issue title contains CJK characters. Use English."
             echo "See docs/harness/guides/git-language-policy.md"
             exit 1
@@ -23,7 +28,7 @@ jobs:
             echo "SKIP: Issue body contains <!-- skip-cjk-check --> marker."
             exit 0
           fi
-          if echo "$BODY" | grep -P "$CJK_RE"; then
+          if printf '%s\n' "$BODY" | contains_cjk; then
             echo "ERROR: Issue body contains CJK characters. Use English."
             echo "See docs/harness/guides/git-language-policy.md"
             exit 1

@@ -51,12 +51,13 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|skip]"
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip]"
     echo "说明:"
     echo "  - 无 --enable 时默认仅部署核心能力 core"
     echo "  - --enable 与 --only 支持逗号分隔"
     echo "  - --only 兼容历史分类: docs/husky/commitlint/workflows/eslint/prettier/lint-staged/gitignore/release-please"
-    echo "  - --only all 表示部署全部能力（兼容历史行为）"
+    echo "  - --enable 兼容旧能力 id，并会展开到新的原子能力或 preset"
+    echo "  - --only all 表示部署全部公开能力；内部能力只通过依赖展开"
     echo "  - --apply 默认不替换已存在文件；安装器能力需通过 --strategy 声明安全策略"
 }
 
@@ -120,6 +121,7 @@ contains_item() {
 MANIFEST_IDS=()
 MANIFEST_PATHS=()
 DEFAULT_IDS=()
+PUBLIC_IDS=()
 
 for manifest_path in "$MANIFEST_DIR"/*.json; do
     [ -f "$manifest_path" ] || continue
@@ -127,6 +129,9 @@ for manifest_path in "$MANIFEST_DIR"/*.json; do
     [ -z "$manifest_id" ] && continue
     MANIFEST_IDS+=( "$manifest_id" )
     MANIFEST_PATHS+=( "$manifest_path" )
+    if ! jq -e '.internal == true' "$manifest_path" >/dev/null 2>&1; then
+        PUBLIC_IDS+=( "$manifest_id" )
+    fi
     if jq -e '.default == true' "$manifest_path" >/dev/null 2>&1; then
         DEFAULT_IDS+=( "$manifest_id" )
     fi
@@ -150,7 +155,7 @@ manifest_path_for_id() {
 }
 
 all_manifest_ids() {
-    printf '%s\n' "${MANIFEST_IDS[@]}"
+    printf '%s\n' "${PUBLIC_IDS[@]}"
 }
 
 default_manifest_ids() {
@@ -166,16 +171,52 @@ map_legacy_category() {
             echo "core"
             ;;
         husky|commitlint)
-            echo "git.commit"
+            echo "git.commit-format"
             ;;
         workflows)
             echo "github.pr"
             ;;
-        eslint|prettier|lint-staged|lint_staged|gitignore)
-            echo "quality.tooling"
+        eslint|prettier|lint-staged|lint_staged)
+            echo "quality.node-tooling"
+            ;;
+        gitignore)
+            echo "project.gitignore"
             ;;
         release-please)
             echo "github.release-please"
+            ;;
+        git.commit)
+            echo "git.commit-format"
+            ;;
+        git.language)
+            echo "repo.language"
+            ;;
+        github.branch-release)
+            echo "github.branch-protection release.versioning"
+            ;;
+        quality.tooling)
+            echo "quality.practices quality.node-tooling project.gitignore"
+            ;;
+        ai.collaboration)
+            echo "ai.execution ai.memory"
+            ;;
+        project.docs)
+            echo "project.context"
+            ;;
+        archive.project)
+            echo "knowledge.archive"
+            ;;
+        knowledge.base)
+            echo "knowledge.adr knowledge.troubleshooting knowledge.research knowledge.archive"
+            ;;
+        quality.standard)
+            echo "quality.practices project.gitignore quality.node-tooling"
+            ;;
+        github.delivery)
+            echo "git.commit-format repo.language github.pr github.branch-protection"
+            ;;
+        release.automated)
+            echo "release.versioning github.release-please"
             ;;
         *)
             echo "$1"
@@ -442,6 +483,7 @@ collect_file_entries_blocked() {
 
 collect_installer_entry_dry() {
     local manifest_path="$1"
+    local cap_id="$2"
     local installer_script safe_strategies status description
     installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
     [ -z "$installer_script" ] && return 0
@@ -461,11 +503,12 @@ collect_installer_entry_dry() {
         description="Installer available."
     fi
 
-    DRY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":$safe_strategies,\"needs_strategy\":false,\"description_nl\":\"$(json_escape "$description")\"}" )
+    DRY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":$safe_strategies,\"needs_strategy\":false,\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
 collect_installer_entry_apply() {
     local manifest_path="$1"
+    local cap_id="$2"
     local installer_script safe_strategies status description needs_strategy action installer_result
     installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
     [ -z "$installer_script" ] && return 0
@@ -503,7 +546,7 @@ collect_installer_entry_apply() {
     elif [ -z "$STRATEGY" ]; then
         status="needs_strategy"
         needs_strategy="true"
-        description="Strategy required for installer-backed capability. Use --strategy merge|skip."
+        description="Strategy required for installer-backed capability. Use a strategy allowed by that capability manifest."
         APPLY_STRATEGY_REQUIRED=$((APPLY_STRATEGY_REQUIRED + 1))
         installer_result="needs_strategy"
     else
@@ -525,7 +568,7 @@ collect_installer_entry_apply() {
         else
             local installer_output installer_rc
             set +e
-            installer_output="$("$installer_path" "$TARGET" --apply "$STRATEGY" 2>&1)"
+            installer_output="$(DOCS_GOVERNANCE_CAPABILITY="$cap_id" "$installer_path" "$TARGET" --apply "$STRATEGY" 2>&1)"
             installer_rc=$?
             set -e
 
@@ -557,7 +600,7 @@ collect_installer_entry_apply() {
         fi
     fi
 
-    APPLY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":${safe_array_json},\"action\":\"$(json_escape "$action")\",\"needs_strategy\":${needs_strategy},\"installer_result\":\"$(json_escape "$installer_result")\",\"description_nl\":\"$(json_escape "$description")\"}" )
+    APPLY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":${safe_array_json},\"action\":\"$(json_escape "$action")\",\"needs_strategy\":${needs_strategy},\"installer_result\":\"$(json_escape "$installer_result")\",\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
 build_selected_list_summary() {
@@ -622,7 +665,7 @@ do_dry_run() {
         DRY_ITEMS=()
         collect_file_entries "$manifest_path" "template" "dry"
         collect_file_entries "$manifest_path" "asset" "dry"
-        collect_installer_entry_dry "$manifest_path"
+        collect_installer_entry_dry "$manifest_path" "$cap_id"
 
         local cap_new=$((DRY_NEW - pre_new))
         local cap_existing=$((DRY_EXISTING - pre_existing))
@@ -757,11 +800,11 @@ do_apply() {
         if [ "$strategy_state" = "allowed" ]; then
             collect_file_entries "$manifest_path" "template" "apply"
             collect_file_entries "$manifest_path" "asset" "apply"
-            collect_installer_entry_apply "$manifest_path"
+            collect_installer_entry_apply "$manifest_path" "$cap_id"
         else
             collect_file_entries_blocked "$manifest_path" "template" "$strategy_state" "$blocked_desc"
             collect_file_entries_blocked "$manifest_path" "asset" "$strategy_state" "$blocked_desc"
-            collect_installer_entry_apply "$manifest_path"
+            collect_installer_entry_apply "$manifest_path" "$cap_id"
         fi
 
         local cap_new=$((APPLY_NEW - pre_new))
@@ -813,7 +856,7 @@ do_apply() {
 
     local top_desc="Apply completed with status $overall_status."
     if [ "$overall_status" = "needs_strategy" ]; then
-        top_desc="Apply required a strategy for installer-backed capabilities. Re-run with --strategy merge|skip."
+        top_desc="Apply required a strategy for installer-backed capabilities. Re-run with an allowed --strategy value."
     elif [ "$overall_status" = "partial" ]; then
         top_desc="Apply completed with partial changes. Existing targets were skipped by default."
     elif [ "$overall_status" = "error" ]; then
@@ -860,7 +903,7 @@ case "$MODE" in
         echo "=== 以上为预览 (dry-run) ===" >&2
         echo "执行 scaffold.sh --apply 以实际复制文件。" >&2
         echo "或使用 --enable <ids> / --only <category> 进一步过滤。" >&2
-        echo "安装器能力（含 installer）如需执行，请提供 --strategy merge|skip。" >&2
+        echo "安装器能力（含 installer）如需执行，请提供该能力允许的 --strategy。" >&2
         ;;
     *)
         usage >&2

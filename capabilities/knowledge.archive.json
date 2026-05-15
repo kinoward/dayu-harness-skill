@@ -1,7 +1,7 @@
 {
-  "id": "archive.project",
-  "description": "Product specs archive scaffold",
-  "description_nl": "Create archive product-specs index for archived project records.",
+  "id": "knowledge.archive",
+  "description": "Project knowledge archive scaffold",
+  "description_nl": "Create archive indexes for historical project records and retired knowledge.",
   "default": false,
   "dependencies": ["core"],
   "template_files": [
@@ -14,5 +14,5 @@
     "Archive AGENTS exists",
     "Archive product specs AGENTS exists"
   ],
-  "suggested_when": "Enable when archived project artifacts need a fixed location."
+  "suggested_when": "Enable when archived project artifacts or retired knowledge need a fixed location."
 }

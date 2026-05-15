@@ -1,0 +1,24 @@
+{
+  "id": "github.branch-protection",
+  "description": "Branch protection assets and local push guard",
+  "description_nl": "Deploy branch protection guidance, main/master ruleset, and local pre-push branch guard.",
+  "default": false,
+  "dependencies": ["core", "git.hooks"],
+  "template_files": [
+    {"src":"templates/docs/harness/guides/branch-protection.md","dst":"docs/harness/guides/branch-protection.md"}
+  ],
+  "asset_files": [
+    {"src":"assets/github/rulesets/protect-main.json","dst":".github/rulesets/protect-main.json"}
+  ],
+  "installer": {
+    "script": "install-husky.sh",
+    "safe_strategies": ["merge", "skip"],
+    "notes": "Installs only the pre-push main/master branch protection snippet."
+  },
+  "acceptance": [
+    "Main-branch ruleset exists",
+    "Pre-push hook protects main/master branches",
+    "No existing hooks replaced by default"
+  ],
+  "suggested_when": "Enable when branch protection is required."
+}

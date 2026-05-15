@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# install-husky.sh — 安装 husky + git hooks
-# 用法: install-husky.sh <target-root> [--check|--apply merge|replace|skip]
+# install-husky.sh — 安装 husky hook snippets
+# 用法: install-husky.sh <target-root> [--check|--apply merge|skip]
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DIFF_HELPER="${SKILL_DIR}/templates/docs/harness/sensors/scripts/diff-helper.sh"
 
-# Parse mode
 MODE="default"
 STRATEGY=""
 TARGET=""
@@ -19,7 +17,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$TARGET" ]; then
-    echo '{"status":"error","error":"usage: install-husky.sh <target-root> [--check|--apply merge|replace|skip]"}' >&2
+    echo '{"status":"error","error":"usage: install-husky.sh <target-root> [--check|--apply merge|skip]"}' >&2
     exit 2
 fi
 TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
@@ -28,9 +26,8 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
 }
 
 HOOKS_DIR="$TARGET/.husky"
-HOOKS=("commit-msg" "pre-commit" "pre-push")
+CAPABILITY="${DOCS_GOVERNANCE_CAPABILITY:-}"
 
-# Helper: escape string for JSON string value
 json_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
@@ -41,39 +38,81 @@ json_escape() {
     printf '%s' "$s"
 }
 
-# Helper: merge hook content (append Skill additions after a marker)
-merge_hook() {
-    local src="$1"
-    local dst="$2"
-    local marker="# >>> docs-governance skill additions >>>"
+fragment_entries() {
+    case "$CAPABILITY" in
+        ""|all)
+            echo "error|${CAPABILITY:-<unset>}|"
+            ;;
+        git.commit-format)
+            echo "commit-msg|git.commit-format|assets/husky/snippets/commit-format.sh"
+            ;;
+        repo.language)
+            echo "commit-msg|repo.language|assets/husky/snippets/repo-language.sh"
+            ;;
+        quality.node-tooling)
+            echo "pre-commit|quality.node-tooling|assets/husky/snippets/quality-node-tooling.sh"
+            ;;
+        github.branch-protection)
+            echo "pre-push|github.branch-protection|assets/husky/snippets/branch-protection.sh"
+            ;;
+        release.versioning)
+            echo "pre-push|release.versioning|assets/husky/snippets/release-versioning.sh"
+            ;;
+        git.hooks)
+            ;;
+        *)
+            echo "error|$CAPABILITY|"
+            ;;
+    esac
+}
 
+ensure_hook_file() {
+    local hook="$1"
+    local dst="$HOOKS_DIR/$hook"
     if [ ! -f "$dst" ]; then
-        cp "$src" "$dst"
-        chmod +x "$dst"
-        return 0
-    fi
-
-    # If marker already exists, skip (already merged)
-    if grep -qF "$marker" "$dst" 2>/dev/null; then
-        return 0
-    fi
-
-    # Read the incoming file and find content beyond the first few lines (skip shebang)
-    local body
-    body=$(tail -n +2 "$src" 2>/dev/null || true)
-    if [ -n "$body" ]; then
+        mkdir -p "$HOOKS_DIR"
         {
+            echo "#!/usr/bin/env bash"
+            echo "# $hook hook managed by docs-governance snippets"
+            if [ "$hook" = "commit-msg" ]; then
+                echo 'COMMIT_MSG_FILE="$1"'
+            fi
             echo ""
-            echo "$marker"
-            echo "# The following is added by docs-governance skill."
-            echo "# Remove this section to revert to original behavior."
-            echo "$body"
-            echo "# <<< docs-governance skill additions <<<"
-        } >> "$dst"
+        } > "$dst"
+        chmod +x "$dst"
     fi
 }
 
-# ===================== --check mode =====================
+append_fragment() {
+    local hook="$1"
+    local id="$2"
+    local src_rel="$3"
+    local src="$SKILL_DIR/$src_rel"
+    local dst="$HOOKS_DIR/$hook"
+    local marker_start="# >>> docs-governance:${id} >>>"
+    local marker_end="# <<< docs-governance:${id} <<<"
+
+    [ -f "$src" ] || return 2
+    ensure_hook_file "$hook"
+
+    if grep -qF "$marker_start" "$dst" 2>/dev/null; then
+        return 0
+    fi
+
+    {
+        echo ""
+        echo "$marker_start"
+        echo "# The following snippet is added by docs-governance."
+        echo "# Remove this marked section to revert this capability."
+        cat "$src"
+        echo "$marker_end"
+    } >> "$dst"
+}
+
+selected_hooks() {
+    fragment_entries | awk -F'|' '$1 != "error" && $1 != "" {print $1}' | sort -u
+}
+
 if [ "$MODE" = "check" ]; then
     ITEMS=""
     ANY_CONFLICT="false"
@@ -81,56 +120,46 @@ if [ "$MODE" = "check" ]; then
     TOTAL_EXISTING=0
     TOTAL_NEW=0
 
-    if [ -d "$HOOKS_DIR" ]; then
-        for hook in "${HOOKS[@]}"; do
-            local_existing="$HOOKS_DIR/$hook"
-            local_incoming="$SKILL_DIR/assets/husky/$hook"
-
-            if [ ! -f "$local_incoming" ]; then
-                ERROR_COUNT=$((ERROR_COUNT + 1))
-                [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Skill asset missing: assets/husky/$hook\"}"
-                continue
-            fi
-
-            plan_json=$("$DIFF_HELPER" merge-plan "$local_existing" "$local_incoming" 2>/dev/null) || {
-                ERROR_COUNT=$((ERROR_COUNT + 1))
-                [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".husky/$hook\",\"status\":\"error\",\"strategies\":[\"skip\"],\"description_nl\":\"Unable to compute merge plan for this husky hook.\"}"
-                continue
-            }
-
-            # Add file field to the plan
-            plan_with_file="\"file\":\".husky/$hook\",$(echo "$plan_json" | sed 's/^{//' )"
-
+    while IFS='|' read -r hook id src_rel; do
+        [ -n "$hook" ] || continue
+        if [ "$hook" = "error" ]; then
+            ERROR_COUNT=$((ERROR_COUNT + 1))
             [ -n "$ITEMS" ] && ITEMS+=","
-            ITEMS+="{${plan_with_file}"
+            ITEMS+="{\"file\":\".husky\",\"capability\":\"$(json_escape "$id")\",\"status\":\"error\",\"recommendation\":\"skip\",\"strategies\":[\"skip\"],\"description_nl\":\"Unknown docs-governance hook capability: $(json_escape "$id")\"}"
+            continue
+        fi
 
-            # Determine if this hook has existing content
-            if echo "$plan_json" | grep -q '"exists": true'; then
-                ANY_CONFLICT="true"
-                TOTAL_EXISTING=$((TOTAL_EXISTING + 1))
+        src="$SKILL_DIR/$src_rel"
+        if [ ! -f "$src" ]; then
+            ERROR_COUNT=$((ERROR_COUNT + 1))
+            [ -n "$ITEMS" ] && ITEMS+=","
+            ITEMS+="{\"file\":\".husky/$hook\",\"capability\":\"$(json_escape "$id")\",\"status\":\"error\",\"recommendation\":\"skip\",\"strategies\":[\"skip\"],\"description_nl\":\"Skill hook snippet missing: $(json_escape "$src_rel")\"}"
+            continue
+        fi
+
+        exists=false
+        status="clean"
+        recommendation="merge"
+        description="New hook snippet ready for install."
+        if [ -f "$HOOKS_DIR/$hook" ]; then
+            exists=true
+            ANY_CONFLICT="true"
+            TOTAL_EXISTING=$((TOTAL_EXISTING + 1))
+            if grep -qF "# >>> docs-governance:${id} >>>" "$HOOKS_DIR/$hook"; then
+                status="clean"
+                description="Hook snippet already present."
             else
-                TOTAL_NEW=$((TOTAL_NEW + 1))
+                status="conflict"
+                description="Existing hook found; merge will append only the ${id} snippet."
             fi
-        done
-    else
-        # No .husky dir at all — all hooks are new
-        for hook in "${HOOKS[@]}"; do
-            local_incoming="$SKILL_DIR/assets/husky/$hook"
-            if [ -f "$local_incoming" ]; then
-                lines=$(wc -l < "$local_incoming" | tr -d ' ')
-                TOTAL_NEW=$((TOTAL_NEW + 1))
-                plan_json=$("$DIFF_HELPER" merge-plan "/nonexistent/.husky/$hook" "$local_incoming" 2>/dev/null) || {
-                    plan_json="{\"status\":\"clean\",\"existing\":{\"exists\":false},\"incoming\":{\"path\":\"$local_incoming\",\"lines\":$lines},\"diff\":{\"added\":$lines,\"removed\":0},\"recommendation\":\"merge\",\"strategies\":[\"merge\",\"replace\",\"skip\"],\"description_nl\":\"New hook file not yet present. Merge may write this file directly.\"}"
-                }
-                [ -n "$ITEMS" ] && ITEMS+=","
-                ITEMS+="{\"file\":\".husky/$hook\",$(echo "$plan_json" | sed 's/^{//')"
-            fi
-        done
-    fi
+        else
+            TOTAL_NEW=$((TOTAL_NEW + 1))
+        fi
 
-    # Build top-level status
+        [ -n "$ITEMS" ] && ITEMS+=","
+        ITEMS+="{\"file\":\".husky/$hook\",\"capability\":\"$(json_escape "$id")\",\"status\":\"$status\",\"exists\":$exists,\"recommendation\":\"$recommendation\",\"strategies\":[\"merge\",\"skip\"],\"description_nl\":\"$(json_escape "$description")\"}"
+    done < <(fragment_entries)
+
     if [ "$ERROR_COUNT" -gt 0 ]; then
         TOP_STATUS="error"
     elif [ "$ANY_CONFLICT" = "true" ]; then
@@ -139,22 +168,15 @@ if [ "$MODE" = "check" ]; then
         TOP_STATUS="clean"
     fi
 
-    # Build summary
     if [ "$TOP_STATUS" = "clean" ]; then
-        SUMMARY="No existing .husky hooks found. ${TOTAL_NEW} hook(s) ready for clean install."
+        SUMMARY="${TOTAL_NEW} hook snippet(s) ready for clean install."
+        DESC_NL="No conflicting husky hook snippets found for capability ${CAPABILITY}."
     elif [ "$TOP_STATUS" = "conflict" ]; then
-        SUMMARY="Found ${TOTAL_EXISTING} existing hook(s), ${TOTAL_NEW} new hook(s). Review each hook's merge plan."
+        SUMMARY="Found existing hook(s). Review merge plan for capability ${CAPABILITY}."
+        DESC_NL="Some husky hooks already exist. Merge appends only the selected docs-governance snippet and preserves existing content."
     else
-        SUMMARY="Errors encountered during check."
-    fi
-
-    # Build description_nl
-    if [ "$TOP_STATUS" = "clean" ]; then
-        DESC_NL="No husky hooks currently installed. All ${TOTAL_NEW} hooks (commit-msg, pre-commit, pre-push) are ready for a clean install. No conflicts to resolve."
-    elif [ "$TOP_STATUS" = "conflict" ]; then
-        DESC_NL="Some husky hooks already exist in the project. Each hook with existing content is shown with a merge plan. You can choose 'merge' (append Skill additions), 'replace' (overwrite entirely), or 'skip' (keep existing) per hook."
-    else
-        DESC_NL="Errors occurred while checking husky hooks. Please verify that all assets are available."
+        SUMMARY="Errors encountered during hook check."
+        DESC_NL="Errors occurred while checking husky hook snippets."
     fi
 
     cat <<JSONEOF
@@ -168,100 +190,56 @@ JSONEOF
     exit 0
 fi
 
-# ===================== --apply mode =====================
 if [ "$MODE" = "apply" ]; then
     case "$STRATEGY" in
-        merge|replace|skip) ;;
+        merge|skip) ;;
         *)
-            echo '{"status":"error","error":"--apply requires strategy: merge, replace, or skip"}' >&2
+            echo '{"status":"error","error":"--apply requires strategy: merge or skip"}' >&2
             exit 2
             ;;
     esac
 
     if [ "$STRATEGY" = "skip" ]; then
-        echo '{"status":"ok","action":"skip","detail":"Husky hooks skipped per user request."}'
+        echo '{"status":"ok","action":"skip","detail":"Husky hook snippets skipped per user request.","description_nl":"No hook snippets were installed because skip was requested."}'
         exit 0
     fi
 
-    mkdir -p "$HOOKS_DIR"
     APPLIED=""
     ERRORS=""
 
-    for hook in "${HOOKS[@]}"; do
-        src="$SKILL_DIR/assets/husky/$hook"
-        dst="$HOOKS_DIR/$hook"
-
-        if [ ! -f "$src" ]; then
-            ERRORS="${ERRORS}Missing asset: assets/husky/$hook; "
+    while IFS='|' read -r hook id src_rel; do
+        [ -n "$hook" ] || continue
+        if [ "$hook" = "error" ]; then
+            ERRORS="${ERRORS}Unknown capability: $id; "
             continue
         fi
+        if append_fragment "$hook" "$id" "$src_rel"; then
+            APPLIED="${APPLIED}.husky/$hook:${id} "
+        else
+            ERRORS="${ERRORS}Failed to merge $id into .husky/$hook; "
+        fi
+    done < <(fragment_entries)
 
-        case "$STRATEGY" in
-            merge)
-                if merge_hook "$src" "$dst"; then
-                    APPLIED="${APPLIED}.husky/$hook "
-                else
-                    ERRORS="${ERRORS}Failed to merge .husky/$hook; "
-                fi
-                ;;
-            replace)
-                cp "$src" "$dst"
-                chmod +x "$dst"
-                APPLIED="${APPLIED}.husky/$hook "
-                ;;
-        esac
-
-        # Syntax check
+    while IFS= read -r hook; do
+        dst="$HOOKS_DIR/$hook"
         if [ -f "$dst" ] && head -1 "$dst" 2>/dev/null | grep -qE '(sh|bash)'; then
             if ! bash -n "$dst" 2>/dev/null; then
                 ERRORS="${ERRORS}bash syntax check failed for .husky/$hook; "
             fi
         fi
-    done
+    done < <(selected_hooks)
 
-    # Output result
     APPLIED=$(echo "$APPLIED" | xargs 2>/dev/null || true)
     ERRORS=$(echo "$ERRORS" | sed 's/; $//' 2>/dev/null || true)
 
     if [ -n "$ERRORS" ]; then
-        echo "{\"status\":\"partial\",\"applied\":\"$(json_escape "$APPLIED")\",\"errors\":\"$(json_escape "$ERRORS")\"}"
+        echo "{\"status\":\"partial\",\"action\":\"$STRATEGY\",\"applied\":\"$(json_escape "$APPLIED")\",\"errors\":\"$(json_escape "$ERRORS")\",\"description_nl\":\"Some hook snippets failed to install.\"}"
     else
-        echo "{\"status\":\"ok\",\"applied\":\"$(json_escape "$APPLIED")\"}"
+        echo "{\"status\":\"ok\",\"action\":\"$STRATEGY\",\"applied\":\"$(json_escape "$APPLIED")\",\"description_nl\":\"Selected hook snippets installed.\"}"
     fi
     exit 0
 fi
 
-# ===================== default mode (backward compat) =====================
-echo "--- 安装 husky ---"
-
-if [ -d "$HOOKS_DIR" ]; then
-    echo "检测到已有 .husky/ 目录"
-    echo "警告：已有 husky 配置。使用 --apply merge 可合并，--apply replace 可覆盖。"
-    echo "使用 --check 可查看详细差异分析。"
-    exit 0
-fi
-
-if [ ! -f "$TARGET/package.json" ]; then
-    echo "跳过：目标项目无 package.json（非 Node.js 项目）"
-    exit 0
-fi
-
-if ! grep -q '"husky"' "$TARGET/package.json" 2>/dev/null; then
-    echo "提示：请在项目中安装 husky："
-    echo "  npm install -D husky"
-    echo "  npx husky init"
-fi
-
-mkdir -p "$HOOKS_DIR"
-
-for hook in "${HOOKS[@]}"; do
-    if [ -f "$SKILL_DIR/assets/husky/$hook" ]; then
-        cp "$SKILL_DIR/assets/husky/$hook" "$HOOKS_DIR/$hook"
-        chmod +x "$HOOKS_DIR/$hook"
-        echo "  ✓ .husky/$hook"
-    else
-        echo "  ✗ $hook 模板不存在"
-    fi
-done
-
-echo "husky 安装完成。"
+echo "--- 安装 husky snippets ---"
+echo "提示：请通过 DOCS_GOVERNANCE_CAPABILITY 指定能力，再使用 --check 或 --apply merge。"
+"$0" "$TARGET" --check

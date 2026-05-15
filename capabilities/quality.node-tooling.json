@@ -1,0 +1,25 @@
+{
+  "id": "quality.node-tooling",
+  "description": "Node.js linting and formatting tooling",
+  "description_nl": "Enable ESLint, Prettier, lint-staged, and the pre-commit lint-staged hook.",
+  "default": false,
+  "dependencies": ["core", "git.hooks"],
+  "template_files": [],
+  "asset_files": [
+    {"src":"assets/eslint/eslint.config.js","dst":"eslint.config.js"},
+    {"src":"assets/prettier/.prettierrc","dst":".prettierrc"},
+    {"src":"assets/lint-staged/.lintstagedrc.json","dst":".lintstagedrc.json"}
+  ],
+  "installer": {
+    "script": "install-husky.sh",
+    "safe_strategies": ["merge", "skip"],
+    "notes": "Installs only the pre-commit lint-staged snippet."
+  },
+  "acceptance": [
+    "ESLint config exists",
+    "Prettier config exists",
+    "lint-staged config exists",
+    "pre-commit hook runs lint-staged"
+  ],
+  "suggested_when": "Enable when project uses Node.js linting or formatting."
+}

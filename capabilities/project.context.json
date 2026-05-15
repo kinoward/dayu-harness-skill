@@ -1,5 +1,5 @@
 {
-  "id": "project.docs",
+  "id": "project.context",
   "description": "Product specs and project context scaffold",
   "description_nl": "Create product specs area for non-governance project content.",
   "default": false,

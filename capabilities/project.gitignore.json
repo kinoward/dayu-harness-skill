@@ -1,0 +1,19 @@
+{
+  "id": "project.gitignore",
+  "description": "Project gitignore management",
+  "description_nl": "Enable project .gitignore generation and merge using universal, Node.js, and Python templates.",
+  "default": false,
+  "dependencies": ["core"],
+  "template_files": [],
+  "asset_files": [],
+  "installer": {
+    "script": "install-gitignore.sh",
+    "safe_strategies": ["merge", "replace", "skip"],
+    "notes": "Detects project type and merges missing ignore patterns."
+  },
+  "acceptance": [
+    ".gitignore exists when installed",
+    "Existing .gitignore is not replaced by default"
+  ],
+  "suggested_when": "Enable when repository ignore rules should be normalized independently of code tooling."
+}

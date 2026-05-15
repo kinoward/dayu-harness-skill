@@ -1,10 +1,12 @@
 {
   "id": "github.release-please",
   "description": "Automated release workflow with release-please",
-  "description_nl": "Deploy release-please workflow and manifest/config files.",
+  "description_nl": "Deploy release-please guide, workflow, and manifest/config files.",
   "default": false,
-  "dependencies": ["core", "git.commit", "github.pr"],
-  "template_files": [],
+  "dependencies": ["core", "git.commit-format", "github.pr", "release.versioning"],
+  "template_files": [
+    {"src":"templates/docs/harness/guides/release-please.md","dst":"docs/harness/guides/release-please.md"}
+  ],
   "asset_files": [
     {"src":"assets/github/workflows/release-please.yml","dst":".github/workflows/release-please.yml"},
     {"src":"assets/github/release-please-config.json","dst":"release-please-config.json"},
@@ -13,6 +15,7 @@
   "installer": null,
   "acceptance": [
     "release-please workflow exists",
+    "release-please guide exists",
     "release-please config exists",
     "release-please manifest exists"
   ],
