@@ -6,7 +6,7 @@
 
 - 项目已有 `commitlint.config.cjs` → 不直接问「是否启用提交校验」，而是确认「检测到已有 commitlint，是否保留/增强/跳过」
 - 项目已有 `docs/` 但结构不同 → 进入融合模式，逐项确认
-- 项目已有 `.husky/`、`.github/workflows/`、ESLint/Prettier/lint-staged 等配置 → 先调用对应 `install-*.sh --check` 获取 JSON merge plan
+- 项目已有 `.husky/`、`.github/workflows/`、ESLint/Prettier/lint-staged 等配置 → 先按能力清单的联动组件逐项判断：有 manifest installer 的组件（如 husky snippet、`.gitignore`）先调用该 `--check` 获取结构化 plan；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置、`.github/workflows/*.yml`、ruleset JSON）先用 `scaffold.sh --dry-run` 出对比预览；若有现有文件与目标文件对可用，再补充 `diff-helper.sh merge-plan <existing> <incoming>`；否则按 `scaffold.sh --dry-run` 输出人工审阅确认
 - `replace` 只能由用户显式选择；`merge` 只表示脚本能证明安全的确定性合并，否则返回 `manual_required`
 
 ## 前置问题
@@ -26,7 +26,8 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - 未显式传入 `--capabilities` 时，环境脚本按默认必选能力检查；可选能力确定后，必须用完整 resolved capability ids 重新检查或通过 `scaffold.sh --dry-run` 查看内嵌的 `environment` 结果。
 - 默认 Git 约束缺失时提示执行 `git init`。
 - 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化。
-- 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或 `install-*.sh`。
+- 说明：Node/npm/npx、`package.json`、`devDependencies` 仅用于安装/运行治理工具链（如 husky、commitlint、lint-staged），不是目标项目必须是 Node.js 应用的前提。
+- 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或能力关联 installer 脚本。
 
 默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
 
@@ -130,7 +131,7 @@ Merge plan:
 1. `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`：先返回依赖检查结果；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行的安装、初始化或登录动作并等待用户确认；用户若拒绝则终止流程。
 2. `scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan；脚本会自动包含 `default=true` 的必选能力
 3. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --enable <optional ids>`；clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准
-4. `install-*.sh --check` 只输出 merge plan，不写 tracked files
+4. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 `scaffold.sh --dry-run` 与 diff-helper/manual review 产出对比描述
 5. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
 6. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
 7. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项

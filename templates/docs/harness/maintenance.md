@@ -89,7 +89,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 2. 修改文档内容
 3. 如涉及脚本变更，同步更新对应脚本
 4. 如涉及索引变更（文件增删），更新对应 `AGENTS.md`，并同步受影响的 `## 目录索引` 区块（及 `README.md` 的 `## 目录结构`）
-5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述（如可用），用户确认
+5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述：若有现有文件与目标文件对，可调用 `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>`；没有可配对文件时改为基于 `scaffold.sh --dry-run` 的人工复核，之后确认
 6. 执行 `docs/harness/sensors/scripts/validate.sh` 验证（如可用）
 
 ### 删除约束
@@ -199,7 +199,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 当需要修改已有配置时，按以下流程操作（本流程可由 AI 手动执行，也可由 `diff-helper.sh` 辅助）：
 
 1. **检测**：检查目标位置是否已有对应配置（如 `.husky/commit-msg`、`commitlint.config.cjs`）
-2. **差异分析**：比较已有配置和 docs-governance 提供的治理模板差异
+2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.js`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）先用 `scaffold.sh --dry-run` 获取差异；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 `scaffold.sh --dry-run` 人工复核
 3. **生成变更描述**：用自然语言描述变更内容，例如「你的项目已有 commit-msg hook，包含 Conventional Commits 校验。新增内容与现有规则并存，不影响既有行为」
 4. **用户确认**：只对已有配置的处理策略提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项；默认能力本身不提供跳过选项
 5. **执行**：按用户选择处理
@@ -220,9 +220,9 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 如果前置检查提示缺失依赖或缺少 Git：
 - 告知用户需先执行 `git init`；
-- 需要 Node 初始化（如 `package.json`）则引导用户先执行 `npm init -y`；
-- 缺少必需 Node 依赖时引导用户执行脚本给出的 `npm install --save-dev ...`；
-- 明确告知不能通过写 `package.json` 模板文件来替代初始化。
+- 需要 Node 运行时以支持治理工具链时（如 husky/commitlint/lint-staged）引导用户先执行 `npm init -y`；
+- 缺少该治理工具链必需依赖时，引导用户执行脚本给出的 `npm install --save-dev ...`；
+- 明确告知这些依赖是治理约束运行需求，不代表项目必须是 Node.js 应用；并且不能通过写 `package.json` 模板文件替代初始化。
 用户拒绝初始化时应立即终止，等待用户下一步操作。
 
 ### 提问措辞模板

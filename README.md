@@ -16,7 +16,7 @@
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
-- **自动化约束资产**：默认部署 Git 提交格式、仓库语言和 .gitignore 约束；按需追加 GitHub、分支/标签保护等 hook/CI 片段
+- **自动化约束资产**：默认部署 Git 提交格式（husky + commitlint）、仓库语言和 .gitignore 约束；按需追加 GitHub、分支/标签保护等 hook/CI 片段
 - **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
 ## 目录结构
@@ -117,6 +117,7 @@ docs-governance/
 - 缺失 Git 上下文时提示并默认提供初始化路径（`git init`）；
   缺失 Node 初始化上下文时提示执行 `npm init -y`，而不是在目标项目中手写 `package.json`。
 - 缺少必需的 `package.json` 依赖时返回 `needs_install`，批准后由 `npm install --save-dev ...` 安装，不通过模板手写依赖。
+- `package.json`、`devDependencies`、`node`、`npm`、`npx` 在本 Skill 中是作为治理工具链（如 husky、commitlint、lint-staged）的运行依赖；它们不代表目标项目一定是 Node.js 应用。
 - `status=needs_install/needs_initialization/needs_user_action` 时，用户拒绝安装、初始化或登录则流程终止；批准后继续执行 dry-run/apply。
 
 ## 安装与删除

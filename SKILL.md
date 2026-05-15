@@ -34,7 +34,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 项目已有完整体系，用户要求检查完整性 → 进入诊断模式
 - 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问；默认治理与 Git 能力不作为是否启用的问题，只在已有配置需要合并策略时确认
 - 部署/融合前统一执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`；尚未确定可选能力时不传 `--capabilities`，脚本按默认必选能力检查。若返回 `needs_install`、`needs_initialization` 或 `needs_user_action`，先向用户展示安装/初始化建议并确认；若用户拒绝，当前流程终止
-- 任何涉及已有配置的操作，使用脚本获取结构化 merge plan，用户确认后执行
+- 任何涉及已有配置的操作，按能力清单中的可管理项/联动组件逐项处理：installer-backed 组件（如 husky hook 片段、`.gitignore`）先走 manifest installer 的 `--check`；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置文件、`.github/workflows`、ruleset JSON）改用 `scaffold.sh --dry-run` 输出变更预览；若可提供现有文件与目标文件对，优先调用 `diff-helper.sh merge-plan <existing> <incoming>`；否则继续基于 `scaffold.sh --dry-run` 做人工确认
 - **不覆盖已有配置**，必须经用户确认
 - 部署、融合、维护或生成操作完成后，必须执行收尾验证，并按 [docs/completion-report-template.md](docs/completion-report-template.md) 用自然语言向用户汇报结果
 
@@ -65,10 +65,14 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 触发：已有文档体系，需要合并
 
 1. 诊断现有状态（调用 `audit.sh --json`）
-2. 对每个已有配置，调用 `install-*.sh --check` 获取结构化 merge plan
-3. 将 merge plan 中的 `description_nl` 以自然语言呈现给用户
+2. 对每个已有组件按能力 manifest 中的联动项区分：
+   - 有 manifest installer 的组件：调用对应 installer 脚本 `--check` 获取结构化 merge plan
+   - 无 installer 的组件（静态模板/资产文件）：先用 `scaffold.sh --dry-run` 获取差异说明；若有源文件和目标文件对可用，再补充 `diff-helper.sh merge-plan <existing> <incoming>` 的结构化说明，再展示给用户
+3. 将 merge plan 或差异说明中的 `description_nl` 以自然语言呈现给用户
 4. 逐项询问：[1] 保留现有 [2] 替换 [3] 合并 [4] 跳过
-5. 用户逐项确认后，调用 `install-*.sh --apply <merge|replace|skip>` 执行
+5. 用户逐项确认后，按组件类型执行：
+   - installer-backed 组件：调用对应 installer `--apply <merge|replace|skip>`
+   - 无 installer 组件：按用户确认方案，用 `scaffold.sh --apply` 或手工更新
 6. 按「执行收尾验证」流程检查融合结果，并使用完成报告模板向用户汇报
 
 ### 4. 维护
@@ -76,8 +80,8 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 触发：用户要求增删改约束或更新文档
 
 子功能：
-- **删除约束**：调用相关 `install-*.sh --check` 获取影响范围 → 展示 → 确认 → 移除 → 更新 AGENTS.md 索引
-- **修改约束**：调用 `diff-helper.sh --json` 获取变更描述 → 展示 → 确认 → 更新
+- **删除约束**：按联动组件逐项处理：installer-backed 组件先调用相关 installer 的 `--check` 获取影响范围；无 installer 组件先用 `scaffold.sh --dry-run` 标注待删差异并确认（如有源文件与目标文件对可用，再调用 `diff-helper.sh merge-plan <existing> <incoming>`） → 展示 → 确认 → 移除 → 更新 AGENTS.md 索引
+- **修改约束**：有现有/目标文件对时调用 `diff-helper.sh merge-plan <existing> <incoming>` 获取变更描述；无可用对时回退到 `scaffold.sh --dry-run` 的人工审核输出 → 展示 → 确认 → 更新
 - **完整性检查**：同诊断模式
 - **更新项目文档**：按 `docs/harness/maintenance.md` 流程 → 更新内容 → 同步索引
 
@@ -168,6 +172,6 @@ Skill 目录中的其他文件按需加载：
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），默认 Git 资产和用户选择的可选资产会部署到项目对应位置。
-- **[scripts/](scripts/)**：Skill 内部初始化脚本（scaffold.sh + install-*.sh + ensure-environment.sh），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
+- **[scripts/](scripts/)**：Skill 内部初始化脚本（`scaffold.sh`、`install-husky.sh`、`install-gitignore.sh`；其余能力按 manifest 指定 `installer.script` 调用），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
 - **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。

@@ -120,7 +120,6 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
       workflows/
         pr-lint.yml
         repo-language-issue-lint.yml
-      rulesets.md
     eslint/
       eslint.config.js
     prettier/
@@ -133,11 +132,6 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
   scripts/                          # Skill 初始化脚本（仅 Skill 内部使用，不部署到项目）
     scaffold.sh                     # 主脚手架
     install-husky.sh
-    install-commitlint.sh
-    install-github-workflows.sh
-    install-eslint.sh
-    install-prettier.sh
-    install-lint-staged.sh
     install-gitignore.sh
 
   tests/
@@ -282,9 +276,9 @@ Q15: 「历史归档」— 废弃项目内容的归档目录
 | 提交信息格式校验 | husky + commitlint | — |
 | Git 内容语言规范 | commit-msg 中 CJK 检测 | 需要 Q3 的 husky hook 作为载体 |
 | PR 工作流规范 | pr-lint.yml | 仅 GitHub 项目联动 CI，文档部分不受影响 |
-| 分支与发布管理 | rulesets.md | 仅 GitHub 项目联动 CI，文档部分不受影响 |
+| 分支与发布管理 | assets/github/rulesets/protect-main.json / protect-tags.json | 仅 GitHub 项目联动 CI，文档部分不受影响 |
 
-### 兼容化处理流程（每个 install-*.sh）
+### 兼容化处理流程（每个 manifest 关联的 installer）
 
 1. **检测**：检查目标项目是否已有对应配置
 2. **差异分析**：生成 diff
@@ -400,16 +394,16 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 #### 2.2 安装脚本改造（scripts/）
 
-所有 `install-*.sh` + `scaffold.sh` 改为双模式：
+所有 manifest 关联的 installer + `scaffold.sh` 改为双模式：
 
 | 模式 | 标志 | 行为 |
 |------|------|------|
-| 检查 | `--check` | 检测已有配置 → 调用 diff-helper.sh --json → 输出结构化 merge plan → 不写入任何文件 |
+| 检查 | `--check` | 检测已有配置 → 调用 `diff-helper.sh merge-plan <existing> <incoming>`（有文件对时）→ 输出结构化 merge plan → 不写入任何文件 |
 | 执行 | `--apply merge\|replace\|skip` | 按指定策略执行，执行后调用 validate.sh 做 smoke test |
 
 `scaffold.sh` 额外改造：
 - `--dry-run`：展示所有将要创建/修改的文件列表（结构化输出）
-- 不再仅是 helper 函数，改为真正的编排入口——包含 Q&A 答案到 install-*.sh 的映射关系
+- 不再仅是 helper 函数，改为真正的编排入口——包含 Q&A 答案到 `capability` `installer` 映射关系
 
 #### 2.3 脚本输出约定
 
@@ -438,10 +432,10 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 #### 3.2 GitHub rulesets JSON 设计
 
-替代 `assets/github/rulesets.md`（说明文档）为可机器应用的 JSON 文件：
+将规则集说明从历史说明文档合并到可执行能力文档后，资产以 JSON 为主：
 - `protect-main.json`：禁止删除 main、禁止 force push、要求 PR merge
 - `protect-tags.json`：禁止删除/覆盖 `v*` 标签
-- 保留 `.md` 作为应用说明文档
+- 可执行资产路径保持：`assets/github/rulesets/protect-main.json`、`assets/github/rulesets/protect-tags.json`
 
 #### 3.3 pr_body_structure.py 设计
 
@@ -493,7 +487,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 1. **frontmatter**：添加 `disable-model-invocation: true`
 2. **激活条件**：移除隐式激活，仅保留显式 `/docs-governance`
 3. **边界规则**：移除矛盾规则，简化为「Skill 仅在用户显式调用时工作」
-4. **融合模式步骤**：明确 LLM 必须先调 `install-*.sh --check` 获取结构化 merge plan
+4. **融合模式步骤**：明确 LLM 必须先调 manifest 关联 installer `--check` 获取结构化 merge plan
 5. **诊断模式步骤**：明确 LLM 优先调 `audit.sh --json`
 6. **新增章节「结构化输出约定」**：说明脚本和 LLM 的分工协议
 
@@ -518,7 +512,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 1. **修复阻断级 bug**：audit.sh + diff-helper.sh macOS 兼容性
 2. **SKILL.md 修改**：frontmatter + 仅显式激活 + 结构化输出约定章节
-3. **脚本改造**：diff-helper.sh --json → install-*.sh --check/--apply → audit.sh --json → validate.sh --json → scaffold.sh 编排
+3. **脚本改造**：`diff-helper.sh merge-plan <existing> <incoming>` → installer `--check` / `--apply` → audit.sh --json → validate.sh --json → scaffold.sh 编排
 4. **新增资产**：pre-push → rulesets JSON → pr_body_structure.py → check-consistency.sh
 5. **文档扩展**：branch-protection.md / release-versioning.md → ai-execution.md / ai-memory.md → git-language-policy.md
 6. **清理与修正**：project/ 子目录 → 行数标注 → Q4 依赖说明 → dev-hygiene 通用化
