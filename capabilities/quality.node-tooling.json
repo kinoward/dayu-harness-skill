@@ -6,7 +6,7 @@
   "dependencies": ["core", "git.hooks"],
   "template_files": [],
   "asset_files": [
-    {"src":"assets/eslint/eslint.config.js","dst":"eslint.config.js"},
+    {"src":"assets/eslint/eslint.config.cjs","dst":"eslint.config.cjs"},
     {"src":"assets/prettier/.prettierrc","dst":".prettierrc"},
     {"src":"assets/lint-staged/.lintstagedrc.json","dst":".lintstagedrc.json"}
   ],

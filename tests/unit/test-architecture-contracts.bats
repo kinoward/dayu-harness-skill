@@ -469,7 +469,7 @@ expected_agents_h1() {
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.practices
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "eslint.config.js" or .dst == ".prettierrc" or .dst == ".lintstagedrc.json")] | length == 0'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "eslint.config.cjs" or .dst == ".prettierrc" or .dst == ".lintstagedrc.json")] | length == 0'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.capability == "quality.node-tooling" and .kind == "installer")] | length == 0'
 }
 
@@ -512,7 +512,7 @@ expected_agents_h1() {
     local target="$WORK_DIR/strat-scoped-target"
     mkdir -p "$target"
     cp -R "$REPO_ROOT/tests/fixtures/empty-project/." "$target"
-    rm -rf "$target/AGENTS.md" "$target/CLAUDE.md" "$target/docs" "$target/.github" "$target/commitlint.config.cjs" "$target/release-please-config.json" "$target/.release-please-manifest.json" 2>/dev/null || true
+    rm -rf "$target/AGENTS.md" "$target/CLAUDE.md" "$target/docs" "$target/.github" "$target/commitlint.config.cjs" "$target/eslint.config.cjs" "$target/release-please-config.json" "$target/.release-please-manifest.json" 2>/dev/null || true
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.release-please
 
@@ -904,6 +904,25 @@ expected_agents_h1() {
 
 @test "GitHub workflows do not shell-interpolate user-controlled PR or issue text" {
     ! rg -n '\$\{\{ github\.event\.(pull_request|issue)\.(title|body)' "$REPO_ROOT/assets/github/workflows"
+}
+
+@test "GitHub ruleset assets are direct API payloads" {
+    for ruleset in "$REPO_ROOT"/assets/github/rulesets/*.json; do
+        jq -e 'has("name") and has("target") and has("conditions") and has("rules")' "$ruleset"
+        jq -e 'has("$schema") | not' "$ruleset"
+        jq -e 'has("$description") | not' "$ruleset"
+    done
+
+    jq -e '.rules[] | select(.type == "pull_request") | .parameters.allowed_merge_methods == ["merge"]' "$REPO_ROOT/assets/github/rulesets/protect-main.json"
+    jq -e '.rules[] | select(.type == "update")' "$REPO_ROOT/assets/github/rulesets/protect-tags.json"
+}
+
+@test "ESLint flat config template is CommonJS-compatible" {
+    jq -e '.asset_files[] | select(.src == "assets/eslint/eslint.config.cjs" and .dst == "eslint.config.cjs")' "$REPO_ROOT/capabilities/quality.node-tooling.json"
+    grep -q "const js = require('@eslint/js')" "$REPO_ROOT/assets/eslint/eslint.config.cjs"
+    grep -q '^module.exports = \[$' "$REPO_ROOT/assets/eslint/eslint.config.cjs"
+    ! grep -q '^import ' "$REPO_ROOT/assets/eslint/eslint.config.cjs"
+    ! grep -q '^export default' "$REPO_ROOT/assets/eslint/eslint.config.cjs"
 }
 
 @test "commit-msg hook accepts Chinese commit messages" {

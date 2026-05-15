@@ -45,7 +45,7 @@ docs-governance/
 
 ### 部署到目标项目后的结构
 
-目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、项目知识/经验和项目上下文目录始终部署；GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
+目标项目接收 `capabilities/*.json` 中 `default=true` 的必选能力，以及用户额外选择的可选能力。`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则、项目知识/经验和项目上下文目录始终部署；通用质量实践、GitHub、发布自动化和 Node.js 工具类文件按 capability 启用。
 
 `docs/` 保持单一入口，但内容语义分层：`harness/` 是治理约束和反馈系统；`design-docs/`、`troubleshooting/`、`references/research/` 是项目知识/经验；`product-specs/` 是项目内容；`exec-plans/` 与 `generated/` 承载执行过程和临时生成资料；`archive/` 保存历史资料。
 
@@ -65,8 +65,8 @@ docs-governance/
 │   │   │   ├── branch-protection.md      # optional：github.branch-protection
 │   │   │   ├── release-versioning.md     # optional：release.versioning
 │   │   │   ├── release-please.md         # optional：github.release-please
-│   │   │   ├── dev-hygiene.md            # quality.practices
-│   │   │   ├── testing-strategy.md       # quality.practices
+│   │   │   ├── dev-hygiene.md            # optional：quality.practices
+│   │   │   ├── testing-strategy.md       # optional：quality.practices
 │   │   │   ├── ai-execution.md           # default：ai.execution
 │   │   │   └── ai-memory.md              # default：ai.memory
 │   │   └── sensors/                  # 行动后检查与反馈
@@ -95,12 +95,12 @@ docs-governance/
 ├── .husky/                           # default：git.hooks + hook-backed Git capabilities
 ├── .github/                          # optional：github.pr / github.branch-protection / release.versioning / github.release-please
 ├── commitlint.config.cjs             # default：git.commit-format
-├── eslint.config.js                  # quality.node-tooling
-├── .prettierrc                       # quality.node-tooling
-├── .lintstagedrc.json                # quality.node-tooling
+├── eslint.config.cjs                 # optional：quality.node-tooling
+├── .prettierrc                       # optional：quality.node-tooling
+├── .lintstagedrc.json                # optional：quality.node-tooling
 ├── .gitignore                        # default：project.gitignore
-├── release-please-config.json        # github.release-please
-└── .release-please-manifest.json     # github.release-please
+├── release-please-config.json        # optional：github.release-please
+└── .release-please-manifest.json     # optional：github.release-please
 ```
 
 能力清单、部署模板或目标项目治理骨架变化时，必须同步更新本结构图和 `templates/` 下对应 `AGENTS.md` 的 `## 目录索引`（以及 `README.md` 的 `## 目录结构`）区块。

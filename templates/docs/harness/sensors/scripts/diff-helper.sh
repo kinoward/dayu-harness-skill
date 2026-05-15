@@ -24,7 +24,7 @@ is_manual_merge_required() {
 
     case "$base" in
         .prettierrc|.prettierrc.js|.prettierrc.json|.prettierrc.json5) return 0 ;;
-        .eslintrc|.eslintrc.js|.eslintrc.json|.eslintrc.cjs|eslint.config.js) return 0 ;;
+        .eslintrc|.eslintrc.js|.eslintrc.json|.eslintrc.cjs|eslint.config.js|eslint.config.cjs) return 0 ;;
         .lintstagedrc|.lintstagedrc.js|.lintstagedrc.json|commitlint.config.cjs|package.json) return 0 ;;
     esac
 

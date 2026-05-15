@@ -2,9 +2,9 @@
 // 安装: npm install -D eslint @eslint/js
 // 使用: npx eslint .
 
-import js from '@eslint/js';
+const js = require('@eslint/js');
 
-export default [
+module.exports = [
   js.configs.recommended,
   {
     rules: {

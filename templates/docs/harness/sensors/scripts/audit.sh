@@ -348,7 +348,7 @@ else
     log_text "  - commit-msg hook 未启用，跳过"
 fi
 
-if path_exists ".husky/pre-commit" ".lintstagedrc.json" "eslint.config.js" ".prettierrc"; then
+if path_exists ".husky/pre-commit" ".lintstagedrc.json" "eslint.config.cjs" "eslint.config.js" ".prettierrc"; then
     check_script ".husky/pre-commit" "pre-commit hook"
 else
     log_text "  - pre-commit hook 未启用，跳过"

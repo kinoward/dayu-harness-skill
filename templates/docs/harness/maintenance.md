@@ -198,7 +198,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 当需要修改已有配置时，按以下流程操作（本流程可由 AI 手动执行，也可由 `diff-helper.sh` 辅助）：
 
 1. **检测**：检查目标位置是否已有对应配置（如 `.husky/commit-msg`、`commitlint.config.cjs`）
-2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.js`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）先用 `scaffold.sh --dry-run` 获取差异；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 `scaffold.sh --dry-run` 人工复核
+2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）先用 `scaffold.sh --dry-run` 获取差异；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 `scaffold.sh --dry-run` 人工复核
 3. **生成变更描述**：用自然语言描述变更内容，例如「你的项目已有 commit-msg hook，包含 Conventional Commits 校验。新增内容与现有规则并存，不影响既有行为」
 4. **用户确认**：只对已有配置的处理策略提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项；默认能力本身不提供跳过选项
 5. **执行**：按用户选择处理

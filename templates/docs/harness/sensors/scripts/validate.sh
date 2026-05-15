@@ -200,7 +200,7 @@ fi
 log_text "--- ESLint ---"
 eslint_found=false
 eslint_file=""
-for f in "eslint.config.js" ".eslintrc.js" ".eslintrc.json" ".eslintrc"; do
+for f in "eslint.config.cjs" "eslint.config.js" ".eslintrc.cjs" ".eslintrc.js" ".eslintrc.json" ".eslintrc"; do
     if [ -f "$PROJECT_ROOT/$f" ]; then
         eslint_found=true
         eslint_file="$f"

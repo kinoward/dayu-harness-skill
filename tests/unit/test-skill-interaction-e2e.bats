@@ -134,7 +134,7 @@ json_from_output() {
     assert_no_path "$project_dir/.husky/pre-push"
     assert_path "$project_dir/package.json"
     assert_path "$project_dir/commitlint.config.cjs"
-    assert_path "$project_dir/eslint.config.js"
+    assert_path "$project_dir/eslint.config.cjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
     assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
     assert_no_path "$project_dir/.github/rulesets"

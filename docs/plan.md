@@ -4,7 +4,9 @@
 
 从 youtube-translate-tools 提炼经验，构建一个完整的项目治理 Skill `docs-governance`。在当前项目中实现并验证，未来独立成 git 仓库分发。
 
-> 历史说明：本文保留早期设计追溯。当前行为以 `SKILL.md`、`README.md`、`capabilities/*.json` 为准；Skill 仅通过 `/docs-governance` 显式激活；自然语言维护意图由项目 AGENTS/doc-maintenance 体系处理；部署清单以 capability manifest 为单一事实源。
+> 历史说明：本文保留早期设计追溯。当前行为以 `SKILL.md`、`README.md`、`capabilities/*.json` 为准；Skill 仅通过 `/docs-governance` 显式激活；自然语言维护意图由项目 `AGENTS.md` 与 `docs/harness/maintenance.md` 体系处理；部署清单以 capability manifest 为单一事实源。
+>
+> 当前路径映射：早期设计中的 `doc-maintenance.md` 现为 `docs/harness/maintenance.md`；`docs/practices/` 现为 `docs/harness/guides/`；`docs/decisions/` 现为 `docs/design-docs/`；`docs/research/` 现为 `docs/references/research/`；`docs/project/` 现为 `docs/product-specs/`；`docs/scripts/` 现为 `docs/harness/sensors/scripts/`。
 
 **Skill 定位**：一次性引导工具。帮助项目建立自己的治理体系，初始化完成后作用大幅减少，可安全删除。项目治理体系的演化是内生的，不依赖外部 Skill。
 
@@ -19,7 +21,7 @@
 5. **能力导向**：从「项目需要什么治理能力」出发，不预设项目类型
 6. **项目文档为权威**：项目 AGENTS.md 体系是最终权威。Skill 存在时是辅助工具，Skill 删除后体系独立运行
 7. **经验自发沉淀**：AI 对话中产生的经验和总结，主动沉淀到项目体系的对应位置（decisions/、troubleshooting/、research/），项目本身成为 AI 经验的归纳场所
-8. **体系自洽，不依赖 Skill**（体系维护语境）：Skill 仅是引导初始化的工具。Skill 删除后，`doc-maintenance.md` 包含所有维护逻辑（新增/删除/修改约束、诊断完整性、Q&A 决策树），AI 仅凭项目文档即可独立执行所有维护操作
+8. **体系自洽，不依赖 Skill**（体系维护语境）：Skill 仅是引导初始化的工具。Skill 删除后，`docs/harness/maintenance.md` 包含所有维护逻辑（新增/删除/修改约束、诊断完整性、Q&A 决策树），AI 仅凭项目文档即可独立执行所有维护操作
 
 > 原则 #3 和 #8 的语境区分：#3 适用于约束的日常执行（如每次 git commit 时 husky hook 强制校验），#8 适用于治理体系的维护操作（如新增/删除约束、诊断完整性）。两者不冲突。
 
@@ -41,8 +43,8 @@ Skill 删除后：
 | 场景 | 行为 |
 |------|------|
 | 日常 AI 协作 | AI 读取项目 AGENTS.md 并遵循，与 Skill 存在时完全一致 |
-| 用户要求修改约束 | AI 读取 `doc-maintenance.md` 中的维护逻辑，按流程自行执行 |
-| 用户要求诊断完整性 | AI 读取 `doc-maintenance.md` 中的诊断清单，逐项检查并报告 |
+| 用户要求修改约束 | AI 读取 `docs/harness/maintenance.md` 中的维护逻辑，按流程自行执行 |
+| 用户要求诊断完整性 | AI 读取 `docs/harness/maintenance.md` 中的诊断清单，逐项检查并报告 |
 
 ### 优先级声明（双重声明）
 
@@ -64,7 +66,7 @@ Skill 删除后：
   - 更新项目文档内容
   - 检查项目完整性或诊断问题
 
-Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自行处理，无需 Skill 介入。
+Skill 删除后，上述意图由 AI 读取项目中的 `docs/harness/maintenance.md` 自行处理，无需 Skill 介入。
 
 ## Skill 完整结构
 
@@ -119,7 +121,7 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
       workflows/
         pr-lint.yml
     eslint/
-      eslint.config.js
+      eslint.config.cjs
     prettier/
       .prettierrc
     lint-staged/
