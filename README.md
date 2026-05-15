@@ -347,24 +347,22 @@ bats tests/unit
 - [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
 - [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
 
-## <a href="https://github.com/kinoward"><img src="https://github.com/kinoward.png?size=96" width="42" height="42" alt="kinoward avatar" align="absmiddle"></a> ⭐ Star History
+## ⭐ Star History
+
+<a href="https://www.star-history.com/?repos=kinoward%2Fdayu-harness-skill&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
 
 <div align="center">
 
-<p>
-  <a href="https://github.com/kinoward/dayu-harness-skill/stargazers">
-    <img alt="GitHub stars" src="https://img.shields.io/github/stars/kinoward/dayu-harness-skill?label=GitHub%20Stars&amp;logo=github&amp;style=for-the-badge">
-  </a>
-</p>
-
-<a href="https://www.star-history.com/#kinoward/dayu-harness-skill&amp;Date">
-  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=kinoward/dayu-harness-skill&amp;type=Date&amp;theme=dark">
-</a>
-
-<hr>
-
 <p><strong>MIT License</strong> © <a href="https://github.com/kinoward">kinoward</a></p>
 
-<p>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</p>
+<sub>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</sub>
 
 </div>
