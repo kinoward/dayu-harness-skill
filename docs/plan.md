@@ -87,10 +87,12 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
         AGENTS.md
         commit-guidelines.md        # ~50行
         pr-guidelines.md            # ~100行
-        branch-and-release.md       # ~100行
+        branch-protection.md        # 分支保护
+        release-versioning.md       # 版本与 release tag 规则
         testing-strategy.md         # ~60行
         dev-hygiene.md              # ~80行
-        ai-collaboration.md         # ~150行（含经验沉淀章节）
+        ai-execution.md             # AI 执行规则
+        ai-memory.md                # AI 经验沉淀与记忆边界
         git-language-policy.md      # ~100行
       decisions/                    # [工程约束] ADR
         AGENTS.md + adr-template.md
@@ -111,14 +113,13 @@ Skill 删除后，上述意图由 AI 读取项目中的 `doc-maintenance.md` 自
 
   assets/                           # 脚本和配置资产（按用户选择部署到项目，未选不部署）
     husky/
-      commit-msg                    # Conventional Commits 格式校验
-      pre-commit                    # lint-staged runner
+      snippets/                     # 按能力安装的 hook 片段
     commitlint/
       commitlint.config.cjs
     github/
       workflows/
         pr-lint.yml
-        issue-lint.yml
+        repo-language-issue-lint.yml
       rulesets.md
     eslint/
       eslint.config.js
@@ -304,8 +305,8 @@ Qx: 检测到已有 .husky/commit-msg（Conventional Commits 校验）
 **Skill 存在时**（skill.md 中明确）：
 每次 AI 协作会话中，如产生可复用的经验，Skill 主动建议沉淀到对应位置。
 
-**Skill 删除后**（ai-collaboration.md 驱动）：
-AI 读取 ai-collaboration.md 中的「经验沉淀」章节，自行判断何时沉淀。
+**Skill 删除后**（ai-memory.md 驱动）：
+AI 读取 ai-memory.md 中的「经验沉淀」章节，自行判断何时沉淀。
 
 ### 沉淀位置
 
@@ -316,7 +317,7 @@ AI 读取 ai-collaboration.md 中的「经验沉淀」章节，自行判断何�
 | 研究发现 | `docs/research/` | 产品调研、技术选型评估 |
 | 约束变更 | `docs/practices/` + AGENTS.md | 修改了工程规范 |
 
-### ai-collaboration.md 模板中加入
+### ai-memory.md 模板中加入
 
 > AI 在每次协作中产生的经验（决策、排障、研究），应在会话结束前主动建议沉淀到 docs/ 对应位置。项目是 AI 经验的唯一归纳场所，不应依赖全局记忆或外部系统。
 
@@ -326,10 +327,10 @@ AI 读取 ai-collaboration.md 中的「经验沉淀」章节，自行判断何�
 |---|------|------|---------|
 | 1 | `commit-guidelines.md` | ~50 | 移除 release-please 专属规则 |
 | 2 | `pr-guidelines.md` | ~100 | 从 196 行瘦身 |
-| 3 | `branch-and-release.md` | ~100 | 从 57 行扩展 |
+| 3 | `branch-protection.md` + `release-versioning.md` | ~80 | 分拆分支保护与版本/tag 规则 |
 | 4 | `testing-strategy.md` | ~60 | 提炼通用原则 |
 | 5 | `dev-hygiene.md` | ~80 | 规则2 改为通用模板 |
-| 6 | `ai-collaboration.md` | ~150 | 吸收 test plan + review 自检 + 经验沉淀章节 |
+| 6 | `ai-execution.md` + `ai-memory.md` | ~110 | 分拆执行规则与经验沉淀章节 |
 | 7 | `git-language-policy.md` | ~100 | GitHub 绑定改为可选 |
 
 ## 实施步骤（本次仅执行阶段 1）
@@ -419,7 +420,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 | 资产 | 来源 | 路径 |
 |------|------|------|
-| pre-push hook | ytt 实践 | `assets/husky/pre-push` |
+| pre-push snippets | ytt 实践 | `assets/husky/snippets/branch-protection.sh` + `release-versioning.sh` |
 | rulesets JSON | ytt 实践 | `assets/github/rulesets/protect-main.json` + `protect-tags.json` |
 | PR body 结构校验 | ytt 实践 | `assets/github/scripts/pr_body_structure.py` |
 | 文档一致性检查 | harness-engineering 理念 | `templates/docs/scripts/check-consistency.sh` |
@@ -459,14 +460,14 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 
 ### 四、文档扩展
 
-#### 4.1 branch-and-release.md（72→~100 行）
+#### 4.1 branch-protection.md + release-versioning.md
 
 新增内容：
 - 分支策略决策树（Git Flow / GitHub Flow / Trunk-based 的适用场景）
 - Release 自动化流程（release-please 触发条件、auto-merge 机制、CHANGELOG 生成）
 - 版本号规范（SemVer 2.0.0）
 
-#### 4.2 ai-collaboration.md（104→~150 行）
+#### 4.2 ai-execution.md + ai-memory.md
 
 新增内容：
 - **Auto-Retry 通用约定**：
@@ -517,7 +518,7 @@ Skill 构建完成后，通过 `/docs-governance` 显式触发融合模式，按
 2. **SKILL.md 修改**：frontmatter + 仅显式激活 + 结构化输出约定章节
 3. **脚本改造**：diff-helper.sh --json → install-*.sh --check/--apply → audit.sh --json → validate.sh --json → scaffold.sh 编排
 4. **新增资产**：pre-push → rulesets JSON → pr_body_structure.py → check-consistency.sh
-5. **文档扩展**：branch-and-release.md → ai-collaboration.md → git-language-policy.md
+5. **文档扩展**：branch-protection.md / release-versioning.md → ai-execution.md / ai-memory.md → git-language-policy.md
 6. **清理与修正**：project/ 子目录 → 行数标注 → Q4 依赖说明 → dev-hygiene 通用化
 7. **doc-maintenance.md Q&A 补全**
 8. **最终验证**：fixture 项目上验证 5 个模式

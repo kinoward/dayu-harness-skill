@@ -19,7 +19,7 @@
 
 **核心问题**：AGENTS.md 模板采用"类别路由"（工程约束/决策与经验/项目内容），而非 harness-engineering 倡导的"任务触发路由"（当你准备 commit 时读什么、当你准备创建 PR 时读什么）。这导致 AI 每次需要加载过多无关上下文。
 
-**次要问题**：机械强制执行不够彻底（缺少 AI 署名剥离、issue 引用拦截）、渐进式披露不够精细（code review checklist 嵌在 ai-collaboration.md 中）、缺乏 release-please 完整的 CI/CD 闭环。
+**次要问题**：机械强制执行不够彻底、渐进式披露不够精细（code review checklist 最初嵌在 AI 协作说明中）、缺乏 release-please 完整的 CI/CD 闭环。
 
 参考来源：
 - harness-engineering 六大核心概念（尤其 #2 Map Not Manual、#3 Mechanical Enforcement）
@@ -52,33 +52,33 @@
 
 #### 变更 3：拆分 code-review-checklist 为独立文档
 
-**影响文件**：`templates/docs/practices/code-review-checklist.md`（新文件）、`templates/docs/practices/ai-collaboration.md`、`templates/docs/practices/AGENTS.md`、`scripts/scaffold.sh`
+**影响文件**：`templates/docs/harness/sensors/reviews/code-review-checklist.md`、`templates/docs/harness/guides/ai-execution.md`、`templates/docs/harness/guides/AGENTS.md`、`scripts/scaffold.sh`
 
-- 从 ai-collaboration.md Section 4 提取 6 个通用模式 + 3 个 Node.js/TS 参考模式
-- ai-collaboration.md Section 4 缩减为简短指针 + TL;DR
+- 从原 AI 协作说明中提取 6 个通用模式 + 3 个 Node.js/TS 参考模式
+- AI 执行说明缩减为简短指针 + TL;DR
 
-**为什么**：渐进式披露——AI 做 code review 时只加载 checklist（~30 行），不需要加载完整 ai-collaboration.md。
+**为什么**：渐进式披露——AI 做 code review 时只加载 checklist（~30 行），不需要加载完整 AI 执行说明。
 
-#### 变更 4：commit-msg hook 增加 AI Co-Authored-By 剥离
+#### 变更 4：commit-msg hook 计划增加 AI Co-Authored-By 剥离
 
-**影响文件**：`assets/husky/commit-msg`、fixture 文件
+**影响文件**：后续按能力拆分为 `assets/husky/snippets/` 片段与 fixture 文件
 
 - 静默剥离 `Co-Authored-By:` / `Co-authored-by:` 行
 
 **为什么**：harness-engineering "Mechanical Enforcement"——AI 署名行不应进入永久 git 历史。
 
-#### 变更 5：commit-msg hook 增加 issue 引用拦截
+#### 变更 5：PR body closing trailer 校验
 
-**影响文件**：`assets/husky/commit-msg`、fixture 文件
+**影响文件**：`assets/github/scripts/pr_body_structure.py`、`assets/github/workflows/pr-lint.yml`、fixture 文件
 
-- 拦截 `Closes #N` / `Fixes #N` / `Refs #N` 等 4 种模式
-- 报错提示引导至 PR body
+- 要求 `Closes #N` / `Fixes #N` / `Resolves #N` 等 trailer 出现在 PR body
+- 避免把 issue 关闭语义分散到单个 commit message
 
-**为什么**：release-please 会根据 commit 中的 `Closes #N` 在 CHANGELOG 中生成重复条目。
+**为什么**：PR 层统一管理 issue closing trailer，降低 changelog 和 issue 自动关闭噪音。
 
 #### 变更 6：增加 release-please CI 工作流和配置
 
-**影响文件**：`assets/github/workflows/release-please.yml`（新）、`assets/github/release-please-config.json`（新）、`assets/github/.release-please-manifest.json`（新）、`templates/docs/practices/branch-and-release.md`、`scripts/scaffold.sh`
+**影响文件**：`assets/github/workflows/release-please.yml`、`assets/github/release-please-config.json`、`assets/github/.release-please-manifest.json`、`templates/docs/harness/guides/release-please.md`、`scripts/scaffold.sh`
 
 - 新增 release-please.yml workflow（googleapis/release-please-action@v4）
 - 新增 release-please-config.json（docs/ci/chore 默认 hidden）
@@ -90,13 +90,13 @@
 
 ### 阶段二：品质和完整性提升
 
-#### 变更 7：ai-collaboration.md Section 2 操作模式更具体化
+#### 变更 7：ai-execution.md 操作模式更具体化
 
-**影响文件**：`templates/docs/practices/ai-collaboration.md`
+**影响文件**：`templates/docs/harness/guides/ai-execution.md`
 
 - 增加后台执行 + Monitor 流式追进度、并行工具调用、遇错从 raw 输出诊断
 
-**为什么**：youtube-translate-tools 的 ai-collaboration.md 有明确的操作模式描述，当前 skill 模板较抽象。
+**为什么**：youtube-translate-tools 的 AI 协作说明有明确的操作模式描述，当前 skill 模板较抽象。
 
 #### 变更 8：pr-lint.yml CI 增强——整合 pr_body_structure.py
 

@@ -65,15 +65,19 @@
 | capability id | 面向用户的说法 |
 | --- | --- |
 | `core` | 项目入口索引、文档维护说明和基础检查脚本 |
-| `git.commit` | Git 提交约束和提交信息检查 |
-| `git.language` | 提交和协作内容的语言约束 |
-| `quality.tooling` | 代码质量、格式化和忽略文件配置 |
+| `git.commit-format` | Git 提交格式约束和提交信息检查 |
+| `repo.language` | 提交、PR、Issue 和发布内容的语言约束 |
+| `quality.practices` | 通用开发纪律和测试策略 |
+| `quality.node-tooling` | Node.js 代码质量与格式化工具 |
+| `project.gitignore` | 忽略文件配置 |
 | `github.pr` | PR/Issue 协作质量护栏 |
-| `github.branch-release` | 分支与发布保护 |
+| `github.branch-protection` | 分支保护 |
+| `release.versioning` | 版本与标签保护 |
 | `github.release-please` | 自动化版本发布流程 |
-| `ai.collaboration` | AI 协作边界与长期记忆 |
+| `ai.execution` | AI 执行边界和协作方式 |
+| `ai.memory` | AI 记忆边界与经验沉淀 |
 | `knowledge.adr` | 重要架构决策记录 |
 | `knowledge.troubleshooting` | 可复用排障知识 |
 | `knowledge.research` | 研究资料记录 |
-| `project.docs` | 项目背景和产品规格文档区 |
-| `archive.project` | 历史内容归档区 |
+| `project.context` | 项目背景和产品规格文档区 |
+| `knowledge.archive` | 历史内容归档区 |

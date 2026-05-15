@@ -11,12 +11,12 @@
 设计边界：直接把规则只做成 Skill，可以约束某个 Agent 在当前环境中的行为；但 Harness Engineering 更强调项目拥有自己的外部约束环境。docs-governance 因此只作为安装器、问答引导器和升级入口，最终权威必须落在目标项目内，让规则和反馈回路可版本化、可审查、可迁移、可执行。
 
 工具入口能力：
-- **脚手架**：按 `core + capability modules` 在新项目中建立 AGENTS.md + docs/ 文档体系
+- **脚手架**：按 `core + capability modules + presets` 在新项目中建立 AGENTS.md + docs/ 文档体系
 - **融合**：与已有文档体系合并，保留现有内容，补全缺失
 - **诊断**：检查现有体系的完整性和一致性
 - **维护**：增删改约束、更新项目文档
 - **生成**：根据项目特征智能生成适配内容
-- **自动化约束资产**：按需部署 AI 署名剥离、issue 引用拦截、Conventional Commits 校验等 hooks/CI
+- **自动化约束资产**：按需部署 Conventional Commits、语言校验、分支/标签保护等 hook/CI 片段
 - **发布工作流资产**：按需部署 Google release-please 自动化版本发布配置
 
 ## 目录结构
@@ -58,13 +58,16 @@ docs-governance/
 │   │   ├── maintenance.md            # core：文档体系维护规范
 │   │   ├── guides/                   # 行动前规则卡片
 │   │   │   ├── AGENTS.md
-│   │   │   ├── commit-guidelines.md      # git.commit
-│   │   │   ├── git-language-policy.md    # git.language
+│   │   │   ├── commit-guidelines.md      # git.commit-format
+│   │   │   ├── git-language-policy.md    # repo.language
 │   │   │   ├── pr-guidelines.md          # github.pr
-│   │   │   ├── branch-and-release.md     # github.branch-release
-│   │   │   ├── dev-hygiene.md            # quality.tooling
-│   │   │   ├── testing-strategy.md       # quality.tooling
-│   │   │   └── ai-collaboration.md       # ai.collaboration
+│   │   │   ├── branch-protection.md      # github.branch-protection
+│   │   │   ├── release-versioning.md     # release.versioning
+│   │   │   ├── release-please.md         # github.release-please
+│   │   │   ├── dev-hygiene.md            # quality.practices
+│   │   │   ├── testing-strategy.md       # quality.practices
+│   │   │   ├── ai-execution.md           # ai.execution
+│   │   │   └── ai-memory.md              # ai.memory
 │   │   └── sensors/                  # 行动后检查与反馈
 │   │       ├── AGENTS.md
 │   │       ├── scripts/              # core：维护脚本
@@ -83,18 +86,18 @@ docs-governance/
 │   │   └── completed/AGENTS.md
 │   ├── generated/                    # core：自动生成资料索引
 │   │   └── AGENTS.md
-│   ├── product-specs/                # project.docs
+│   ├── product-specs/                # project.context
 │   ├── references/                   # knowledge.research
 │   │   └── research/
 │   ├── troubleshooting/              # knowledge.troubleshooting
-│   └── archive/                      # archive.project
-├── .husky/                           # git.commit 通过安装脚本合并部署
-├── .github/                          # github.pr / github.branch-release / github.release-please
-├── commitlint.config.cjs             # git.commit
-├── eslint.config.js                  # quality.tooling
-├── .prettierrc                       # quality.tooling
-├── .lintstagedrc.json                # quality.tooling
-├── .gitignore                        # quality.tooling
+│   └── archive/                      # knowledge.archive
+├── .husky/                           # git.hooks + hook-backed capabilities
+├── .github/                          # github.pr / repo.language / github.branch-protection / release.versioning / github.release-please
+├── commitlint.config.cjs             # git.commit-format
+├── eslint.config.js                  # quality.node-tooling
+├── .prettierrc                       # quality.node-tooling
+├── .lintstagedrc.json                # quality.node-tooling
+├── .gitignore                        # project.gitignore
 ├── release-please-config.json        # github.release-please
 └── .release-please-manifest.json     # github.release-please
 ```
