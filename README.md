@@ -128,24 +128,18 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 [github-prs-link]: https://github.com/kinoward/dayu-harness-skill/pulls
 [github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
+<!-- contributors:start -->
 <table>
   <tr>
     <td align="center" width="96">
       <a href="https://github.com/kinoward">
-        <img src="https://avatars.githubusercontent.com/kinoward?s=96" width="64" height="64" alt="kinoward"><br>
+        <img src="https://avatars.githubusercontent.com/u/33886943?v=4&amp;s=96" width="64" height="64" alt="kinoward"><br>
         <sub><b>kinoward</b></sub>
       </a>
     </td>
   </tr>
 </table>
-
-<p align="center">
-  <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/kinoward/dayu-harness-skill?label=Contributors&color=0EA5E9"></a>
-  <a href="https://github.com/kinoward/dayu-harness-skill/commits/main"><img alt="Commits" src="https://img.shields.io/github/commit-activity/t/kinoward/dayu-harness-skill?label=Commits&color=7C3AED"></a>
-  <a href="https://github.com/kinoward/dayu-harness-skill/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/kinoward/dayu-harness-skill?label=Last%20commit&color=16A34A"></a>
-  <a href="https://github.com/kinoward/dayu-harness-skill/issues"><img alt="Issues" src="https://img.shields.io/github/issues/kinoward/dayu-harness-skill?label=Issues&color=F59E0B"></a>
-  <a href="https://github.com/kinoward/dayu-harness-skill/pulls"><img alt="PRs" src="https://img.shields.io/github/issues-pr/kinoward/dayu-harness-skill?label=PRs&color=2563EB"></a>
-</p>
+<!-- contributors:end -->
 
 ## ⭐ Star History
 
