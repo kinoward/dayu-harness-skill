@@ -98,33 +98,27 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 ## 快速开始
 
-在支持 Agent Skills 的宿主中安装本仓库，然后在目标项目输入：
+在目标项目目录安装（默认即为项目级安装，不会写入用户全局目录）：
+
+推荐安装方式（Vercel `skills` CLI）：
+
+```bash
+cd <target-project>
+
+# 项目目录安装（默认作用域），不带 -g
+npx skills add kinoward/dayu-harness-skill --yes
+```
+
+安装完成后在项目中运行：
 
 ```text
 /dayu-harness
 ```
 
-手动安装示例：
+移除（可选）：
 
 ```bash
-# Claude Code：项目级安装
-mkdir -p <target-project>/.claude/skills
-cp -R dayu-harness-skill <target-project>/.claude/skills/dayu-harness
-
-# Codex 或通用 Agent Skills 客户端
-cp -R dayu-harness-skill <agent-skills-dir>/dayu-harness
-```
-
-也可以让智能体自行安装：
-
-```text
-从当前仓库安装大禹治库 Skill，然后在目标项目中运行 /dayu-harness。
-```
-
-完成初始化或升级后，如不再需要 Skill，可从客户端技能目录移除：
-
-```bash
-rm -rf <installed-skills-dir>/dayu-harness/
+npx skills remove <skill-name>
 ```
 
 ## 运行流程
