@@ -334,11 +334,11 @@ bats tests/unit
 >
 > **组织维护者:** [@kinoward](https://github.com/kinoward)
 
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/kinoward/dayu-harness-skill/pulls)
-[![Good First Issues](https://img.shields.io/github/issues/kinoward/dayu-harness-skill/good%20first%20issue?label=good%20first%20issue)](https://github.com/kinoward/dayu-harness-skill/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-[![Contributors](https://img.shields.io/github/contributors/kinoward/dayu-harness-skill)](https://github.com/kinoward/dayu-harness-skill/graphs/contributors)
+[![Issue](https://img.shields.io/badge/Issue-Open-blue.svg)]([github-issues-link])
+[![PRs](https://img.shields.io/badge/PRs-Open-brightgreen.svg)]([github-prs-link])
 
 [github-issues-link]: https://github.com/kinoward/dayu-harness-skill/issues
+[github-prs-link]: https://github.com/kinoward/dayu-harness-skill/pulls
 [github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
 <a href="https://github.com/kinoward/dayu-harness-skill/graphs/contributors" target="_blank">
