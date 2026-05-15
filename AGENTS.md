@@ -8,7 +8,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [SKILL.md](SKILL.md) - Skill 行为定义
 - [README.md](README.md) - 使用者阅读概述与安装指南
 - [.gitignore](.gitignore) - 本仓库临时测试产物忽略规则
-- [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 贡献者区块自动更新工作流
+- [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 动态区块自动更新工作流
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
 - [LICENSE](LICENSE) - MIT 许可文件
 - [agents/](agents/) - Codex UI 与触发策略元数据
@@ -222,7 +222,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - 设计计划：[docs/plan.md](docs/plan.md)
 - Q&A 参考模板：[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)
 - 执行完成报告模板：[docs/completion-report-template.md](docs/completion-report-template.md)
-- README 贡献者区块更新脚本：[scripts/update-readme-contributors.mjs](scripts/update-readme-contributors.mjs)
+- README 贡献者与 Star 数量更新脚本：[scripts/update-readme-contributors.mjs](scripts/update-readme-contributors.mjs)
 
 ## Skill 产物
 

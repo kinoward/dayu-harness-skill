@@ -4,8 +4,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 
 const README_PATH = "README.md";
-const START = "<!-- contributors:start -->";
-const END = "<!-- contributors:end -->";
+const CONTRIBUTORS_START = "<!-- contributors:start -->";
+const CONTRIBUTORS_END = "<!-- contributors:end -->";
+const STARS_START = "<!-- stars:start -->";
+const STARS_END = "<!-- stars:end -->";
 const DEFAULT_REPOSITORY = "kinoward/dayu-harness-skill";
 
 function resolveRepository() {
@@ -25,15 +27,7 @@ function resolveRepository() {
 }
 
 async function fetchContributors(repository) {
-  const headers = {
-    Accept: "application/vnd.github+json",
-    "User-Agent": "dayu-harness-skill-readme-contributors",
-  };
-
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
+  const headers = githubHeaders();
   const contributors = [];
   for (let page = 1; page <= 10; page += 1) {
     const url = `https://api.github.com/repos/${repository}/contributors?per_page=100&page=${page}`;
@@ -50,9 +44,32 @@ async function fetchContributors(repository) {
   return contributors;
 }
 
+async function fetchRepository(repository) {
+  const url = `https://api.github.com/repos/${repository}`;
+  const response = await fetch(url, { headers: githubHeaders() });
+  if (!response.ok) {
+    throw new Error(`GitHub repository API returned ${response.status} for ${url}`);
+  }
+
+  return response.json();
+}
+
+function githubHeaders() {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "dayu-harness-skill-readme-updater",
+  };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  return headers;
+}
+
 function renderContributors(contributors) {
   if (!contributors.length) {
-    return `${START}\n\n暂无贡献者数据。\n\n${END}`;
+    return `${CONTRIBUTORS_START}\n\n暂无贡献者数据。\n\n${CONTRIBUTORS_END}`;
   }
 
   const cells = contributors
@@ -77,7 +94,16 @@ function renderContributors(contributors) {
     rows.push(["  <tr>", ...cells.slice(index, index + 6), "  </tr>"].join("\n"));
   }
 
-  return `${START}\n<table>\n${rows.join("\n")}\n</table>\n${END}`;
+  return `${CONTRIBUTORS_START}\n<table>\n${rows.join("\n")}\n</table>\n${CONTRIBUTORS_END}`;
+}
+
+function renderStars(repositoryData) {
+  const count = Number(repositoryData.stargazers_count ?? 0);
+  return `${STARS_START}\n<p align="center"><strong>⭐ Stars: ${formatNumber(count)}</strong></p>\n${STARS_END}`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 function escapeHtml(value) {
@@ -89,15 +115,23 @@ function escapeHtml(value) {
 }
 
 const repository = resolveRepository();
-const contributors = await fetchContributors(repository);
-const block = renderContributors(contributors);
+const [contributors, repositoryData] = await Promise.all([
+  fetchContributors(repository),
+  fetchRepository(repository),
+]);
+const contributorsBlock = renderContributors(contributors);
+const starsBlock = renderStars(repositoryData);
 const readme = await readFile(README_PATH, "utf8");
 
-if (!readme.includes(START) || !readme.includes(END)) {
-  throw new Error(`README.md must contain ${START} and ${END} markers`);
+for (const marker of [CONTRIBUTORS_START, CONTRIBUTORS_END, STARS_START, STARS_END]) {
+  if (!readme.includes(marker)) {
+    throw new Error(`README.md must contain ${marker}`);
+  }
 }
 
-const nextReadme = readme.replace(new RegExp(`${START}[\\s\\S]*?${END}`), block);
+const nextReadme = readme
+  .replace(new RegExp(`${CONTRIBUTORS_START}[\\s\\S]*?${CONTRIBUTORS_END}`), contributorsBlock)
+  .replace(new RegExp(`${STARS_START}[\\s\\S]*?${STARS_END}`), starsBlock);
 
 if (nextReadme !== readme) {
   await writeFile(README_PATH, nextReadme);

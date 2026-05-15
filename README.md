@@ -143,8 +143,16 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 
 ## ⭐ Star History
 
-<a href="https://starchart.cc/kinoward/dayu-harness-skill">
-  <img alt="Star History Chart" src="https://starchart.cc/kinoward/dayu-harness-skill.svg" />
+<!-- stars:start -->
+<p align="center"><strong>⭐ Stars: 2</strong></p>
+<!-- stars:end -->
+
+<a href="https://www.star-history.com/?repos=kinoward%2Fdayu-harness-skill&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+ </picture>
 </a>
 
 ---

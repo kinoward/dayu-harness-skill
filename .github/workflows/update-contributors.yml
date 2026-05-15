@@ -1,4 +1,4 @@
-name: Update README Contributors
+name: Update README Dynamic Blocks
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  update-contributors:
+  update-readme:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Update README contributors
+      - name: Update README dynamic blocks
         run: node scripts/update-readme-contributors.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
