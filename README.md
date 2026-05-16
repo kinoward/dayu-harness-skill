@@ -4,9 +4,9 @@
 
 <br>
 
-# 🌊 Dayu Harness Skill（大禹治库.skill）
+# Dayu Harness Skill（大禹治库.skill）
 
-### 🌊 *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
+### *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
