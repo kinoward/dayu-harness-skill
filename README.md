@@ -43,7 +43,7 @@
 
 [🧭 前言](#-前言) · [🚀 快速开始与使用](#-快速开始与使用) · [📦 会生成什么](#-会生成什么) · [📁 项目结构](#-项目结构) · [🔎 更多细节](#-更多细节)
 
-[🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
+[📚 参考引用](#-参考引用) · [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
 
 </div>
 
@@ -288,6 +288,15 @@ dayu-harness-skill/
 - 想了解 Skill 的行为定义：看 [SKILL.md](SKILL.md)。
 - 想了解本仓库的维护规则、能力清单、脚本流程和测试基线：看 [AGENTS.md](AGENTS.md)。
 - 想了解不同 Agent 客户端的兼容方式：看 [references/agent-compatibility.md](references/agent-compatibility.md)。
+
+## 📚 参考引用
+
+- [微信公众号「浮之静」：《深度解析：Harness Engineering》](https://mp.weixin.qq.com/s/-mgf8K7XZrTKoD0pMOIn3w)：项目治理与 AI 协作理念参考。
+- [OpenAI: Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：本 Skill 的设计哲学来源。
+- [deusyu/harness-engineering](https://github.com/deusyu/harness-engineering)：README 信息层次、概念先行叙事和 AGENTS.md 渐进式披露实践参考。
+- [Martin Fowler: Harness Engineering](https://martinfowler.com/articles/harness-engineering.html)：Guides 与 Sensors 控制论框架参考。
+- [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
+- [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
 
 ## 🤝 参与贡献
 
