@@ -1,5 +1,9 @@
 <div align="center">
 
+<img src="assets/readme/dayu-harness-banner.png" alt="Dayu Harness Skill banner" width="100%">
+
+<br>
+
 # 🌊 Dayu Harness Skill（大禹治库.skill）
 
 ### 🌊 *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
@@ -221,7 +225,9 @@ dayu-harness-skill/
 │       └── archive/
 │           ├── AGENTS.md                         # 历史归档索引
 │           └── product-specs/AGENTS.md           # 归档后的产品文档目录
-├── assets/                                       # 按能力部署到目标项目的脚本和配置资产
+├── assets/                                       # README 展示资产，以及按能力部署到目标项目的脚本和配置资产
+│   ├── readme/
+│   │   └── dayu-harness-banner.png               # README 顶部横幅图片
 │   ├── husky/snippets/
 │   │   ├── commit-format.sh                      # commit-msg 提交格式校验片段
 │   │   ├── quality-node-tooling.sh               # pre-commit Node 质量检查片段
