@@ -2,10 +2,9 @@
 
 # 🌊 Dayu Harness Skill（大禹治库.skill）
 
-### *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
+### 🌊 *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![One-shot Deploy](https://img.shields.io/badge/One--shot-Deploy-6C5CE7)](scripts/scaffold.sh)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
 [![Stars](https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social)](https://github.com/kinoward/dayu-harness-skill/stargazers)
 
@@ -38,7 +37,7 @@
 
 <br>
 
-[🧭 前言](#前言) · [🚀 快速开始与使用](#快速开始与使用) · [📦 会生成什么](#会生成什么) · [🔎 更多细节](#更多细节)
+[🧭 前言](#-前言) · [🚀 快速开始与使用](#-快速开始与使用) · [📦 会生成什么](#-会生成什么) · [🔎 更多细节](#-更多细节)
 
 [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
 
@@ -46,7 +45,7 @@
 
 ---
 
-## 前言
+## 🧭 前言
 
 你的项目已经开始让智能体参与开发、审查、排障和文档维护，但规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？
 
@@ -54,71 +53,25 @@ Dayu Harness Skill 面向 [Harness Engineering](https://openai.com/zh-Hans-CN/in
 
 “大禹”取自大禹治水：不把洪流堵在一处，而是疏导、分流并建立长期秩序。本 Skill 的目标也是如此：把一次性的提示词、约束和经验，整理成可版本化、可审查、可迁移的治理资产。
 
-## 适合场景
+## 🎯 适合场景
 
 - 新项目希望从第一天就建立 `AGENTS.md` 根索引、文档分层和基础工程约束。
 - 旧项目已有零散文档、hooks、CI 或提交规则，需要融合成可维护的治理体系。
 - 团队希望 AI 协作经验能持续沉淀，而不是留在不可检索的聊天记录里。
 - 项目需要在 Claude Code、Codex 和通用 Agent Skills 客户端之间保持可迁移规则。
 
-## 快速开始与使用
+## 🚀 快速开始与使用
 
-Dayu Harness Skill 建议只安装到需要治理的目标项目里，不做全局安装。它是一次性部署、融合、诊断和维护入口；使用完成后可以删除 Skill 目录，长期生效的是目标项目内写入的 `AGENTS.md`、`docs/`、hooks、CI 和检查脚本。
+推荐只安装到需要治理的目标项目里，不做全局安装，也不建议把 Skill 安装目录提交进项目。Dayu Harness Skill 是一次性部署、融合、诊断和维护入口；使用完成后可以删除，长期生效的是目标项目内写入的 `AGENTS.md`、`docs/`、hooks、CI 和检查脚本。
 
-### Claude Code CLI
-
-```bash
-cd <target-project>
-mkdir -p .claude/skills
-git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git .claude/skills/dayu-harness
-```
-
-在该项目目录启动 Claude Code：
-
-```bash
-claude
-```
-
-然后在会话中输入 `/dayu-harness`。
-
-移除：
-
-```bash
-rm -rf .claude/skills/dayu-harness
-```
-
-### Codex
-
-```bash
-cd <target-project>
-mkdir -p .agents/skills
-git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git .agents/skills/dayu-harness
-```
-
-在该项目目录启动 Codex：
-
-```bash
-codex -C .
-```
-
-然后在会话中输入 `/dayu-harness`。
-
-移除：
-
-```bash
-rm -rf .agents/skills/dayu-harness
-```
-
-### Vercel skills CLI
-
-默认安装到项目目录；如果不加 `-a`，CLI 会根据已检测到的客户端提示选择目标目录。
+### ⚡ 推荐：Vercel skills CLI
 
 ```bash
 cd <target-project>
 npx skills add kinoward/dayu-harness-skill
 ```
 
-也可以明确指定目标客户端：
+如果希望明确指定客户端：
 
 ```bash
 # Claude Code -> .claude/skills/
@@ -128,21 +81,57 @@ npx skills add kinoward/dayu-harness-skill -a claude-code
 npx skills add kinoward/dayu-harness-skill -a codex
 ```
 
-安装完成后，在支持 Agent Skills 的客户端中打开该项目并调用：
+安装完成后，在目标项目中打开你的 Agent 客户端，并输入：
 
 ```text
 /dayu-harness
 ```
 
-移除：
+然后按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再给出变更计划；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
+
+使用完成后可删除：
 
 ```bash
 npx skills remove dayu-harness
 ```
 
-运行 `/dayu-harness` 后，按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再给出变更计划；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
+<details>
+<summary>手动安装到 Claude Code 或 Codex</summary>
 
-## 会生成什么
+手动安装时建议复制文件并移除内层 `.git`，避免在目标项目中留下嵌套 Git 仓库。
+
+Claude Code：
+
+```bash
+cd <target-project>
+tmp_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git "$tmp_dir/dayu-harness-skill"
+mkdir -p .claude/skills
+cp -R "$tmp_dir/dayu-harness-skill" .claude/skills/dayu-harness
+rm -rf .claude/skills/dayu-harness/.git "$tmp_dir"
+```
+
+Codex：
+
+```bash
+cd <target-project>
+tmp_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git "$tmp_dir/dayu-harness-skill"
+mkdir -p .agents/skills
+cp -R "$tmp_dir/dayu-harness-skill" .agents/skills/dayu-harness
+rm -rf .agents/skills/dayu-harness/.git "$tmp_dir"
+```
+
+移除：
+
+```bash
+rm -rf .claude/skills/dayu-harness
+rm -rf .agents/skills/dayu-harness
+```
+
+</details>
+
+## 📦 会生成什么
 
 Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产物包括：
 
@@ -151,9 +140,9 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 - Git hooks、CI 工作流、提交规范、PR 指南和质量检查配置。
 - `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/` 等长期知识目录。
 
-它不是长期运行的后台服务。初始化或升级完成后，长期生效的是目标项目内可版本化、可审查的文件。
+这些文件会留在目标项目中，成为后续协作的权威入口。
 
-## 更多细节
+## 🔎 更多细节
 
 - 想了解 Skill 的行为定义：看 [SKILL.md](SKILL.md)。
 - 想了解本仓库的维护规则、能力清单、脚本流程和测试基线：看 [AGENTS.md](AGENTS.md)。
@@ -161,7 +150,7 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 
 ## 🤝 参与贡献
 
-我们非常欢迎各种形式的贡献。如果你对贡献代码感兴趣，可以查看我们的 GitHub [Issues][github-issues-link] 和 [Projects][github-project-link]，大展身手，向我们展示你的奇思妙想。
+欢迎提交 Issue 或 PR：问题反馈、使用体验、兼容适配和文档改进都很有价值。
 
 > [!TIP]
 >
@@ -175,7 +164,6 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 
 [github-issues-link]: https://github.com/kinoward/dayu-harness-skill/issues
 [github-prs-link]: https://github.com/kinoward/dayu-harness-skill/pulls
-[github-project-link]: https://github.com/kinoward/dayu-harness-skill/projects
 
 <!-- contributors:start -->
 <table>
