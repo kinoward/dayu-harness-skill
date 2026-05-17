@@ -16,6 +16,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [capabilities/](capabilities/) - 治理能力 manifest，部署清单单一事实源
 - [templates/](templates/) - 部署到目标项目的文档模板
 - [assets/](assets/) - README 展示资产，以及按能力部署的 hook、CI、配置资产
+- [marketing/](marketing/) - 独立对外传播物料，不参与 Skill 功能或部署产物
 - [scripts/](scripts/) - Skill 内部环境前置、初始化与安装脚本
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
 - [tests/](tests/) - Skill 自身测试和 fixture 项目

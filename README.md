@@ -251,6 +251,15 @@ dayu-harness-skill/
 │       │   └── protect-tags.json                 # release tag 保护规则集
 │       ├── release-please-config.json            # release-please 配置
 │       └── .release-please-manifest.json         # release-please manifest
+├── marketing/                                    # 独立对外传播物料，不参与 Skill 功能或部署产物
+│   ├── README.md                                 # 传播物料边界说明
+│   └── wechat-moments/
+│       ├── README.md                             # 朋友圈发布素材说明
+│       ├── dayu-harness-moments-card.png         # 朋友圈竖版配图
+│       ├── dayu-harness-moments-card.html        # 配图排版源
+│       ├── dayu-harness-moments-copy.md          # 朋友圈正文文案
+│       ├── dayu-harness-character.png            # Q 版人物素材
+│       └── dayu-harness-qr-art.png               # GitHub 仓库二维码素材
 ├── scripts/                                      # Skill 自身执行脚本
 │   ├── ensure-environment.sh                     # 部署前环境、工具链和初始化状态检查
 │   ├── scaffold.sh                               # dry-run / apply 脚手架编排入口

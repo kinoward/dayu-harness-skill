@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1080, initial-scale=1" />
+    <title>大禹治库.skill / Dayu Harness Skill</title>
+    <style>
+      :root {
+        --bg: #06111f;
+        --panel: #081b2e;
+        --cyan: #65d8ee;
+        --cyan-2: #1fb7d5;
+        --gold: #f7d98a;
+        --gold-2: #d8a844;
+        --text: #f4fbff;
+        --muted: #bdd4de;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1080px;
+        height: 1350px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC",
+          "Source Han Sans SC", Arial, sans-serif;
+      }
+
+      .poster {
+        position: relative;
+        width: 1080px;
+        height: 1350px;
+        padding: 76px 70px 56px;
+        overflow: hidden;
+        isolation: isolate;
+        background:
+          radial-gradient(circle at 17% 13%, rgba(31, 183, 213, 0.34), transparent 31%),
+          radial-gradient(circle at 84% 22%, rgba(216, 168, 68, 0.18), transparent 27%),
+          radial-gradient(circle at 62% 86%, rgba(31, 183, 213, 0.22), transparent 36%),
+          linear-gradient(150deg, #071b2e 0%, #06111f 48%, #08233a 100%);
+      }
+
+      .poster::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -3;
+        opacity: 0.24;
+        background-image:
+          linear-gradient(rgba(101, 216, 238, 0.12) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(101, 216, 238, 0.1) 1px, transparent 1px);
+        background-size: 54px 54px;
+      }
+
+      .poster::after {
+        content: "";
+        position: absolute;
+        inset: 36px;
+        z-index: 10;
+        pointer-events: none;
+        border: 1px solid rgba(101, 216, 238, 0.18);
+        border-radius: 36px;
+        box-shadow:
+          inset 0 0 0 1px rgba(247, 217, 138, 0.07),
+          inset 0 0 90px rgba(31, 183, 213, 0.06);
+      }
+
+      .pill {
+        position: relative;
+        z-index: 3;
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        height: 48px;
+        padding: 0 23px;
+        border: 1px solid rgba(247, 217, 138, 0.42);
+        border-radius: 999px;
+        background: rgba(5, 18, 32, 0.78);
+        color: var(--gold);
+        font-size: 21px;
+        font-weight: 650;
+      }
+
+      .pill-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--gold);
+        box-shadow: 0 0 22px rgba(247, 217, 138, 0.72);
+      }
+
+      .title {
+        position: relative;
+        z-index: 3;
+        margin-top: 78px;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: 78px;
+        line-height: 1.06;
+        font-weight: 820;
+        letter-spacing: 0;
+        text-shadow: 0 0 46px rgba(101, 216, 238, 0.2);
+        white-space: nowrap;
+      }
+
+      .en {
+        margin: 18px 0 0;
+        color: var(--cyan);
+        font-size: 38px;
+        line-height: 1.05;
+        font-weight: 760;
+      }
+
+      .rule {
+        width: 178px;
+        height: 4px;
+        margin: 36px 0 32px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--gold), var(--cyan));
+        box-shadow: 0 0 32px rgba(101, 216, 238, 0.34);
+      }
+
+      .tagline {
+        width: 550px;
+        margin: 0;
+        color: #ebf8fc;
+        font-size: 34px;
+        line-height: 1.43;
+        font-weight: 720;
+      }
+
+      .tagline strong {
+        color: var(--gold);
+        font-weight: 820;
+      }
+
+      .mascot-stage {
+        position: absolute;
+        right: 10px;
+        top: 238px;
+        z-index: 2;
+        width: 500px;
+        height: 600px;
+      }
+
+      .mascot-glow {
+        position: absolute;
+        left: 26px;
+        right: 32px;
+        top: 120px;
+        bottom: 36px;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 52% 45%, rgba(101, 216, 238, 0.2), transparent 58%),
+          radial-gradient(circle at 52% 78%, rgba(247, 217, 138, 0.13), transparent 48%);
+        filter: blur(2px);
+      }
+
+      .mascot-stage img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter:
+          drop-shadow(0 34px 34px rgba(0, 0, 0, 0.36))
+          drop-shadow(0 0 18px rgba(101, 216, 238, 0.22));
+      }
+
+      .systems {
+        position: absolute;
+        left: 66px;
+        right: 66px;
+        bottom: 256px;
+        z-index: 1;
+        height: 250px;
+        opacity: 0.78;
+      }
+
+      .promo-panel {
+        position: absolute;
+        left: 70px;
+        top: 574px;
+        z-index: 4;
+        width: 520px;
+        padding: 24px 28px 22px;
+        border-radius: 28px;
+        border: 1px solid rgba(101, 216, 238, 0.28);
+        background:
+          linear-gradient(145deg, rgba(5, 18, 32, 0.9), rgba(7, 33, 55, 0.78)),
+          radial-gradient(circle at 10% 10%, rgba(247, 217, 138, 0.13), transparent 42%);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
+      }
+
+      .promo-kicker {
+        margin: 0 0 14px;
+        color: var(--gold);
+        font-size: 25px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .promo-copy {
+        margin: 0;
+        color: rgba(235, 248, 252, 0.94);
+        font-size: 23px;
+        line-height: 1.45;
+        font-weight: 610;
+      }
+
+      .promo-copy strong {
+        color: var(--cyan);
+        font-weight: 800;
+      }
+
+      .promo-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .promo-chip {
+        padding: 9px 13px;
+        border-radius: 999px;
+        border: 1px solid rgba(247, 217, 138, 0.28);
+        color: rgba(247, 217, 138, 0.92);
+        background: rgba(247, 217, 138, 0.07);
+        font-size: 18px;
+        line-height: 1;
+        font-weight: 720;
+      }
+
+      .flow-card {
+        position: absolute;
+        left: 330px;
+        right: 70px;
+        bottom: 218px;
+        z-index: 4;
+        min-height: 252px;
+        padding: 25px 26px 23px;
+        border-radius: 30px;
+        border: 1px solid rgba(101, 216, 238, 0.29);
+        background:
+          linear-gradient(135deg, rgba(5, 18, 32, 0.92), rgba(6, 29, 48, 0.8)),
+          radial-gradient(circle at 92% 14%, rgba(101, 216, 238, 0.16), transparent 38%);
+        box-shadow: 0 28px 76px rgba(0, 0, 0, 0.26);
+      }
+
+      .flow-title {
+        margin: 0;
+        color: #f4fbff;
+        font-size: 29px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .flow-sub {
+        margin: 13px 0 18px;
+        color: rgba(189, 212, 222, 0.92);
+        font-size: 21px;
+        line-height: 1.36;
+        font-weight: 590;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .flow-item {
+        min-height: 92px;
+        padding: 15px 14px;
+        border-radius: 22px;
+        border: 1px solid rgba(101, 216, 238, 0.2);
+        background: rgba(6, 17, 31, 0.54);
+      }
+
+      .flow-label {
+        color: var(--gold);
+        font-size: 21px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .flow-text {
+        margin-top: 10px;
+        color: rgba(235, 248, 252, 0.88);
+        font-size: 18px;
+        line-height: 1.28;
+        font-weight: 610;
+      }
+
+      .repo-strip {
+        position: absolute;
+        left: 70px;
+        right: 70px;
+        bottom: 94px;
+        z-index: 4;
+        min-height: 100px;
+        padding: 18px 26px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        border-radius: 28px;
+        border: 1px solid rgba(101, 216, 238, 0.3);
+        background:
+          linear-gradient(135deg, rgba(5, 18, 32, 0.93), rgba(6, 29, 48, 0.77)),
+          radial-gradient(circle at 12% 25%, rgba(247, 217, 138, 0.12), transparent 40%);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+      }
+
+      .repo-mark {
+        flex: 0 0 auto;
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(247, 217, 138, 0.48);
+        color: var(--gold);
+        transform: translateY(1px);
+      }
+
+      .repo-mark svg {
+        display: block;
+        width: 23px;
+        height: 23px;
+      }
+
+      .repo-url {
+        flex: 1 1 auto;
+        min-width: 0;
+        color: var(--muted);
+        font-size: 27px;
+        line-height: 1;
+        font-weight: 700;
+        white-space: nowrap;
+        letter-spacing: 0;
+        transform: translateY(-1px);
+      }
+
+      .qr-node {
+        position: absolute;
+        left: 70px;
+        bottom: 218px;
+        z-index: 5;
+        width: 232px;
+        height: 286px;
+        padding: 14px;
+        border-radius: 30px;
+        border: 1px solid rgba(247, 217, 138, 0.52);
+        background:
+          radial-gradient(circle at 28% 18%, rgba(247, 217, 138, 0.18), transparent 42%),
+          radial-gradient(circle at 78% 84%, rgba(101, 216, 238, 0.16), transparent 42%),
+          rgba(5, 18, 32, 0.9);
+        box-shadow:
+          0 30px 88px rgba(0, 0, 0, 0.36),
+          0 0 56px rgba(31, 183, 213, 0.18),
+          inset 0 0 0 1px rgba(101, 216, 238, 0.11);
+      }
+
+      .qr-node::before {
+        content: "";
+        position: absolute;
+        right: -130px;
+        top: 112px;
+        width: 130px;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(101, 216, 238, 0.54), transparent);
+        box-shadow: 0 0 18px rgba(101, 216, 238, 0.42);
+      }
+
+      .qr-inner {
+        padding: 10px;
+        border-radius: 22px;
+        background: linear-gradient(145deg, #fff6dc 0%, #f0e3c3 100%);
+        box-shadow: inset 0 0 0 2px rgba(6, 17, 31, 0.1);
+      }
+
+      .qr-inner img {
+        display: block;
+        width: 184px;
+        height: 184px;
+        border-radius: 14px;
+      }
+
+      .scan {
+        margin-top: 15px;
+        text-align: center;
+      }
+
+      .scan-main {
+        color: var(--gold);
+        font-size: 25px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .scan-sub {
+        margin-top: 8px;
+        color: rgba(189, 212, 222, 0.82);
+        font-size: 16px;
+        line-height: 1;
+        font-weight: 650;
+      }
+
+      .footer {
+        position: absolute;
+        left: 70px;
+        bottom: 54px;
+        z-index: 4;
+        color: rgba(189, 212, 222, 0.72);
+        font-size: 22px;
+        font-weight: 560;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="poster" aria-label="大禹治库.skill 朋友圈发布卡片">
+      <div class="pill"><span class="pill-dot"></span>Harness Engineering</div>
+
+      <section class="title">
+        <h1>大禹治库.skill</h1>
+        <p class="en">Dayu Harness Skill</p>
+        <div class="rule"></div>
+        <p class="tagline">
+          把一次性的 <strong>AI 协作提示</strong>，<br />
+          疏导成项目里的长期秩序。
+        </p>
+      </section>
+
+      <section class="promo-panel" aria-label="项目宣传介绍">
+        <p class="promo-kicker">不再反复提醒 Agent</p>
+        <p class="promo-copy">
+          把聊天、PR、旧文档里的判断和排障经验，
+          整理成仓库内可审查、可维护、可迁移的治理资产。
+        </p>
+        <div class="promo-chips" aria-label="适用场景">
+          <span class="promo-chip">初始化</span>
+          <span class="promo-chip">融合</span>
+          <span class="promo-chip">诊断</span>
+          <span class="promo-chip">维护</span>
+        </div>
+      </section>
+
+      <svg class="systems" viewBox="0 0 948 250" aria-hidden="true">
+        <path d="M42 150 C184 118 276 198 420 164 C548 134 668 92 906 124" fill="none" stroke="rgba(101,216,238,.46)" stroke-width="10" stroke-linecap="round"/>
+        <path d="M84 196 C220 170 342 218 492 194 C636 170 740 154 906 174" fill="none" stroke="rgba(247,217,138,.28)" stroke-width="5" stroke-linecap="round"/>
+        <path d="M26 94 C146 70 226 118 356 98 C486 78 620 42 920 74" fill="none" stroke="rgba(31,183,213,.34)" stroke-width="7" stroke-linecap="round"/>
+        <g opacity="0.72">
+          <rect x="125" y="38" width="86" height="58" rx="16" fill="rgba(8,35,58,.84)" stroke="rgba(101,216,238,.36)"/>
+          <rect x="242" y="70" width="94" height="62" rx="18" fill="rgba(8,35,58,.74)" stroke="rgba(247,217,138,.26)"/>
+          <rect x="386" y="46" width="86" height="58" rx="16" fill="rgba(8,35,58,.8)" stroke="rgba(101,216,238,.34)"/>
+          <rect x="536" y="84" width="108" height="68" rx="18" fill="rgba(8,35,58,.74)" stroke="rgba(101,216,238,.31)"/>
+          <rect x="690" y="48" width="94" height="62" rx="18" fill="rgba(8,35,58,.74)" stroke="rgba(247,217,138,.26)"/>
+        </g>
+      </svg>
+
+      <section class="mascot-stage" aria-label="参考 README 角色风格重新生成的 Q 版人物形象">
+        <div class="mascot-glow"></div>
+        <img src="dayu-harness-character.png" alt="参考 README 角色风格重新生成的 Q 版人物" />
+      </section>
+
+      <section class="qr-node" aria-label="GitHub repository QR code">
+        <div class="qr-inner">
+          <img src="dayu-harness-qr-art.png" alt="GitHub 仓库二维码" />
+        </div>
+        <div class="scan">
+          <div class="scan-main">扫码查看</div>
+          <div class="scan-sub">GitHub Repo</div>
+        </div>
+      </section>
+
+      <section class="flow-card" aria-label="治理体系组成">
+        <p class="flow-title">部署后留在仓库里</p>
+        <p class="flow-sub">
+          Skill 用完可删，项目仍有入口、记录和自动化反馈。
+        </p>
+        <div class="flow-grid">
+          <div class="flow-item">
+            <div class="flow-label">定位</div>
+            <div class="flow-text">AGENTS.md 指向上下文</div>
+          </div>
+          <div class="flow-item">
+            <div class="flow-label">沉淀</div>
+            <div class="flow-text">docs/ 记录决策与排障</div>
+          </div>
+          <div class="flow-item">
+            <div class="flow-label">验证</div>
+            <div class="flow-text">hooks / CI 持续检查</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="repo-strip" aria-label="GitHub repository URL">
+        <div class="repo-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M10 13.5a5 5 0 0 0 7.1 0l1.4-1.4a5 5 0 0 0-7.1-7.1l-.9.9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M14 10.5a5 5 0 0 0-7.1 0l-1.4 1.4a5 5 0 0 0 7.1 7.1l.9-.9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M9.3 14.7 14.7 9.3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="repo-url">https://github.com/kinoward/dayu-harness-skill</div>
+      </section>
+
+      <footer class="footer">Open source Skill for project-level AI collaboration</footer>
+    </main>
+  </body>
+</html>
