@@ -48,7 +48,7 @@ https://github.com/kinoward/dayu-harness-skill
 
 它的核心想法来自 Harness Engineering：人不再只是在每次对话里反复提醒 AI Agent，而是把项目约束、协作规则和反馈机制沉淀到仓库里，让 Agent 在一个更明确、更可检查的工程环境中工作。
 
-我自己理解的 Harness Engineering，大概是：
+我理解这个项目大概是：
 
 > 人类定义意图、边界和反馈回路；Agent 执行具体任务；仓库负责沉淀长期事实；脚本和 CI 负责机械化检查。
 
