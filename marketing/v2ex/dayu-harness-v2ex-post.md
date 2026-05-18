@@ -42,6 +42,8 @@ https://raw.githubusercontent.com/kinoward/dayu-harness-skill/main/marketing/v2e
 项目地址：
 https://github.com/kinoward/dayu-harness-skill
 
+如果这个方向对你有帮助，也欢迎 Star；如果试用中遇到问题，或者觉得某些设计不符合真实项目习惯，也欢迎直接提 Issue。
+
 ## 为什么做这个
 
 它的核心想法来自 Harness Engineering：人不再只是在每次对话里反复提醒 AI Agent，而是把项目约束、协作规则和反馈机制沉淀到仓库里，让 Agent 在一个更明确、更可检查的工程环境中工作。
@@ -136,9 +138,9 @@ npx skills add kinoward/dayu-harness-skill
 
 ## 还不成熟的地方
 
-目前项目肯定还有不成熟的地方，比如模板还偏通用，对不同语言栈、团队规模和已有工程体系的适配还需要更多真实项目反馈。也欢迎大家直接指出哪些设计过重、哪些地方不符合实际开发习惯。
+目前项目肯定还有不成熟的地方，比如模板还偏通用，对不同语言栈、团队规模和已有工程体系的适配还需要更多真实项目反馈。也欢迎大家直接指出哪些设计过重、哪些地方不符合实际开发习惯，可以在帖子里交流，也可以到 GitHub 提 Issue。
 
-如果你也在折腾 AI Agent 参与真实项目开发，或者已经在实践 Harness Engineering、AGENTS.md、Claude Skills、Codex 这类工作流，欢迎交流一下你们是怎么管理项目规则、长期上下文和自动化反馈的。
+如果你也在折腾 AI Agent 参与真实项目开发，或者已经在实践 Harness Engineering、AGENTS.md、Claude Skills、Codex 这类工作流，欢迎交流一下你们是怎么管理项目规则、长期上下文和自动化反馈的。项目如果对你有一点启发，也欢迎顺手给个 Star。
 
 感谢各位。
 ````
