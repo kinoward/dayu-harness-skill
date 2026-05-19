@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# audit.sh — 诊断脚本：检查项目治理体系的完整性
-# 用法:
+# audit.sh — governance diagnostic: validate completeness of project governance structure
+# Usage:
 #   audit.sh [--json] [project_root]
-# 退出码: 0=全部通过, 1=存在失败项, 2=脚本错误
+# Exit code: 0=all pass, 1=failures found, 2=script error
 set -euo pipefail
 
 JSON_MODE=false
@@ -62,7 +62,7 @@ is_external_link() {
     esac
 }
 
-# 解析参数
+# Parse parameters
 while [ $# -gt 0 ]; do
     case "$1" in
         --json)
@@ -76,28 +76,28 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# 规范化项目路径
+# Normalize project root path
 PROJECT_ROOT="$(cd "$PROJECT_ROOT" 2>/dev/null && pwd)" || {
-    echo "错误: 无法解析项目路径 '$PROJECT_ROOT'" >&2
+    echo "Error: unable to resolve project path '$PROJECT_ROOT'" >&2
     exit 2
 }
 
-# ---- 结果存储 ----
-RESULTS_JSON=""          # JSON 对象数组片段
+# ---- Result storage ----
+RESULTS_JSON=""          # JSON object array fragment
 PASSED=0
 FAILED=0
 WARNINGS=0
 TOTAL=0
-DESC_LINES=""            # 自然语言故障描述（用于 description_nl）
+DESC_LINES=""            # Natural-language failure summary for description_nl
 
-# ---- JSON 转义辅助函数 ----
-# 转义字符串使其可安全嵌入 JSON 字符串值
+# ---- JSON escaping helper ----
+# Escape a string so it can be safely embedded in JSON string values
 json_escape() {
     local s="$1"
-    # 反斜杠和双引号必须优先转义
+    # Escape backslashes and quotes first
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
-    # 换行、回车、制表符
+    # Newline / CR / tab
     s="${s//$'\n'/\\n}"
     s="${s//$'\r'/\\r}"
     s="${s//$'\t'/\\t}"
@@ -108,7 +108,7 @@ resolve_relative_path() {
     local base_dir="$1"
     local target="$2"
 
-    # 去掉 URL fragment
+    # Strip URL fragment
     target="${target%%\#*}"
 
     [ -z "$target" ] && { echo ""; return; }
@@ -159,9 +159,8 @@ extract_markdown_links() {
     ' "$file"
 }
 
-# ---- 检查结果记录 ----
-# 参数: check_name status detail
-# status: pass | fail | warn
+# ---- Record check result ----
+# Params: check_name status detail
 record_result() {
     local check="$1"
     local status="$2"
@@ -184,7 +183,7 @@ record_result() {
     fi
     RESULTS_JSON+="{\"check\":\"${escaped_check}\",\"status\":\"${status}\",\"detail\":\"${escaped_detail}\"}"
 
-    # 为自然语言描述收集失败的项
+    # Collect failed items for human-readable summary
     if [ "$status" = "fail" ] || [ "$status" = "warn" ]; then
         if [ -n "$DESC_LINES" ]; then
             DESC_LINES+=$'\n'
@@ -195,7 +194,7 @@ record_result() {
     fi
 }
 
-# ---- 辅助输出 ----
+# ---- Log helper ----
 log_text() {
     if [ "$JSON_MODE" = false ]; then
         echo "$@"
@@ -204,32 +203,32 @@ log_text() {
     fi
 }
 
-# ---- 主逻辑 ----
+# ---- Main flow ----
 
 if [ "$JSON_MODE" = false ]; then
-    echo "=== 大禹治库 Skill 诊断 ==="
-    echo "项目路径: $PROJECT_ROOT"
+    echo "=== Dayu Harness Skill Audit ==="
+    echo "Project path: $PROJECT_ROOT"
     echo ""
 fi
 
-# 1. CLAUDE.md 检查
+# 1. CLAUDE.md check
 if [ -f "$PROJECT_ROOT/CLAUDE.md" ]; then
     if grep -q '@AGENTS.md' "$PROJECT_ROOT/CLAUDE.md"; then
-        record_result "CLAUDE.md" "pass" "CLAUDE.md 存在且引用 @AGENTS.md"
-        log_text "  ✓ CLAUDE.md 存在且引用 @AGENTS.md"
+        record_result "CLAUDE.md" "pass" "CLAUDE.md exists and references @AGENTS.md"
+        log_text "  ✓ CLAUDE.md exists and references @AGENTS.md"
     else
-        record_result "CLAUDE.md" "warn" "CLAUDE.md 存在但未引用 @AGENTS.md"
-        log_text "  ⚠ CLAUDE.md 存在但未引用 @AGENTS.md"
+        record_result "CLAUDE.md" "warn" "CLAUDE.md exists but does not reference @AGENTS.md"
+        log_text "  ⚠ CLAUDE.md exists but does not reference @AGENTS.md"
     fi
 else
-    record_result "CLAUDE.md" "fail" "CLAUDE.md 不存在"
-    log_text "  ✗ CLAUDE.md 不存在"
+    record_result "CLAUDE.md" "fail" "CLAUDE.md does not exist"
+    log_text "  ✗ CLAUDE.md does not exist"
 fi
 
-# 2. 根 AGENTS.md 检查 + 链接有效性
+# 2. Root AGENTS.md check + link validity
 if [ -f "$PROJECT_ROOT/AGENTS.md" ]; then
-    record_result "AGENTS.md" "pass" "根 AGENTS.md 存在"
-    log_text "  ✓ 根 AGENTS.md 存在"
+    record_result "AGENTS.md" "pass" "Root AGENTS.md exists"
+    log_text "  ✓ Root AGENTS.md exists"
 
     while IFS=$'\t' read -r _line_no raw_link raw_line; do
         raw_link="${raw_link-}"
@@ -254,40 +253,40 @@ if [ -f "$PROJECT_ROOT/AGENTS.md" ]; then
         exists=false
         if [ -f "$PROJECT_ROOT/$link" ] || [ -d "$PROJECT_ROOT/$link" ]; then
             exists=true
-            record_result "AGENTS.md 链接: ${raw_link}" "pass" "链接有效: ${raw_link}"
+            record_result "AGENTS.md link: ${raw_link}" "pass" "Link valid: ${raw_link}"
             log_text "    ✓ ${raw_link}"
             continue
         fi
 
         if [ -n "$optional_capability" ]; then
             if is_allowed_optional_capability "$optional_capability"; then
-                record_result "AGENTS.md 链接: ${raw_link}" "pass" "可选能力未部署，跳过断链检查: ${raw_link}（${optional_capability}）"
-                log_text "    ✅ 可选能力未部署，跳过: ${raw_link} (${optional_capability})"
+                record_result "AGENTS.md link: ${raw_link}" "pass" "Optional capability not enabled; skipping broken-link check: ${raw_link} (${optional_capability})"
+                log_text "    ✅ Optional capability not enabled; skipping: ${raw_link} (${optional_capability})"
             else
-                record_result "AGENTS.md 链接: ${raw_link}" "fail" "可选 capability 未在白名单: ${optional_capability}"
-                log_text "    ✗ 可选 capability 未在白名单: ${optional_capability} (${raw_link})"
+                record_result "AGENTS.md link: ${raw_link}" "fail" "Optional capability not in allowlist: ${optional_capability}"
+                log_text "    ✗ Optional capability not in allowlist: ${optional_capability} (${raw_link})"
             fi
             continue
         fi
 
-        record_result "AGENTS.md 链接: ${raw_link}" "fail" "断链: ${raw_link}"
-        log_text "    ✗ 断链: ${raw_link}"
+        record_result "AGENTS.md link: ${raw_link}" "fail" "Broken link: ${raw_link}"
+        log_text "    ✗ Broken link: ${raw_link}"
     done < <(extract_markdown_links "$PROJECT_ROOT/AGENTS.md")
 else
-    record_result "AGENTS.md" "fail" "根 AGENTS.md 不存在"
-    log_text "  ✗ 根 AGENTS.md 不存在"
+    record_result "AGENTS.md" "fail" "Root AGENTS.md does not exist"
+    log_text "  ✗ Root AGENTS.md does not exist"
 fi
 
-# 3. docs/AGENTS.md 检查
+# 3. docs/AGENTS.md check
 if [ -f "$PROJECT_ROOT/docs/AGENTS.md" ]; then
-    record_result "docs/AGENTS.md" "pass" "docs/AGENTS.md 存在"
-    log_text "  ✓ docs/AGENTS.md 存在"
+    record_result "docs/AGENTS.md" "pass" "docs/AGENTS.md exists"
+    log_text "  ✓ docs/AGENTS.md exists"
 else
-    record_result "docs/AGENTS.md" "fail" "docs/AGENTS.md 不存在"
-    log_text "  ✗ docs/AGENTS.md 不存在"
+    record_result "docs/AGENTS.md" "fail" "docs/AGENTS.md does not exist"
+    log_text "  ✗ docs/AGENTS.md does not exist"
 fi
 
-# 4. 子目录 AGENTS.md 检查
+# 4. Subdirectory AGENTS.md check
 SUBDIRS=(
     "docs/harness"
     "docs/harness/guides"
@@ -309,33 +308,33 @@ SUBDIRS=(
 for dir in "${SUBDIRS[@]}"; do
     if [ -d "$PROJECT_ROOT/$dir" ]; then
         if [ -f "$PROJECT_ROOT/$dir/AGENTS.md" ]; then
-            record_result "$dir/AGENTS.md" "pass" "$dir/AGENTS.md 存在"
+            record_result "$dir/AGENTS.md" "pass" "$dir/AGENTS.md exists"
             log_text "  ✓ $dir/AGENTS.md"
         else
-            record_result "$dir/AGENTS.md" "warn" "$dir/ 目录存在但缺少 AGENTS.md"
-            log_text "  ⚠ $dir/ 存在但缺少 AGENTS.md"
+            record_result "$dir/AGENTS.md" "warn" "$dir directory exists but AGENTS.md is missing"
+            log_text "  ⚠ $dir directory exists but AGENTS.md is missing"
         fi
     else
-        record_result "$dir/AGENTS.md" "warn" "$dir/ 目录不存在（可能已跳过）"
-        log_text "  - $dir/ 目录不存在（可能已跳过）"
+        record_result "$dir/AGENTS.md" "warn" "$dir directory does not exist (may be skipped)"
+        log_text "  - $dir directory does not exist (may be skipped)"
     fi
 done
 
-# 5. 联动脚本与配置检查
+# 5. Coupled script/config checks
 check_script() {
     local path="$1"
     local name="$2"
     if [ -f "$PROJECT_ROOT/$path" ]; then
         if [ -x "$PROJECT_ROOT/$path" ]; then
-            record_result "$name ($path)" "pass" "$path 已安装且可执行"
-            log_text "  ✓ $name ($path) 已安装且可执行"
+            record_result "$name ($path)" "pass" "$path is installed and executable"
+            log_text "  ✓ $name ($path) is installed and executable"
         else
-            record_result "$name ($path)" "warn" "$path 已安装但不可执行"
-            log_text "  ⚠ $name ($path) 已安装但不可执行"
+            record_result "$name ($path)" "warn" "$path is installed but not executable"
+            log_text "  ⚠ $name ($path) is installed but not executable"
         fi
     else
-        record_result "$name ($path)" "warn" "$path 未安装"
-        log_text "  - $name ($path) 未安装"
+        record_result "$name ($path)" "warn" "$path is not installed"
+        log_text "  - $name ($path) is not installed"
     fi
 }
 
@@ -350,62 +349,62 @@ path_exists() {
 if path_exists ".husky/commit-msg" "docs/harness/guides/commit-guidelines.md"; then
     check_script ".husky/commit-msg" "commit-msg hook"
 else
-    log_text "  - commit-msg hook 未启用，跳过"
+    log_text "  - commit-msg hook not enabled, skipping"
 fi
 
 if path_exists ".husky/pre-commit" ".lintstagedrc.json" "eslint.config.cjs" "eslint.config.js" ".prettierrc"; then
     check_script ".husky/pre-commit" "pre-commit hook"
 else
-    log_text "  - pre-commit hook 未启用，跳过"
+    log_text "  - pre-commit hook not enabled, skipping"
 fi
 
 if path_exists ".husky/pre-push" "docs/harness/guides/branch-protection.md" "docs/harness/guides/release-versioning.md" ".github/rulesets/protect-main.json" ".github/rulesets/protect-tags.json"; then
     check_script ".husky/pre-push" "pre-push hook"
 else
-    log_text "  - pre-push hook 未启用，跳过"
+    log_text "  - pre-push hook not enabled, skipping"
 fi
 
 # commitlint
 if [ -f "$PROJECT_ROOT/commitlint.config.cjs" ]; then
-    record_result "commitlint.config.cjs" "pass" "commitlint.config.cjs 存在"
-    log_text "  ✓ commitlint.config.cjs 存在"
+    record_result "commitlint.config.cjs" "pass" "commitlint.config.cjs exists"
+    log_text "  ✓ commitlint.config.cjs exists"
 elif path_exists "docs/harness/guides/commit-guidelines.md"; then
-    record_result "commitlint.config.cjs" "warn" "已启用提交格式指南但 commitlint.config.cjs 未安装"
-    log_text "  - commitlint.config.cjs 未安装"
+    record_result "commitlint.config.cjs" "warn" "Commit format governance is enabled, but commitlint.config.cjs is not installed"
+    log_text "  - commitlint.config.cjs not installed"
 else
-    log_text "  - commitlint 未启用，跳过"
+    log_text "  - commitlint not enabled, skipping"
 fi
 
-# docs/harness/sensors/scripts/ 维护脚本
+# docs/harness/sensors/scripts/ maintenance scripts
 for script in audit.sh validate.sh diff-helper.sh check-consistency.sh; do
     if [ -f "$PROJECT_ROOT/docs/harness/sensors/scripts/$script" ]; then
         if [ -x "$PROJECT_ROOT/docs/harness/sensors/scripts/$script" ]; then
-            record_result "docs/harness/sensors/scripts/$script" "pass" "docs/harness/sensors/scripts/$script 已安装且可执行"
+            record_result "docs/harness/sensors/scripts/$script" "pass" "docs/harness/sensors/scripts/$script is installed and executable"
             log_text "  ✓ docs/harness/sensors/scripts/$script"
         else
-            record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script 已安装但不可执行"
-            log_text "  ⚠ docs/harness/sensors/scripts/$script 已安装但不可执行"
+            record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script is installed but not executable"
+            log_text "  ⚠ docs/harness/sensors/scripts/$script is installed but not executable"
         fi
     else
-        record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script 未安装"
-        log_text "  - docs/harness/sensors/scripts/$script 未安装"
+        record_result "docs/harness/sensors/scripts/$script" "warn" "docs/harness/sensors/scripts/$script is not installed"
+        log_text "  - docs/harness/sensors/scripts/$script is not installed"
     fi
 done
 
-# 6. 生成 description_nl
+# 6. Build description_nl
 build_description_nl() {
     if [ "$FAILED" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
-        echo "项目治理体系完整性检查全部通过。共检查 ${TOTAL} 项，无错误和警告。CLAUDE.md、AGENTS.md、子目录索引和联动脚本均符合规范。"
+        echo "Project governance audit passed for all checks. Checked ${TOTAL} items; no errors or warnings. CLAUDE.md, AGENTS.md, subdirectory indexes, and coupled scripts are compliant."
     elif [ "$FAILED" -eq 0 ]; then
-        echo "项目治理体系基本完整，但存在 ${WARNINGS} 个警告项。主要问题：${DESC_LINES}"
+        echo "Project governance is mostly complete with ${WARNINGS} warnings. Main issues: ${DESC_LINES}"
     else
-        echo "项目治理体系存在 ${FAILED} 个失败项和 ${WARNINGS} 个警告项（共检查 ${TOTAL} 项）。需要修复的问题：${DESC_LINES}"
+        echo "Project governance has ${FAILED} failures and ${WARNINGS} warnings (checked ${TOTAL} items). Items to fix: ${DESC_LINES}"
     fi
 }
 
 DESC_NL=$(build_description_nl)
 
-# 7. 结果输出
+# 7. Output
 if [ "$JSON_MODE" = true ]; then
     cat <<JSONEOF
 {
@@ -416,24 +415,24 @@ if [ "$JSON_MODE" = true ]; then
 JSONEOF
 else
     echo ""
-    echo "=== 诊断结果 ==="
-    echo "错误: $FAILED"
-    echo "警告: $WARNINGS"
-    echo "总计: $TOTAL"
+    echo "=== Audit Result ==="
+    echo "Failed: $FAILED"
+    echo "Warnings: $WARNINGS"
+    echo "Total: $TOTAL"
 
     if [ "$FAILED" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
-        echo "状态: 通过"
+        echo "Status: PASS"
         exit 0
     elif [ "$FAILED" -eq 0 ]; then
-        echo "状态: 通过（有警告）"
+        echo "Status: PASS (warnings)"
         exit 0
     else
-        echo "状态: 需要修复"
+        echo "Status: NEEDS FIX"
         exit 1
     fi
 fi
 
-# JSON 模式下的退出码
+# Exit code for JSON mode
 if [ "$JSON_MODE" = true ]; then
     if [ "$FAILED" -eq 0 ]; then
         exit 0

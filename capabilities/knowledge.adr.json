@@ -3,10 +3,18 @@
   "description": "Architecture decision record templates",
   "description_nl": "Deploy decision record documentation templates and index.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/design-docs/AGENTS.md","dst":"docs/design-docs/AGENTS.md"},
-    {"src":"templates/docs/design-docs/adr-template.md","dst":"docs/design-docs/adr-template.md"}
+    {
+      "src": "templates/docs/design-docs/AGENTS.md",
+      "dst": "docs/design-docs/AGENTS.md"
+    },
+    {
+      "src": "templates/docs/design-docs/adr-template.md",
+      "dst": "docs/design-docs/adr-template.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
@@ -14,5 +22,17 @@
     "ADR AGENTS exists",
     "ADR template exists"
   ],
-  "suggested_when": "Enable for projects that want explicit decision records."
+  "suggested_when": "Enable for projects that want explicit decision records.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/design-docs/AGENTS.md",
+        "dst": "docs/design-docs/AGENTS.md"
+      },
+      {
+        "src": "templates.en/docs/design-docs/adr-template.md",
+        "dst": "docs/design-docs/adr-template.md"
+      }
+    ]
+  }
 }

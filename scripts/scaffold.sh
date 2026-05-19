@@ -17,6 +17,7 @@ ENABLED_CATEGORIES=""
 ONLY_CATEGORY="all"
 ONLY_EXPLICIT="false"
 STRATEGY=""
+LOCALE="zh-CN"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -41,6 +42,17 @@ while [ $# -gt 0 ]; do
             STRATEGY="${2:-}"
             shift 2
             ;;
+        --locale)
+            LOCALE="${2:-}"
+            case "$LOCALE" in
+                zh-CN|en) ;;
+                *)
+                    echo "error: unsupported locale '$LOCALE'. Supported: zh-CN|en" >&2
+                    exit 2
+                    ;;
+            esac
+            shift 2
+            ;;
         --help|-h)
             MODE="help"
             shift
@@ -53,7 +65,7 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip]"
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en]"
     echo "说明:"
     echo "  - default=true 的必选能力始终部署；--enable 在必选集上追加能力"
     echo "  - --enable 与 --only 支持逗号分隔；--only 保留历史兼容，不会排除必选能力"
@@ -61,6 +73,7 @@ usage() {
     echo "  - --enable 兼容旧能力 id，并会展开到新的原子能力或 preset"
     echo "  - --only all 表示部署全部公开能力；内部能力只通过依赖展开"
     echo "  - --apply 默认不替换已存在文件；安装器 clean 时自动 merge，已有配置需通过 --strategy 声明安全策略"
+    echo "  - --locale 选择模板语言。默认 zh-CN；en 将优先使用 manifest.template_files_i18n.en（如存在）"
 }
 
 if [ "$MODE" = "help" ] || [ -z "${TARGET:-}" ]; then
@@ -338,6 +351,57 @@ resolve_request_ids() {
     printf '%s\n' "${resolved[@]}"
 }
 
+get_template_items_json() {
+    local manifest_path="$1"
+    local items_json
+
+    if [ "$LOCALE" = "en" ]; then
+        items_json="$(jq -c '
+            . as $manifest
+            | (.template_files // []) as $base
+            | ($manifest.template_files_i18n.en // []) as $en
+            | [
+                $base[] | . as $src_item
+                | (
+                    ($en | map(select(.dst == $src_item.dst)) | .[0]) as $en_item
+                    | if ($en_item | type == "object") then
+                        $en_item + {"__locale_source_found":true}
+                      else
+                        {
+                            "src": ($src_item.src | sub("^templates/"; "templates.en/")),
+                            "dst": $src_item.dst,
+                            "executable": ($src_item.executable // false),
+                            "__locale_source_found": false
+                        }
+                      end
+                )
+            ]
+        ' "$manifest_path")"
+        echo "$items_json"
+        return
+    fi
+
+    jq -c '.template_files // []' "$manifest_path"
+}
+
+get_kind_items_json() {
+    local manifest_path="$1"
+    local kind="$2"
+    local items_json
+
+    if [ "$kind" = "template" ]; then
+        items_json="$(get_template_items_json "$manifest_path")"
+        if [ -n "$items_json" ]; then
+            echo "$items_json"
+        else
+            echo "[]"
+        fi
+        return
+    fi
+
+    jq -c ".${kind}_files // []" "$manifest_path"
+}
+
 RESOLVE_SEEN=()
 RESOLVE_ORDER=()
 
@@ -387,6 +451,10 @@ collect_file_entries() {
     local manifest_path="$1"
     local kind="$2"
     local mode="$3"
+
+    local items_json
+    items_json="$(get_kind_items_json "$manifest_path" "$kind")"
+
     while IFS= read -r item_json; do
         [ -z "$item_json" ] && continue
 
@@ -394,6 +462,8 @@ collect_file_entries() {
         src_rel="$(echo "$item_json" | jq -r '.src // empty')"
         dst_rel="$(echo "$item_json" | jq -r '.dst // empty')"
         executable="$(echo "$item_json" | jq -r '(.executable // false) | tostring')"
+        local locale_source_found
+        locale_source_found="$(echo "$item_json" | jq -r 'if has("__locale_source_found") then .["__locale_source_found"] else true end')"
         [ -z "$src_rel" ] && continue
 
         local src_path="$SKILL_DIR/$src_rel"
@@ -406,10 +476,14 @@ collect_file_entries() {
         local description=""
 
         if [ "$mode" = "dry" ]; then
-            if [ ! -f "$src_path" ]; then
+            if [ "$locale_source_found" = "false" ] || [ ! -f "$src_path" ]; then
                 status="missing_source"
                 DRY_MISSING=$((DRY_MISSING + 1))
-                description="Source file missing: $src_rel"
+                if [ "$locale_source_found" = "false" ]; then
+                    description="Source template lacks English mapping for locale mode: $src_rel"
+                else
+                    description="Source file missing: $src_rel"
+                fi
             else
                 source_lines="$(wc -l < "$src_path" | tr -d ' ')"
                 DRY_FILES=$((DRY_FILES + 1))
@@ -426,11 +500,15 @@ collect_file_entries() {
                 fi
             fi
         else
-            if [ ! -f "$src_path" ]; then
+            if [ "$locale_source_found" = "false" ] || [ ! -f "$src_path" ]; then
                 status="missing_source"
                 APPLY_MISSING=$((APPLY_MISSING + 1))
                 APPLY_ERROR=$((APPLY_ERROR + 1))
-                description="Source file missing: $src_rel"
+                if [ "$locale_source_found" = "false" ]; then
+                    description="Source template lacks English mapping for locale mode: $src_rel"
+                else
+                    description="Source file missing: $src_rel"
+                fi
             else
                 source_lines="$(wc -l < "$src_path" | tr -d ' ')"
                 APPLY_FILES=$((APPLY_FILES + 1))
@@ -475,7 +553,7 @@ collect_file_entries() {
         else
             APPLY_ITEMS+=( "$item" )
         fi
-    done < <(jq -c ".${kind}_files[]?" "$manifest_path")
+    done < <(echo "$items_json" | jq -c '.[]?')
 }
 
 collect_file_entries_blocked() {
@@ -484,6 +562,9 @@ collect_file_entries_blocked() {
     local status="$3"
     local description="$4"
 
+    local items_json
+    items_json="$(get_kind_items_json "$manifest_path" "$kind")"
+
     while IFS= read -r item_json; do
         [ -z "$item_json" ] && continue
 
@@ -491,6 +572,8 @@ collect_file_entries_blocked() {
         src_rel="$(echo "$item_json" | jq -r '.src // empty')"
         dst_rel="$(echo "$item_json" | jq -r '.dst // empty')"
         executable="$(echo "$item_json" | jq -r '(.executable // false) | tostring')"
+        local locale_source_found
+        locale_source_found="$(echo "$item_json" | jq -r 'if has("__locale_source_found") then .["__locale_source_found"] else true end')"
         [ -z "$src_rel" ] && continue
 
         src_path="$SKILL_DIR/$src_rel"
@@ -501,7 +584,7 @@ collect_file_entries_blocked() {
         item_status="$status"
 
         APPLY_FILES=$((APPLY_FILES + 1))
-        if [ -f "$src_path" ]; then
+        if [ "$locale_source_found" != "false" ] && [ -f "$src_path" ]; then
             source_lines="$(wc -l < "$src_path" | tr -d ' ')"
         else
             item_status="missing_source"
@@ -527,7 +610,7 @@ collect_file_entries_blocked() {
         fi
         item+="}"
         APPLY_ITEMS+=( "$item" )
-    done < <(jq -c ".${kind}_files[]?" "$manifest_path")
+    done < <(echo "$items_json" | jq -c '.[]?')
 }
 
 collect_installer_entry_dry() {

@@ -3,9 +3,14 @@
   "description": "AI project-memory boundaries and experience capture",
   "description_nl": "Deploy project-memory boundaries and experience capture rules for AI collaboration.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/harness/guides/ai-memory.md","dst":"docs/harness/guides/ai-memory.md"}
+    {
+      "src": "templates/docs/harness/guides/ai-memory.md",
+      "dst": "docs/harness/guides/ai-memory.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
@@ -13,5 +18,13 @@
     "AI memory practice document exists",
     "Project memory boundaries are documented"
   ],
-  "suggested_when": "Enable when reusable decisions, troubleshooting notes, and research findings should become repository-owned memory."
+  "suggested_when": "Enable when reusable decisions, troubleshooting notes, and research findings should become repository-owned memory.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/ai-memory.md",
+        "dst": "docs/harness/guides/ai-memory.md"
+      }
+    ]
+  }
 }

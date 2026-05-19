@@ -3,9 +3,14 @@
   "description": "AI execution and collaboration practices",
   "description_nl": "Deploy AI execution practices for human/AI responsibilities, autonomous work, retries, and reporting.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/harness/guides/ai-execution.md","dst":"docs/harness/guides/ai-execution.md"}
+    {
+      "src": "templates/docs/harness/guides/ai-execution.md",
+      "dst": "docs/harness/guides/ai-execution.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
@@ -13,5 +18,13 @@
     "AI execution practice document exists",
     "Autonomous execution and retry rules are documented"
   ],
-  "suggested_when": "Enable when AI agents regularly implement or maintain project work."
+  "suggested_when": "Enable when AI agents regularly implement or maintain project work.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/ai-execution.md",
+        "dst": "docs/harness/guides/ai-execution.md"
+      }
+    ]
+  }
 }

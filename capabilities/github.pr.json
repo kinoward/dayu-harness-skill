@@ -3,19 +3,45 @@
   "description": "GitHub pull request structure and review hygiene",
   "description_nl": "Deploy PR structure workflow, helper script, PR guide, and review checklist.",
   "default": false,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/harness/guides/pr-guidelines.md","dst":"docs/harness/guides/pr-guidelines.md"},
-    {"src":"templates/docs/harness/sensors/reviews/code-review-checklist.md","dst":"docs/harness/sensors/reviews/code-review-checklist.md"}
+    {
+      "src": "templates/docs/harness/guides/pr-guidelines.md",
+      "dst": "docs/harness/guides/pr-guidelines.md"
+    },
+    {
+      "src": "templates/docs/harness/sensors/reviews/code-review-checklist.md",
+      "dst": "docs/harness/sensors/reviews/code-review-checklist.md"
+    }
   ],
   "asset_files": [
-    {"src":"assets/github/workflows/pr-lint.yml","dst":".github/workflows/pr-lint.yml"},
-    {"src":"assets/github/scripts/pr_body_structure.py","dst":".github/scripts/pr_body_structure.py"}
+    {
+      "src": "assets/github/workflows/pr-lint.yml",
+      "dst": ".github/workflows/pr-lint.yml"
+    },
+    {
+      "src": "assets/github/scripts/pr_body_structure.py",
+      "dst": ".github/scripts/pr_body_structure.py"
+    }
   ],
   "installer": null,
   "acceptance": [
     "PR lint workflow exists",
     "PR body validator script exists"
   ],
-  "suggested_when": "Enable when project uses GitHub pull requests."
+  "suggested_when": "Enable when project uses GitHub pull requests.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/pr-guidelines.md",
+        "dst": "docs/harness/guides/pr-guidelines.md"
+      },
+      {
+        "src": "templates.en/docs/harness/sensors/reviews/code-review-checklist.md",
+        "dst": "docs/harness/sensors/reviews/code-review-checklist.md"
+      }
+    ]
+  }
 }
