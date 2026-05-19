@@ -45,9 +45,9 @@ Chat logs · PR comments · team conventions · old documents · troubleshooting
 
 <br>
 
-[🧭 Introduction](#-introduction) · [🚀 Quick Start and Use](#-quick-start-and-use) · [📦 What Will Be Generated](#-what-will-be-generated) · [📁 Project Structure](#-project-structure) · [🔎 More Details](#-more-details)
+[🧭 Introduction](#-introduction) · [🚀 Quick Start and Use](#-quick-start-and-use) · [📦 What Will Be Generated](#-what-will-be-generated) · [🌐 Bilingual Deployment](#-bilingual-deployment)
 
-[📚 References](#-references) · [🤝 Contributing](#-contributing) · [⭐ Star History](#-star-history)
+[📁 Project Structure](#-project-structure) · [🔎 More Details](#-more-details) · [📚 References](#-references) · [🤝 Contributing](#-contributing) · [⭐ Star History](#-star-history)
 
 </div>
 
@@ -155,6 +155,14 @@ Dayu Harness Skill organizes project collaboration rules into the target reposit
 - Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
 
 These files stay in the target project and become the authority for future collaboration.
+
+## 🌐 Bilingual Deployment
+
+Dayu Harness Skill uses Chinese as the source language and recommends Chinese deployment by default; English content is mirrored from the Chinese semantics to help English users understand, not to rewrite the Chinese intent in reverse.
+
+When running `/dayu-harness`, interactive questions and options are shown bilingually in Chinese and English, so English users can still choose correctly. Deployment writes only one language into the target project, defaults to Chinese, and writes English artifacts only when English is explicitly selected.
+
+`templates/` is the Chinese source template tree, and `templates.en/` is the English mirror template tree. The two directories stay isomorphic; maintainers can use the drift check script to confirm the README mirror, template trees, capability mappings, and bilingual Q&A remain aligned.
 
 ## 📁 Project Structure
 
