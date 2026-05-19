@@ -97,12 +97,6 @@ After installation, open your Agent client in the target project and enter:
 
 Then follow the prompts to initialize, fuse existing rules, diagnose project completeness, or maintain current governance content. The Skill analyzes repository state first and proposes a change plan; existing hooks, CI, lint, and release configs receive merge plans instead of being overwritten directly.
 
-To check the target project environment separately before applying changes, run:
-
-```bash
-scripts/ensure-environment.sh <target-project> --check
-```
-
 After use, remove it with:
 
 ```bash
