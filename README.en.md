@@ -19,8 +19,6 @@
 
 <br>
 
-[Chinese version](README.md)
-
 中文说明文档见 [README.md](README.md)。
 
 <br>

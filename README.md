@@ -19,8 +19,6 @@
 
 <br>
 
-[English version](README.en.md)
-
 English documentation is available in [README.en.md](README.en.md).
 
 <br>
