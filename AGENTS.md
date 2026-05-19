@@ -7,6 +7,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [SKILL.md](SKILL.md) - Skill 行为定义
 - [README.md](README.md) - 使用者阅读概述与安装指南
+- [README.en.md](README.en.md) - 英文镜像说明文档
 - [.gitignore](.gitignore) - 本仓库临时测试产物忽略规则
 - [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 动态区块自动更新工作流
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
@@ -15,9 +16,11 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [references/agent-compatibility.md](references/agent-compatibility.md) - 跨 Agent 兼容说明
 - [capabilities/](capabilities/) - 治理能力 manifest，部署清单单一事实源
 - [templates/](templates/) - 部署到目标项目的文档模板
+- [templates.en/](templates.en/) - 英文部署模板镜像树
 - [assets/](assets/) - README 展示资产，以及按能力部署的 hook、CI、配置资产
 - [marketing/](marketing/) - 独立对外传播物料，不参与 Skill 功能或部署产物
 - [scripts/](scripts/) - Skill 内部环境前置、初始化与安装脚本
+- [scripts/check-i18n-drift.sh](scripts/check-i18n-drift.sh) - README 与部署模板镜像漂移检查
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
@@ -207,6 +210,8 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - 运行时检索系统、向量库、上下文缓存或外部智能体记忆可以提升效率，但不能替代仓库内可审查的治理事实。
 - 外部知识有价值时，应整理成决策、排障、研究、项目上下文或约束文档后回写项目，并同步对应 `AGENTS.md` 索引。
 - README 面向使用者，只保留安装、使用方式和基本解释；项目内部规则、能力 ID、测试流程和维护说明放在 AGENTS 体系内。
+- 英文镜像文档只能翻译中文源文档的文本语义，不得重排原有 Markdown/HTML 格式结构；标题层级、列表层级、表格、引用、代码块、链接行、动态区块和目录树展示需与中文源保持同版式，并用 `scripts/check-i18n-drift.sh --json` 检查。
+- Skill 运行时的提问和选项必须中英双语展示，中文在前、英文在后；默认项、确认、取消、跳过、保留、替换、合并等选择都要写成 `中文 / English`，避免英文用户无法判断选项含义。
 
 ## 理解 Skill
 
@@ -229,7 +234,8 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 > 触发时机：理解 Skill 的产出和部署目标时读取
 
-- 文档模板：[templates/](templates/)
+- 中文文档模板：[templates/](templates/)
+- 英文模板镜像：[templates.en/](templates.en/)
 - 脚本与配置资产：[assets/](assets/)
 - 内部环境前置、初始化与安装脚本：[scripts/](scripts/)
 - Skill 自身文档：[docs/AGENTS.md](docs/AGENTS.md)

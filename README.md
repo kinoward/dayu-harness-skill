@@ -19,6 +19,10 @@
 
 <br>
 
+[English version](README.en.md)
+
+<br>
+
 <table>
 <tr><td align="left">
 
@@ -93,6 +97,12 @@ npx skills add kinoward/dayu-harness-skill -a codex
 
 然后按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再给出变更计划；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
 
+如需在执行前单独检查目标项目环境，可运行：
+
+```bash
+scripts/ensure-environment.sh <target-project> --check
+```
+
 使用完成后可删除：
 
 ```bash
@@ -153,6 +163,7 @@ dayu-harness-skill/
 ├── SKILL.md                                      # Skill 行为定义，声明 /dayu-harness 显式入口
 ├── AGENTS.md                                     # 本仓库维护索引、能力说明和协作规则
 ├── README.md                                     # 面向使用者的项目介绍、安装指南和展示页
+├── README.en.md                                  # 英文镜像说明文档
 ├── Q&A-TEMPLATE.md                               # 初始化、融合、维护时的问题模板和取舍参考
 ├── LICENSE                                       # MIT License
 ├── .gitignore                                    # 本仓库测试缓存、临时产物和本地文件忽略规则
@@ -225,6 +236,7 @@ dayu-harness-skill/
 │       └── archive/
 │           ├── AGENTS.md                         # 历史归档索引
 │           └── product-specs/AGENTS.md           # 归档后的产品文档目录
+├── templates.en/                                 # 英文部署模板镜像树，与 templates/ 保持同构
 ├── assets/                                       # README 展示资产，以及按能力部署到目标项目的脚本和配置资产
 │   ├── readme/
 │   │   └── dayu-harness-banner.png               # README 顶部横幅图片
@@ -265,6 +277,7 @@ dayu-harness-skill/
 │   ├── scaffold.sh                               # dry-run / apply 脚手架编排入口
 │   ├── install-husky.sh                          # husky hook 片段检查、合并和安装器
 │   ├── install-gitignore.sh                      # .gitignore 检查、合并和安装器
+│   ├── check-i18n-drift.sh                       # README 与部署模板镜像漂移检查
 │   └── update-readme-contributors.mjs            # README 贡献者动态区块刷新脚本
 ├── docs/                                         # Skill 自身设计和维护资料
 │   ├── AGENTS.md                                 # docs 目录索引

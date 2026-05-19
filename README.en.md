@@ -1,0 +1,371 @@
+<div align="center">
+
+<img src="assets/readme/dayu-harness-banner.png" alt="Dayu Harness Skill banner" width="100%">
+
+<br>
+
+# Dayu Harness Skill
+
+### *“Turn one-off AI collaboration prompts into long-running repository governance.”*
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
+[![Stars](https://img.shields.io/github/stars/kinoward/dayu-harness-skill?style=social)](https://github.com/kinoward/dayu-harness-skill/stargazers)
+
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-blueviolet)](https://claude.ai/code)
+[![Hermes](https://img.shields.io/badge/Hermes-Skill-orange)](https://github.com/kinoward/dayu-harness-skill)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-Skill-teal)](https://github.com/kinoward/dayu-harness-skill)
+[![Codex](https://img.shields.io/badge/Codex-Skill-black)](https://github.com/kinoward/dayu-harness-skill)
+
+<br>
+
+[Chinese version](README.md)
+
+<br>
+
+<table>
+<tr><td align="left">
+
+🤖 &nbsp;Has your project already started letting agents join development, review, troubleshooting, and documentation maintenance?<br>
+📚 &nbsp;Are your rules still scattered across chat logs, PR comments, team conventions, and old documents?<br>
+🧭 &nbsp;Do you want the project to keep knowing how to collaborate, check, and retain experience after the Skill is removed?
+
+</td></tr>
+</table>
+
+### ✨ Dayu Harness can handle these problems.
+
+<br>
+
+From **one-off prompts to repository-level governance**, so rules no longer stay trapped in a single conversation.
+
+Chat logs · PR comments · team conventions · old documents · troubleshooting experience can all become reviewable project assets.
+
+**Maps, guides, check scripts, and automation feedback** go to their proper places, so the project knows how to collaborate, check, and retain knowledge.
+
+<br>
+
+[🧭 Introduction](#-introduction) · [🚀 Quick Start and Use](#-quick-start-and-use) · [📦 What Will Be Generated](#-what-will-be-generated) · [📁 Project Structure](#-project-structure) · [🔎 More Details](#-more-details)
+
+[📚 References](#-references) · [🤝 Contributing](#-contributing) · [⭐ Star History](#-star-history)
+
+</div>
+
+---
+
+## 🧭 Introduction
+
+Your project may already be letting agents participate in development, review, troubleshooting, and documentation maintenance, but are its rules still scattered across chat logs, PR comments, team conventions, and old documents?
+
+Dayu Harness Skill is designed for [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)-style project governance. It is not about making one Agent obey better in one conversation; it deploys long-term rules into the target repository, making `AGENTS.md`, `docs/`, hooks, CI, and maintenance scripts the actual authority for collaboration.
+
+The name “Dayu” comes from Great Yu’s flood-control story: do not block the current at one point, but guide, divide, and establish long-term order. This Skill follows the same goal: convert one-off prompts, constraints, and experience into versioned, reviewable, and portable governance assets.
+
+## 🎯 When It Fits
+
+- A new project wants an `AGENTS.md` root index, layered docs, and baseline engineering constraints from day one.
+- An existing project has scattered docs, hooks, CI, or commit rules that need to be fused into a maintainable governance system.
+- A team wants AI collaboration experience to persist instead of staying in unsearchable chat logs.
+- A project needs portable rules across Claude Code, Codex, and general Agent Skills clients.
+
+## 🚀 Quick Start and Use
+
+Install this Skill only into the target repository that needs governance. Do not install it globally, and do not commit the Skill installation directory into the target project. Dayu Harness Skill is a one-time scaffold, fuse, diagnose, and maintenance entrypoint; after use it can be removed, while the long-lived effect remains in the target project’s `AGENTS.md`, `docs/`, hooks, CI, and check scripts.
+
+### ⚡ Recommended: Vercel skills CLI
+
+```bash
+cd <target-project>
+npx skills add kinoward/dayu-harness-skill
+```
+
+If you want to target a specific client explicitly:
+
+```bash
+# Claude Code -> .claude/skills/
+npx skills add kinoward/dayu-harness-skill -a claude-code
+
+# Codex -> .agents/skills/
+npx skills add kinoward/dayu-harness-skill -a codex
+```
+
+After installation, open your Agent client in the target project and enter:
+
+```text
+/dayu-harness
+```
+
+Then follow the prompts to initialize, fuse existing rules, diagnose project completeness, or maintain current governance content. The Skill analyzes repository state first and proposes a change plan; existing hooks, CI, lint, and release configs receive merge plans instead of being overwritten directly.
+
+To check the target project environment separately before applying changes, run:
+
+```bash
+scripts/ensure-environment.sh <target-project> --check
+```
+
+After use, remove it with:
+
+```bash
+npx skills remove dayu-harness
+```
+
+<details>
+<summary>Manual installation for Claude Code or Codex</summary>
+
+For manual installation, copy the files and remove the nested `.git` directory to avoid leaving a nested Git repository in the target project.
+
+Claude Code:
+
+```bash
+cd <target-project>
+tmp_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git "$tmp_dir/dayu-harness-skill"
+mkdir -p .claude/skills
+cp -R "$tmp_dir/dayu-harness-skill" .claude/skills/dayu-harness
+rm -rf .claude/skills/dayu-harness/.git "$tmp_dir"
+```
+
+Codex:
+
+```bash
+cd <target-project>
+tmp_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/kinoward/dayu-harness-skill.git "$tmp_dir/dayu-harness-skill"
+mkdir -p .agents/skills
+cp -R "$tmp_dir/dayu-harness-skill" .agents/skills/dayu-harness
+rm -rf .agents/skills/dayu-harness/.git "$tmp_dir"
+```
+
+Remove:
+
+```bash
+rm -rf .claude/skills/dayu-harness
+rm -rf .agents/skills/dayu-harness
+```
+
+</details>
+
+## 📦 What Will Be Generated
+
+Dayu Harness Skill organizes project collaboration rules into the target repository. Common outputs include:
+
+- A root `AGENTS.md` governance entrypoint and required subdirectory indexes.
+- Collaboration guides, maintenance instructions, and check scripts under `docs/harness/`.
+- Git hooks, CI workflows, commit conventions, PR guidelines, and quality check configs.
+- Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
+
+These files stay in the target project and become the authority for future collaboration.
+
+## 📁 Project Structure
+
+```text
+dayu-harness-skill/
+├── SKILL.md                                      # Skill behavior definition and explicit /dayu-harness entry
+├── AGENTS.md                                     # Repository maintenance index, capability notes, and collaboration rules
+├── README.md                                     # User-facing project introduction, installation guide, and showcase
+├── README.en.md                                  # English mirror README
+├── Q&A-TEMPLATE.md                               # Question templates and tradeoff references for initialization, fuse, and maintenance
+├── LICENSE                                       # MIT License
+├── .gitignore                                    # Ignore rules for this repository's test cache, temp artifacts, and local files
+├── .github/
+│   └── workflows/
+│       └── update-contributors.yml               # Daily refresh for the README contributors dynamic block
+├── agents/
+│   └── openai.yaml                               # Codex display name, trigger policy, and UI metadata
+├── capabilities/                                 # Governance capability manifests, the single source of truth for deployment lists
+│   ├── core.json                                 # Core governance skeleton: AGENTS.md, CLAUDE.md, docs indexes, and maintenance entry
+│   ├── git.commit-format.json                    # Conventional Commits, commitlint, and commit-msg hook capability
+│   ├── project.gitignore.json                    # .gitignore merge capability
+│   ├── ai.execution.json                         # AI execution boundaries, reporting, retry, and collaboration rules
+│   ├── ai.memory.json                            # Project long-term memory and experience writeback rules
+│   ├── knowledge.adr.json                        # ADR decision record directory and template capability
+│   ├── knowledge.troubleshooting.json            # Troubleshooting knowledge base capability
+│   ├── knowledge.research.json                   # Research artifact retention capability
+│   ├── knowledge.archive.json                    # Historical archive capability
+│   ├── project.context.json                      # Product/project context directory capability
+│   ├── github.pr.json                            # PR guide, PR lint, and review checklist capability
+│   ├── github.branch-protection.json             # GitHub branch protection rules capability
+│   ├── github.release-please.json                # release-please publishing automation capability
+│   ├── release.versioning.json                   # Version, tag, and release constraint capability
+│   ├── quality.practices.json                    # General quality practices and testing strategy capability
+│   ├── quality.node-tooling.json                 # ESLint, Prettier, lint-staged, and pre-commit capability
+│   └── git.hooks.json                            # Internal hook snippet carrier capability
+├── templates/                                    # Documentation templates copied into the target project
+│   ├── AGENTS.md                                 # Target project root Agent index template
+│   ├── CLAUDE.md                                 # Claude Code project routing template
+│   └── docs/
+│       ├── AGENTS.md                             # Target project docs root index
+│       ├── harness/
+│       │   ├── AGENTS.md                         # Governance system documentation index
+│       │   ├── maintenance.md                    # Operation entry for maintaining governance after removing the Skill
+│       │   ├── guides/
+│       │   │   ├── AGENTS.md                     # Governance guide index
+│       │   │   ├── ai-execution.md               # AI execution boundaries and collaboration style
+│       │   │   ├── ai-memory.md                  # Long-term memory, experience retention, and external memory writeback rules
+│       │   │   ├── branch-protection.md          # Branch protection rule explanation
+│       │   │   ├── commit-guidelines.md          # Commit message standards
+│       │   │   ├── dev-hygiene.md                # Development hygiene and local quality constraints
+│       │   │   ├── pr-guidelines.md              # PR authoring, review, and merge constraints
+│       │   │   ├── release-please.md             # release-please workflow notes
+│       │   │   ├── release-versioning.md         # Release and tag constraints
+│       │   │   └── testing-strategy.md           # Testing strategy and validation layers
+│       │   └── sensors/
+│       │       ├── AGENTS.md                     # Mechanical check entry index
+│       │       ├── reviews/
+│       │       │   ├── AGENTS.md                 # Review material index
+│       │       │   └── code-review-checklist.md  # Code review checklist
+│       │       └── scripts/
+│       │           ├── AGENTS.md                 # Check script index
+│       │           ├── audit.sh                  # Governance system completeness check
+│       │           ├── validate.sh               # Enabled hooks, configs, and workflow validation
+│       │           ├── check-consistency.sh      # Documentation index, link, and orphan document check
+│       │           └── diff-helper.sh            # Helper for merge plans and diff descriptions
+│       ├── design-docs/
+│       │   ├── AGENTS.md                         # Design document index
+│       │   └── adr-template.md                   # ADR template
+│       ├── exec-plans/
+│       │   ├── AGENTS.md                         # Execution plan index
+│       │   ├── active/AGENTS.md                  # Active plan directory
+│       │   └── completed/AGENTS.md               # Completed plan directory
+│       ├── troubleshooting/AGENTS.md             # Troubleshooting record directory
+│       ├── references/
+│       │   ├── AGENTS.md                         # Reference material index
+│       │   └── research/AGENTS.md                # Research material directory
+│       ├── product-specs/AGENTS.md               # Product/project context directory
+│       ├── generated/AGENTS.md                   # Generated content staging directory
+│       └── archive/
+│           ├── AGENTS.md                         # Historical archive index
+│           └── product-specs/AGENTS.md           # Archived product document directory
+├── templates.en/                                 # English deployment template mirror tree, kept isomorphic with templates/
+├── assets/                                       # README display assets and scripts/config assets deployed by capability
+│   ├── readme/
+│   │   └── dayu-harness-banner.png               # README top banner image
+│   ├── husky/snippets/
+│   │   ├── commit-format.sh                      # commit-msg commit format validation snippet
+│   │   ├── quality-node-tooling.sh               # pre-commit Node quality check snippet
+│   │   ├── branch-protection.sh                  # pre-push main branch protection snippet
+│   │   └── release-versioning.sh                 # pre-push release tag protection snippet
+│   ├── commitlint/commitlint.config.cjs          # Conventional Commits config
+│   ├── eslint/eslint.config.cjs                  # Optional Node project ESLint config
+│   ├── prettier/.prettierrc                      # Prettier config
+│   ├── lint-staged/.lintstagedrc.json            # lint-staged config
+│   ├── gitignore/
+│   │   ├── universal.gitignore                   # Universal ignore rules
+│   │   ├── node.gitignore                        # Node project ignore rules
+│   │   └── python.gitignore                      # Python project ignore rules
+│   └── github/
+│       ├── workflows/
+│       │   ├── pr-lint.yml                       # PR body structure check workflow
+│       │   └── release-please.yml                # release-please workflow
+│       ├── scripts/pr_body_structure.py          # PR body structure check script
+│       ├── rulesets/
+│       │   ├── protect-main.json                 # main branch protection ruleset
+│       │   └── protect-tags.json                 # release tag protection ruleset
+│       ├── release-please-config.json            # release-please config
+│       └── .release-please-manifest.json         # release-please manifest
+├── marketing/                                    # Independent external promotion material, not part of Skill function or deployment output
+│   ├── README.md                                 # Promotion material boundary notes
+│   └── wechat-moments/
+│       ├── README.md                             # WeChat Moments publishing material notes
+│       ├── dayu-harness-moments-card.png         # Vertical card image for Moments
+│       ├── dayu-harness-moments-card.html        # Source layout for the card image
+│       ├── dayu-harness-moments-copy.md          # Moments copy
+│       ├── dayu-harness-character.png            # Chibi character asset
+│       └── dayu-harness-qr-art.png               # GitHub repository QR asset
+├── scripts/                                      # Skill execution scripts
+│   ├── ensure-environment.sh                     # Pre-deployment environment, toolchain, and initialization state check
+│   ├── scaffold.sh                               # dry-run / apply scaffold orchestration entry
+│   ├── install-husky.sh                          # husky hook snippet check, merge, and installer
+│   ├── install-gitignore.sh                      # .gitignore check, merge, and installer
+│   ├── check-i18n-drift.sh                       # README and deployment template mirror drift check
+│   └── update-readme-contributors.mjs            # README contributors dynamic block refresh script
+├── docs/                                         # Skill design and maintenance materials
+│   ├── AGENTS.md                                 # docs directory index
+│   ├── plan.md                                   # Historical design plan and architecture trace
+│   ├── optimization-2026-05.md                   # 2026-05 optimization record
+│   └── completion-report-template.md             # Verification and reporting template after execution
+├── references/
+│   └── agent-compatibility.md                    # Claude Code, Codex, and general Agent Skills compatibility notes
+└── tests/                                        # Tests, fixtures, and regression baseline
+    ├── README.md                                 # Test execution baseline
+    ├── unit/
+    │   ├── test-architecture-contracts.bats      # manifest, template, and script structure contract tests
+    │   ├── test-audit.bats                       # audit script behavior tests
+    │   ├── test-diff-helper.bats                 # diff-helper behavior tests
+    │   └── test-skill-interaction-e2e.bats       # Skill interaction and scaffold end-to-end tests
+    └── fixtures/
+        ├── empty-project/                        # Empty project initialization scenario
+        ├── has-husky-project/                    # Existing husky project fuse scenario
+        ├── has-github-actions-project/           # Existing GitHub Actions project fuse scenario
+        ├── has-full-config-project/              # Existing full lint/hook config project
+        ├── messy-project/                        # Incomplete doc index and orphan document scenario
+        ├── skill-empty-template/                 # Empty template output baseline
+        └── skill-messy-template/                 # Complex template output and merge baseline
+```
+
+Here, `capabilities/` decides “what can be deployed”, `templates/` and `assets/` decide “what it becomes”, and `scripts/` handles “how to deploy, fuse, and check safely”.
+
+## 🔎 More Details
+
+- To understand the Skill behavior definition: read [SKILL.md](SKILL.md).
+- To understand repository maintenance rules, capability lists, script flow, and test baseline: read [AGENTS.md](AGENTS.md).
+- To understand compatibility across Agent clients: read [references/agent-compatibility.md](references/agent-compatibility.md).
+
+## 📚 References
+
+- [WeChat Official Account “浮之静”: Deep Analysis: Harness Engineering](https://mp.weixin.qq.com/s/-mgf8K7XZrTKoD0pMOIn3w): reference for project governance and AI collaboration concepts.
+- [OpenAI: Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/): philosophical source for this Skill.
+- [deusyu/harness-engineering](https://github.com/deusyu/harness-engineering): reference for README information layering, concept-first narrative, and AGENTS.md progressive disclosure practice.
+- [Martin Fowler: Harness Engineering](https://martinfowler.com/articles/harness-engineering.html): reference for the Guides and Sensors cybernetic framework.
+- [agentsmd/agents.md](https://github.com/agentsmd/agents.md): AGENTS.md open format specification.
+- [microsoft/skills](https://github.com/microsoft/skills): skill declaration and client compatibility practice.
+
+## 🤝 Contributing
+
+Issues and PRs are welcome: bug reports, usage feedback, compatibility adaptations, and documentation improvements are all valuable.
+
+> [!TIP]
+>
+> We hope this repository becomes a technical sharing project: preserving good practices, failure experience, check scripts, and governance constraints from AI collaboration so more projects can reuse them.
+> We also welcome product feature and usage feedback to help improve Dayu Harness Skill.
+>
+> **Organization maintainer:** [@kinoward](https://github.com/kinoward)
+
+[![Issue](https://img.shields.io/badge/Issue-Open-blue.svg)][github-issues-link]
+[![PRs](https://img.shields.io/badge/PRs-Open-brightgreen.svg)][github-prs-link]
+
+[github-issues-link]: https://github.com/kinoward/dayu-harness-skill/issues
+[github-prs-link]: https://github.com/kinoward/dayu-harness-skill/pulls
+
+<!-- contributors:start -->
+<table>
+  <tr>
+    <td align="center" width="96">
+      <a href="https://github.com/kinoward">
+        <img src="https://avatars.githubusercontent.com/u/33886943?v=4&amp;s=96" width="64" height="64" alt="kinoward"><br>
+        <sub><b>kinoward</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
+<!-- contributors:end -->
+
+## ⭐ Star History
+
+<a href="https://www.star-history.com/?repos=kinoward%2Fdayu-harness-skill&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=kinoward/dayu-harness-skill&type=date&legend=top-left" />
+ </picture>
+</a>
+
+---
+
+<div align="center">
+
+<p><strong>MIT License</strong> © <a href="https://github.com/kinoward">kinoward</a></p>
+
+<sub>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</sub>
+
+</div>

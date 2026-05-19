@@ -9,7 +9,29 @@
 - 项目已有 `.husky/`、`.github/workflows/`、ESLint/Prettier/lint-staged 等配置 → 先按能力清单的联动组件逐项判断：有 manifest installer 的组件（如 husky snippet、`.gitignore`）先调用该 `--check` 获取结构化 plan；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置、`.github/workflows/*.yml`、ruleset JSON）先用 `scaffold.sh --dry-run` 出对比预览；若有现有文件与目标文件对可用，再补充 `diff-helper.sh merge-plan <existing> <incoming>`；否则按 `scaffold.sh --dry-run` 输出人工审阅确认
 - `replace` 只能由用户显式选择；`merge` 只表示脚本能证明安全的确定性合并，否则返回 `manual_required`
 
+## 双语提问总规则
+
+- 使用 Skill 进行初始化、融合、维护或诊断时，所有面向用户的提问、确认语、选项、继续/取消/跳过等选择项都必须中英双语展示。
+- 中文是源语言，英文是辅助翻译；展示顺序固定为中文在前、英文在后，避免中文用户丢失作者原意，也避免英文用户看不懂选项。
+- 选项格式固定为 `[1] 中文选项 / English option`；默认项必须写明 `（默认，推荐）/ (default, recommended)`。
+- 问题正文使用两行或同段双语均可，但不能只显示中文，也不能只显示英文。
+- `description_nl`、dry-run、merge plan 或检查报告中的关键结论如要转成问题，也必须补充英文说明后再让用户选择。
+
 ## 前置问题
+
+### 部署语言
+
+进入能力问答前，先询问部署到目标项目的文档语言：
+
+```markdown
+请选择部署到目标项目的文档语言。推荐使用中文，因为中文是本 Skill 的源语言，更贴近作者意图。
+Please choose the documentation language to deploy to the target project. Chinese is recommended because it is the source language of this Skill and is closest to the author's intent.
+
+[1] 中文（默认，推荐）/ Chinese (default, recommended)
+[2] 英文 / English
+```
+
+用户选择中文或未明确选择时，后续 `scaffold.sh` 使用默认 `--locale zh-CN`；用户明确选择英文时，执行 `scaffold.sh --locale en`。无论选择哪种语言，写入目标项目的路径保持不变，只改变部署内容语言。
 
 ### 环境前置检查
 
@@ -29,6 +51,17 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - 说明：Node/npm/npx、`package.json`、`devDependencies` 仅用于安装/运行治理工具链（如 husky、commitlint、lint-staged），不是目标项目必须是 Node.js 应用的前提。
 - 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或能力关联 installer 脚本。
 
+需要用户确认环境处理时，选项必须双语：
+
+```markdown
+检测到目标项目需要先完成环境准备。
+The target project needs environment preparation first.
+
+[1] 执行建议的安装/初始化/登录步骤 / Run the suggested install, initialization, or login steps
+[2] 暂停流程 / Pause this flow
+[3] 取消本次部署 / Cancel this deployment
+```
+
 默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
 
 - `core`
@@ -44,14 +77,16 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。只有 GitHub、发布自动化、Node.js 工具等可选能力需要询问。
 
-可选能力每项 3 选项：[1] 启用 [2] 跳过 [3] 自定义需求。
+可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 自定义需求 / Custom request。
 
-```
+```markdown
 Q: 是否使用 GitHub 远程托管？
-   选项：[1] 是 [2] 否 [3] 其他托管平台（请描述）
+Q: Do you use GitHub as the remote hosting platform?
+   选项 / Options: [1] 是 / Yes [2] 否 / No [3] 其他托管平台（请描述）/ Other hosting platform (please describe)
 
 Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
-   选项：[1] 启用 [2] 跳过 [3] 自定义工具链
+Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
+   选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 自定义工具链 / Custom toolchain
 ```
 
 ## 必选治理能力清单
@@ -76,32 +111,34 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？ | 通过 GitHub 工作流实现 PR body 结构、closing trailer 与 AI watermark 检查（`Summary` / `Implementation notes` / `Test plan`）。 | GitHub 项目 |
-| `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？ | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
-| `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？ | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
-| `quality.practices` | 是否希望建立通用开发纪律和测试策略？ | 部署 dev hygiene 与 testing strategy 文档，不安装 Node.js 工具。 | 含代码项目 |
-| `quality.node-tooling` | 是否希望在提交前自动拦截常见 Node.js 代码质量与格式问题？ | 通过 ESLint、Prettier、lint-staged 和 pre-commit hook snippet 实现。 | Node.js 项目；复杂配置默认 `manual_required` |
-| `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？ | 通过 release-please guide、workflow 与配置文件实现自动发布节奏。 | 仅在 GitHub + `git.commit-format` + `github.pr` 后建议；不自动启用 |
+| `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、closing trailer 与 AI watermark 检查（`Summary` / `Implementation notes` / `Test plan`）。 | GitHub 项目 |
+| `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
+| `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？<br>Do you need unified version and release tag rules to reduce release mistakes? | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
+| `quality.practices` | 是否希望建立通用开发纪律和测试策略？<br>Do you want general development discipline and testing strategy? | 部署 dev hygiene 与 testing strategy 文档，不安装 Node.js 工具。 | 含代码项目 |
+| `quality.node-tooling` | 是否希望在提交前自动拦截常见 Node.js 代码质量与格式问题？<br>Do you want common Node.js quality and formatting issues blocked before commit? | 通过 ESLint、Prettier、lint-staged 和 pre-commit hook snippet 实现。 | Node.js 项目；复杂配置默认 `manual_required` |
+| `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？<br>Do you want reusable and traceable releases with fewer manual versioning and publishing mistakes? | 通过 release-please guide、workflow 与配置文件实现自动发布节奏。 | 仅在 GitHub + `git.commit-format` + `github.pr` 后建议；不自动启用 |
 
 ## 确认汇总
 
 提问完成后，展示汇总：
 
 ```markdown
-## 确认汇总
+## 确认汇总 / Confirmation Summary
 
-### 启用的治理能力
-- 默认必选 → core、Git 提交/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
-- github.pr → 用户选择启用 PR 协作检查与交付结构约束
+### 启用的治理能力 / Enabled Governance Capabilities
+- 默认必选 / Required defaults → core、Git 提交/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
+- github.pr → 用户选择启用 PR 协作检查与交付结构约束 / The user chose to enable PR collaboration checks and delivery structure constraints
 
-### 需要确认策略的已有文件
+### 需要确认策略的已有文件 / Existing Files Requiring Strategy Confirmation
 - .husky/commit-msg → manual_required
 - .github/workflows/pr-lint.yml → manual_required
 
-### 跳过的治理能力
-- quality.node-tooling（用户选择跳过）
+### 跳过的治理能力 / Skipped Governance Capabilities
+- quality.node-tooling（用户选择跳过 / user chose to skip）
 
-[1] 确认 dry-run [2] 调整选择 [3] 取消
+[1] 确认 dry-run / Confirm dry-run
+[2] 调整选择 / Adjust choices
+[3] 取消 / Cancel
 ```
 
 ## 融合模式额外提问
@@ -110,17 +147,19 @@ Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 
 ```markdown
 检测到你的项目已有 `.husky/commit-msg`。
+Existing `.husky/commit-msg` was detected in your project.
 
 Merge plan:
 - status: manual_required
 - recommendation: manual_required
 - reason: shell hook 已存在，脚本无法证明安全合并
+- reason: the shell hook already exists, and the script cannot prove a safe merge
 
-请选择：
-[1] 保留现有配置
-[2] 替换为大禹治库 Skill 提供的治理模板
-[3] 手动合并后继续
-[4] 跳过此项
+请选择 / Please choose:
+[1] 保留现有配置 / Keep the existing configuration
+[2] 替换为大禹治库 Skill 提供的治理模板 / Replace with the governance template provided by Dayu Harness Skill
+[3] 手动合并后继续 / Continue after manual merge
+[4] 跳过此项 / Skip this item
 ```
 
 ## 执行规则
