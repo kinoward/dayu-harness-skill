@@ -42,11 +42,16 @@ extract_optional_capability() {
     local clean_line
 
     clean_line="${raw_line//\`/}"
-    if [[ "$clean_line" =~ 可选[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
-        capability="${BASH_REMATCH[1]}"
+    if [[ "$clean_line" =~ (可选|Optional)[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
+        capability="${BASH_REMATCH[2]}"
     fi
 
     printf '%s' "$capability"
+}
+
+is_directory_index_header() {
+    local line="$1"
+    [[ "$line" =~ ^[[:space:]]*#{1,6}[[:space:]]*(目录索引|Directory Index)[[:space:]]*$ ]]
 }
 
 is_external_link() {

@@ -19,6 +19,10 @@
 
 <br>
 
+English documentation is available in [README.en.md](README.en.md).
+
+<br>
+
 <table>
 <tr><td align="left">
 
@@ -41,9 +45,9 @@
 
 <br>
 
-[🧭 前言](#-前言) · [🚀 快速开始与使用](#-快速开始与使用) · [📦 会生成什么](#-会生成什么) · [📁 项目结构](#-项目结构) · [🔎 更多细节](#-更多细节)
+[🧭 前言](#-前言) · [🚀 快速开始与使用](#-快速开始与使用) · [📦 会生成什么](#-会生成什么) · [🌐 双语部署](#-双语部署)
 
-[📚 参考引用](#-参考引用) · [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
+[📁 项目结构](#-项目结构) · [🔎 更多细节](#-更多细节) · [📚 参考引用](#-参考引用) · [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
 
 </div>
 
@@ -146,6 +150,14 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 
 这些文件会留在目标项目中，成为后续协作的权威入口。
 
+## 🌐 双语部署
+
+Dayu Harness Skill 以中文为源语言，并推荐默认中文部署；英文内容来自中文语义镜像，服务英文用户理解，不反向改写中文意图。
+
+运行 `/dayu-harness` 时，交互式问题和选项会中英双语展示，避免英文用户因为看不懂中文而无法选择。部署目标项目时只写入一种语言，默认中文；如果明确选择英文，则写入英文部署产物。
+
+`templates/` 是中文源模板，`templates.en/` 是英文镜像模板，两个目录保持同构；维护者可以用漂移检查脚本确认 README 镜像、模板树、能力映射和双语问答保持一致。
+
 ## 📁 项目结构
 
 ```text
@@ -153,6 +165,7 @@ dayu-harness-skill/
 ├── SKILL.md                                      # Skill 行为定义，声明 /dayu-harness 显式入口
 ├── AGENTS.md                                     # 本仓库维护索引、能力说明和协作规则
 ├── README.md                                     # 面向使用者的项目介绍、安装指南和展示页
+├── README.en.md                                  # 英文镜像说明文档
 ├── Q&A-TEMPLATE.md                               # 初始化、融合、维护时的问题模板和取舍参考
 ├── LICENSE                                       # MIT License
 ├── .gitignore                                    # 本仓库测试缓存、临时产物和本地文件忽略规则
@@ -225,6 +238,7 @@ dayu-harness-skill/
 │       └── archive/
 │           ├── AGENTS.md                         # 历史归档索引
 │           └── product-specs/AGENTS.md           # 归档后的产品文档目录
+├── templates.en/                                 # 英文部署模板镜像树，与 templates/ 保持同构
 ├── assets/                                       # README 展示资产，以及按能力部署到目标项目的脚本和配置资产
 │   ├── readme/
 │   │   └── dayu-harness-banner.png               # README 顶部横幅图片
@@ -265,6 +279,7 @@ dayu-harness-skill/
 │   ├── scaffold.sh                               # dry-run / apply 脚手架编排入口
 │   ├── install-husky.sh                          # husky hook 片段检查、合并和安装器
 │   ├── install-gitignore.sh                      # .gitignore 检查、合并和安装器
+│   ├── check-i18n-drift.sh                       # README 与部署模板镜像漂移检查
 │   └── update-readme-contributors.mjs            # README 贡献者动态区块刷新脚本
 ├── docs/                                         # Skill 自身设计和维护资料
 │   ├── AGENTS.md                                 # docs 目录索引

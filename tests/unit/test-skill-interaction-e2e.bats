@@ -157,6 +157,53 @@ json_from_output() {
     [ "$status" -eq 0 ]
 }
 
+@test "conversation replay: zh-CN and English default deployments differ only by locale" {
+    local zh_project_dir="$TEST_DIR/i18n-zh"
+    local en_project_dir="$TEST_DIR/i18n-en"
+    mkdir -p "$zh_project_dir" "$en_project_dir"
+
+    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$zh_project_dir" --apply --strategy merge
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.validation == "passed"'
+
+    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$en_project_dir" --apply --locale en --strategy merge
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.validation == "passed"'
+
+    assert_path "$zh_project_dir/.husky/commit-msg"
+    assert_path "$en_project_dir/.husky/commit-msg"
+    assert_path "$zh_project_dir/commitlint.config.cjs"
+    assert_path "$en_project_dir/commitlint.config.cjs"
+    assert_no_path "$zh_project_dir/.github"
+    assert_no_path "$en_project_dir/.github"
+
+    run bash "$REPO_ROOT/tests/helpers/compare-i18n-deployments.sh" --json "$zh_project_dir" "$en_project_dir"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "pass"'
+    echo "$output" | jq -e '.checks | any(.name == "No GitHub constraints" and .status == "pass")'
+    echo "$output" | jq -e '.checks | any(.name == "Git constraints" and .status == "pass")'
+    echo "$output" | jq -e '.checks | any(.name == "Artifact content parity" and .status == "pass")'
+}
+
+@test "manual Claude CLI bilingual deployment smoke test is opt-in" {
+    local smoke_script="$REPO_ROOT/tests/smoke/claude-i18n-deploy-smoke.sh"
+    [ -x "$smoke_script" ]
+
+    run bash "$smoke_script" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"RUN_CLAUDE_I18N_SMOKE=1"* ]]
+    [[ "$output" == *"/dayu-harness"* ]]
+
+    if [ "${RUN_CLAUDE_I18N_SMOKE:-}" != "1" ]; then
+        skip "set RUN_CLAUDE_I18N_SMOKE=1 to run the real Claude Code CLI smoke test"
+    fi
+
+    run bash "$smoke_script" --json
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "pass"'
+    echo "$output" | jq -e '.deployments.zh and .deployments.en'
+}
+
 @test "conversation replay: messy project merges selected capabilities and fixes progressive docs indexes" {
     local project_dir="$TEST_DIR/messy-selected"
     cp -R "$REPO_ROOT/tests/fixtures/skill-messy-template" "$project_dir"

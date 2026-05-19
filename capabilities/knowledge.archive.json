@@ -3,10 +3,18 @@
   "description": "Project knowledge archive scaffold",
   "description_nl": "Create archive indexes for historical project records and retired knowledge.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/archive/AGENTS.md","dst":"docs/archive/AGENTS.md"},
-    {"src":"templates/docs/archive/product-specs/AGENTS.md","dst":"docs/archive/product-specs/AGENTS.md"}
+    {
+      "src": "templates/docs/archive/AGENTS.md",
+      "dst": "docs/archive/AGENTS.md"
+    },
+    {
+      "src": "templates/docs/archive/product-specs/AGENTS.md",
+      "dst": "docs/archive/product-specs/AGENTS.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
@@ -14,5 +22,17 @@
     "Archive AGENTS exists",
     "Archive product specs AGENTS exists"
   ],
-  "suggested_when": "Enable when archived project artifacts or retired knowledge need a fixed location."
+  "suggested_when": "Enable when archived project artifacts or retired knowledge need a fixed location.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/archive/AGENTS.md",
+        "dst": "docs/archive/AGENTS.md"
+      },
+      {
+        "src": "templates.en/docs/archive/product-specs/AGENTS.md",
+        "dst": "docs/archive/product-specs/AGENTS.md"
+      }
+    ]
+  }
 }

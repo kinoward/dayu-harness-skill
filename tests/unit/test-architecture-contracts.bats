@@ -154,6 +154,94 @@ write_file() {
     printf '%s\n' "$@" > "$file"
 }
 
+build_i18n_drift_fixture() {
+    local fixture="$1"
+    mkdir -p "$fixture"
+
+    mkdir -p \
+        "$fixture/templates/docs/harness" \
+        "$fixture/templates.en/docs/harness" \
+        "$fixture/capabilities"
+
+    cat > "$fixture/README.md" <<'EOF'
+# Repository
+EOF
+
+    cat > "$fixture/README.en.md" <<'EOF'
+# Repository
+EOF
+
+    cat > "$fixture/templates/CLAUDE.md" <<'EOF'
+# CLAUDE
+
+## Intro
+EOF
+
+    cat > "$fixture/templates.en/CLAUDE.md" <<'EOF'
+# CLAUDE
+
+## Intro
+EOF
+
+    cat > "$fixture/templates/docs/harness/maintenance.md" <<'EOF'
+# 运维
+
+## 指南
+EOF
+
+    cat > "$fixture/templates.en/docs/harness/maintenance.md" <<'EOF'
+# Maintenance
+
+## Guide
+EOF
+
+    cat > "$fixture/Q&A-TEMPLATE.md" <<'EOF'
+## 双语提问总规则
+
+默认语言：中文。如需英文请先确认，再切换为 `scaffold --locale en`；可选问题请在需要时提供。
+This template supports Chinese and English interaction paths. Optional: i18n-benchmark.
+
+请选择部署到目标项目的文档语言。
+Please choose the documentation language to deploy to the target project.
+
+[1] 中文（默认，推荐）/ Chinese (default, recommended)
+[2] 英文 / English
+
+选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 自定义需求 / Custom request
+
+请选择 / Please choose:
+[1] 保留现有配置 / Keep the existing configuration
+EOF
+
+    cat > "$fixture/capabilities/i18n.json" <<'EOF'
+{
+  "id": "i18n.fixture",
+  "template_files": [
+    {
+      "src": "templates/CLAUDE.md",
+      "dst": "CLAUDE.md"
+    },
+    {
+      "src": "templates/docs/harness/maintenance.md",
+      "dst": "docs/harness/maintenance.md"
+    }
+  ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/CLAUDE.md",
+        "dst": "CLAUDE.md"
+      },
+      {
+        "src": "templates.en/docs/harness/maintenance.md",
+        "dst": "docs/harness/maintenance.md"
+      }
+    ]
+  }
+}
+EOF
+}
+
 extract_allowed_capabilities() {
     local script="$1"
     sed -n '/^ALLOWED_OPTIONAL_CAPABILITIES=(/,/^)/p' "$script" \
@@ -235,6 +323,12 @@ expected_agents_h1() {
 
     if [[ "$relative" == templates/* ]]; then
         relative="${relative#templates/}"
+        echo "# ${relative}"
+        return
+    fi
+
+    if [[ "$relative" == templates.en/* ]]; then
+        relative="${relative#templates.en/}"
         echo "# ${relative}"
         return
     fi
@@ -346,6 +440,28 @@ expected_agents_h1() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
 }
 
+@test "scaffold --dry-run default uses zh-CN templates" {
+    local target="$WORK_DIR/scaffold-locale-default"
+    mkdir -p "$target"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items | map(select(.kind=="template" and .src=="templates/docs/harness/guides/commit-guidelines.md")) | length == 1'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items | map(select(.kind=="template" and ((.src // "") | startswith("templates.en/")))) | length == 0'
+}
+
+@test "scaffold --dry-run --locale en uses English template sources" {
+    local target="$WORK_DIR/scaffold-locale-en"
+    mkdir -p "$target"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run --locale en
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items | map(select(.kind=="template" and .src=="templates.en/docs/harness/guides/commit-guidelines.md")) | length == 1'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="git.commit-format").items | map(select(.kind=="template" and .src=="templates/docs/harness/guides/commit-guidelines.md")) | length == 0'
+}
+
 @test "environment preflight check script has machine-readable contract" {
     if [ ! -f "$REPO_ROOT/scripts/ensure-environment.sh" ]; then
         skip "ensure-environment.sh not available in this branch yet"
@@ -425,11 +541,11 @@ expected_agents_h1() {
     [ "$status" -eq 0 ]
 }
 
-@test "environment preflight policy is documented across Q&A/Skill/README/maintenance" {
+@test "environment preflight policy is documented across Skill maintenance surfaces" {
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/SKILL.md"
-    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/README.md"
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    ! grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/README.md"
     grep -q -- '--capabilities' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -q "缺失依赖" "$REPO_ROOT/templates/docs/harness/maintenance.md"
     grep -q "git init" "$REPO_ROOT/templates/docs/harness/maintenance.md"
@@ -557,9 +673,16 @@ expected_agents_h1() {
             echo "  期望: $expected_h1"
             return 1
         fi
-        grep -q '^## 目录索引$' "$file"
-        grep -Fqx -- '- [AGENTS.md](AGENTS.md) - 当前索引' "$file"
-        grep -q '目录索引变化时，必须同步更新本区块' "$file"
+        if [[ "${file#"$REPO_ROOT/"}" == templates.en/* ]]; then
+            grep -q '^## Directory Index$' "$file"
+            grep -Fqx -- '- [AGENTS.md](AGENTS.md) - Current index' "$file"
+            grep -Eqi 'directory|section' "$file"
+            grep -Eqi 'sync|synchron|updated' "$file"
+        else
+            grep -q '^## 目录索引$' "$file"
+            grep -Fqx -- '- [AGENTS.md](AGENTS.md) - 当前索引' "$file"
+            grep -q '目录索引变化时，必须同步更新本区块' "$file"
+        fi
         ! grep -q '^## 目录结构' "$file"
     done
 }
@@ -763,6 +886,93 @@ expected_agents_h1() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'has("checks") and ( .checks | type == "array" and length == 4 ) and has("summary") and has("description_nl")'
     echo "$output" | jq -e '.summary.total == 4'
+}
+
+@test "i18n drift check passes on mirrored zh-CN/en fixture" {
+    local fixture="$WORK_DIR/i18n-drift-pass"
+    build_i18n_drift_fixture "$fixture"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "pass"'
+    echo "$output" | jq -e '.checks | all(.status == "pass")'
+}
+
+@test "i18n drift check fails when English README mirror is missing" {
+    local fixture="$WORK_DIR/i18n-drift-missing-readme"
+    build_i18n_drift_fixture "$fixture"
+    rm -f "$fixture/README.en.md"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="README pair" and .status=="fail" and (.detail | contains("README.en.md")) )'
+}
+
+@test "i18n drift check fails when English README format drifts" {
+    local fixture="$WORK_DIR/i18n-drift-readme-format"
+    build_i18n_drift_fixture "$fixture"
+    printf "\n> Extra layout marker\n" >> "$fixture/README.en.md"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="README format parity" and .status=="fail")'
+}
+
+@test "i18n drift check fails when Q&A options are not bilingual" {
+    local fixture="$WORK_DIR/i18n-drift-qna-options"
+    build_i18n_drift_fixture "$fixture"
+    cat > "$fixture/Q&A-TEMPLATE.md" <<'EOF'
+默认语言：中文。如需英文请先确认，再切换为 `scaffold --locale en`。
+[1] 中文（默认，推荐）
+[2] English
+EOF
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="Q&A locale guidance" and .status=="fail")'
+}
+
+@test "i18n drift check fails when templates.en mirror differs" {
+    local fixture="$WORK_DIR/i18n-drift-template-mismatch"
+    build_i18n_drift_fixture "$fixture"
+    rm -f "$fixture/templates.en/docs/harness/maintenance.md"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="Template tree mirror" and .status=="fail")'
+}
+
+@test "i18n drift check fails when markdown headings drift across template locales" {
+    local fixture="$WORK_DIR/i18n-drift-heading-mismatch"
+    build_i18n_drift_fixture "$fixture"
+    printf "## Maintenance\n" > "$fixture/templates.en/docs/harness/maintenance.md"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="Template heading parity" and .status=="fail")'
+}
+
+@test "i18n drift check fails when markdown structure drifts across template locales" {
+    local fixture="$WORK_DIR/i18n-drift-format-mismatch"
+    build_i18n_drift_fixture "$fixture"
+    printf "\n> Extra layout marker\n" >> "$fixture/templates.en/docs/harness/maintenance.md"
+
+    run bash "$REPO_ROOT/scripts/check-i18n-drift.sh" --json "$fixture"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.status == "needs_fix"'
+    echo "$output" | jq -e '.checks | any(.name=="Template format parity" and .status=="fail")'
 }
 
 @test "diff-helper merge-plan returns merge schema for changed files" {

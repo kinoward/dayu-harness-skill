@@ -3,7 +3,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 
-const README_PATH = "README.md";
+const README_PATHS = ["README.md", "README.en.md"];
 const CONTRIBUTORS_START = "<!-- contributors:start -->";
 const CONTRIBUTORS_END = "<!-- contributors:end -->";
 const DEFAULT_REPOSITORY = "kinoward/dayu-harness-skill";
@@ -55,9 +55,12 @@ function githubHeaders() {
   return headers;
 }
 
-function renderContributors(contributors) {
+function renderContributors(contributors, readmePath) {
   if (!contributors.length) {
-    return `${CONTRIBUTORS_START}\n\n暂无贡献者数据。\n\n${CONTRIBUTORS_END}`;
+    const emptyMessage = readmePath.endsWith(".en.md")
+      ? "No contributor data available yet."
+      : "暂无贡献者数据。";
+    return `${CONTRIBUTORS_START}\n\n${emptyMessage}\n\n${CONTRIBUTORS_END}`;
   }
 
   const cells = contributors
@@ -85,6 +88,40 @@ function renderContributors(contributors) {
   return `${CONTRIBUTORS_START}\n<table>\n${rows.join("\n")}\n</table>\n${CONTRIBUTORS_END}`;
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function updateReadme(readmePath, contributorsBlock) {
+  let readme;
+  try {
+    readme = await readFile(readmePath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new Error(`Missing target file: ${readmePath}`);
+    }
+    throw error;
+  }
+
+  for (const marker of [CONTRIBUTORS_START, CONTRIBUTORS_END]) {
+    if (!readme.includes(marker)) {
+      throw new Error(`${readmePath} must contain ${marker}`);
+    }
+  }
+
+  const nextReadme = readme.replace(
+    new RegExp(`${escapeRegex(CONTRIBUTORS_START)}[\\s\\S]*?${escapeRegex(CONTRIBUTORS_END)}`),
+    contributorsBlock,
+  );
+
+  if (nextReadme !== readme) {
+    await writeFile(readmePath, nextReadme);
+    return true;
+  }
+
+  return false;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -95,20 +132,8 @@ function escapeHtml(value) {
 
 const repository = resolveRepository();
 const contributors = await fetchContributors(repository);
-const contributorsBlock = renderContributors(contributors);
-const readme = await readFile(README_PATH, "utf8");
 
-for (const marker of [CONTRIBUTORS_START, CONTRIBUTORS_END]) {
-  if (!readme.includes(marker)) {
-    throw new Error(`README.md must contain ${marker}`);
-  }
-}
-
-const nextReadme = readme.replace(
-  new RegExp(`${CONTRIBUTORS_START}[\\s\\S]*?${CONTRIBUTORS_END}`),
-  contributorsBlock,
-);
-
-if (nextReadme !== readme) {
-  await writeFile(README_PATH, nextReadme);
+for (const readmePath of README_PATHS) {
+  const contributorsBlock = renderContributors(contributors, readmePath);
+  await updateReadme(readmePath, contributorsBlock);
 }

@@ -3,14 +3,27 @@
   "description": "Troubleshooting knowledge base scaffold",
   "description_nl": "Create troubleshooting knowledge index and structure.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/troubleshooting/AGENTS.md","dst":"docs/troubleshooting/AGENTS.md"}
+    {
+      "src": "templates/docs/troubleshooting/AGENTS.md",
+      "dst": "docs/troubleshooting/AGENTS.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
   "acceptance": [
     "Troubleshooting AGENTS exists"
   ],
-  "suggested_when": "Enable when troubleshooting notes should be first-class in docs."
+  "suggested_when": "Enable when troubleshooting notes should be first-class in docs.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/troubleshooting/AGENTS.md",
+        "dst": "docs/troubleshooting/AGENTS.md"
+      }
+    ]
+  }
 }

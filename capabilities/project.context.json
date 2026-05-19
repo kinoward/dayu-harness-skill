@@ -3,14 +3,27 @@
   "description": "Product specs and project context scaffold",
   "description_nl": "Create product specs area for non-governance project content.",
   "default": true,
-  "dependencies": ["core"],
+  "dependencies": [
+    "core"
+  ],
   "template_files": [
-    {"src":"templates/docs/product-specs/AGENTS.md","dst":"docs/product-specs/AGENTS.md"}
+    {
+      "src": "templates/docs/product-specs/AGENTS.md",
+      "dst": "docs/product-specs/AGENTS.md"
+    }
   ],
   "asset_files": [],
   "installer": null,
   "acceptance": [
     "Product specs AGENTS exists"
   ],
-  "suggested_when": "Enable for repositories with durable product specs or project-specific documentation."
+  "suggested_when": "Enable for repositories with durable product specs or project-specific documentation.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/product-specs/AGENTS.md",
+        "dst": "docs/product-specs/AGENTS.md"
+      }
+    ]
+  }
 }

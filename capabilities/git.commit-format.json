@@ -3,16 +3,28 @@
   "description": "Conventional Commits validation and commit format guidance",
   "description_nl": "Enable Conventional Commits guidance, commitlint config, and commit-msg format validation.",
   "default": true,
-  "dependencies": ["core", "git.hooks"],
+  "dependencies": [
+    "core",
+    "git.hooks"
+  ],
   "template_files": [
-    {"src":"templates/docs/harness/guides/commit-guidelines.md","dst":"docs/harness/guides/commit-guidelines.md"}
+    {
+      "src": "templates/docs/harness/guides/commit-guidelines.md",
+      "dst": "docs/harness/guides/commit-guidelines.md"
+    }
   ],
   "asset_files": [
-    {"src":"assets/commitlint/commitlint.config.cjs","dst":"commitlint.config.cjs"}
+    {
+      "src": "assets/commitlint/commitlint.config.cjs",
+      "dst": "commitlint.config.cjs"
+    }
   ],
   "installer": {
     "script": "install-husky.sh",
-    "safe_strategies": ["merge", "skip"],
+    "safe_strategies": [
+      "merge",
+      "skip"
+    ],
     "notes": "Installs only the commit-msg Conventional Commits snippet."
   },
   "acceptance": [
@@ -20,6 +32,16 @@
     "commitlint.config.cjs exists",
     "No existing hooks replaced by default"
   ],
-  "requires": ["Git repository context"],
-  "suggested_when": "Enable when project enforces git commit conventions."
+  "requires": [
+    "Git repository context"
+  ],
+  "suggested_when": "Enable when project enforces git commit conventions.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/commit-guidelines.md",
+        "dst": "docs/harness/guides/commit-guidelines.md"
+      }
+    ]
+  }
 }

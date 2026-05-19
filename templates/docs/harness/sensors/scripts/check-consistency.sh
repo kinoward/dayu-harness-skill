@@ -193,11 +193,16 @@ extract_optional_capability() {
     local clean_line
 
     clean_line="${raw_line//\`/}"
-    if [[ "$clean_line" =~ 可选[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
-        capability="${BASH_REMATCH[1]}"
+    if [[ "$clean_line" =~ (可选|Optional)[：:][[:space:]]*([A-Za-z0-9._-]+) ]]; then
+        capability="${BASH_REMATCH[2]}"
     fi
 
     printf '%s' "$capability"
+}
+
+is_directory_index_header() {
+    local line="$1"
+    [[ "$line" =~ ^[[:space:]]*#{1,6}[[:space:]]*(目录索引|Directory Index)[[:space:]]*$ ]]
 }
 
 # JSON 字符串转义
@@ -236,6 +241,39 @@ file_to_json_array() {
         fi
         printf '"%s"' "$(json_escape "$line")"
     done < "$file"
+}
+
+count_directory_index_links() {
+    local file="$1"
+    [ -f "$file" ] || { echo 0; return; }
+
+    local found_index=0
+    local in_index=0
+    local count=0
+    local line
+
+    while IFS= read -r line; do
+        if is_directory_index_header "$line"; then
+            found_index=1
+            in_index=1
+            continue
+        fi
+
+        if [ "$in_index" -eq 1 ]; then
+            if echo "$line" | grep -qE '^[[:space:]]*#{1,6}[[:space:]]+'; then
+                break
+            fi
+            if echo "$line" | grep -qE '^[[:space:]]*[-*][[:space:]]+\[.+\]\([^)]+\)'; then
+                count=$((count + 1))
+            fi
+        fi
+    done < "$file"
+
+    if [ "$found_index" -eq 0 ]; then
+        count=$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[.+\]\([^)]+\)' "$file" 2>/dev/null || echo 0)
+    fi
+
+    echo "$count"
 }
 
 # ---------------------------------------------------------------------------
@@ -358,8 +396,8 @@ run_c2() {
         count_claims=$(grep -oE "$count_pattern" "$full_path" 2>/dev/null || true)
         [ -z "$count_claims" ] && continue
 
-        # 统计该文件中的列表项链接数
-        actual_count=$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[.+\]\([^)]+\)' "$full_path" 2>/dev/null || echo 0)
+        # 统计该文件目录索引（或 Directory Index）中的列表项链接数
+        actual_count="$(count_directory_index_links "$full_path")"
 
         # 处理每个计数声明
         echo "$count_claims" | while IFS= read -r claim; do
@@ -386,7 +424,7 @@ run_c2() {
                     resolved_sub="$(resolve_relative_path "$base_dir" "$sub_path")"
 
                     if [ -f "$PROJECT_ROOT/$resolved_sub" ]; then
-                        scope_count=$(grep -cE '^[[:space:]]*[-*][[:space:]]+\[.+\]\([^)]+\)' "$PROJECT_ROOT/$resolved_sub" 2>/dev/null || echo 0)
+                        scope_count="$(count_directory_index_links "$PROJECT_ROOT/$resolved_sub")"
                         scope_desc="$resolved_sub"
                     fi
                 fi
