@@ -38,6 +38,25 @@
 - 已有项目：模拟用户在默认能力基础上追加 GitHub PR、分支保护、版本保护和质量工具，明确跳过 release-please，并确认 merge 既有 hook。
 - 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg`、`pre-push` main 分支保护和 release tag 保护。
 - 融合行为：验证已有项目中的 `CLAUDE.md`、根 `AGENTS.md` 断链和孤儿旧文档在用户确认后被修复并纳入渐进式文档索引。
+- 双语部署：分别部署默认中文与 `--locale en` 英文产物，使用 [helpers/compare-i18n-deployments.sh](helpers/compare-i18n-deployments.sh) 验证真实治理产物只有语言差异，且 Git 约束存在、GitHub 约束不存在。
+
+### Claude CLI 本地 Smoke
+
+位置：`tests/smoke/claude-i18n-deploy-smoke.sh`
+
+该脚本沉淀真实 Claude Code CLI 交互测试方式：创建两个空目录，分别通过 `/dayu-harness` 部署中文和英文，保留默认 Git 约束，不启用任何 GitHub 约束，最后复用同一个比较器检查双语产物等价性。
+
+它依赖本机 Claude 登录态、网络和权限提示，不进入默认 CI。需要显式开启：
+
+```bash
+RUN_CLAUDE_I18N_SMOKE=1 tests/smoke/claude-i18n-deploy-smoke.sh
+```
+
+如需让 Bats 一并运行真实 Claude CLI smoke：
+
+```bash
+RUN_CLAUDE_I18N_SMOKE=1 bats tests/unit/test-skill-interaction-e2e.bats
+```
 
 ## 运行方式
 
@@ -46,6 +65,14 @@
 ```bash
 bats tests/unit/test-skill-interaction-e2e.bats
 ```
+
+单独运行 i18n 漂移契约检查：
+
+```bash
+bash scripts/check-i18n-drift.sh --json
+```
+
+该检查会验证英文镜像是否保持中文源的 Markdown 格式结构，包括 README、`templates/` 与 `templates.en/` 的文件树、标题层级、列表层级、表格、引用、代码块和链接行。
 
 运行完整维护者测试：
 

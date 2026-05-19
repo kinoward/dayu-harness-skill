@@ -149,6 +149,32 @@ teardown() {
     echo "$output" | jq -e '.summary.failed >= 1'
 }
 
+@test "check-consistency accepts English Optional marker for missing optional doc" {
+    local project_dir="$TEST_DIR/broken-optional-en"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [Missing optional doc](docs/design-docs/does-not-exist.md) Optional: ai.execution" >> "$project_dir/AGENTS.md"
+    run bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$project_dir"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.summary.failed == 0'
+}
+
+@test "audit --json accepts English Optional marker for missing optional doc" {
+    local project_dir="$TEST_DIR/audit-json-broken-optional-en"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply
+    [ "$status" -eq 0 ]
+
+    echo "- [Missing optional doc](docs/design-docs/does-not-exist.md) Optional: ai.execution" >> "$project_dir/AGENTS.md"
+
+    run bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$project_dir"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.summary.failed == 0'
+    echo "$output" | jq -e '.results | any(.check == "AGENTS.md 链接: docs/design-docs/does-not-exist.md" and .status == "pass" and (.detail | contains("可选能力未部署，跳过断链检查")) )'
+}
+
 @test "audit.sh --json fails on non-optional broken root AGENTS link" {
     local project_dir="$TEST_DIR/json-root-broken-nonoptional"
     mkdir -p "$project_dir"

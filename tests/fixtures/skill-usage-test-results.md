@@ -114,6 +114,28 @@ knowledge.research, project.context, knowledge.archive
 - 回放 AI 问答后的能力选择，并验证旧 id 兼容展开。
 - 验证 dry-run、apply、merge、部署后检查和语义融合后的结果。
 - 验证原子能力边界：未启用的 hook、workflow、ruleset 或 release-please 文件不会被误部署。
+- 验证默认中文部署与英文部署的治理产物等价性：文件树一致、Git 约束存在、GitHub 约束不存在、部署后检查结果一致，非语言机器文件保持一致。
+
+## Claude CLI 双语部署 Smoke 基线
+
+该基线来自真实 Claude Code CLI 交互测试，已沉淀为 [claude-i18n-deploy-smoke.sh](../smoke/claude-i18n-deploy-smoke.sh) 和 [compare-i18n-deployments.sh](../helpers/compare-i18n-deployments.sh)。
+
+测试意图：
+
+- 新建两个空临时目录。
+- 通过 Claude Code CLI 执行 `/dayu-harness`。
+- 一个目录选择中文 `zh-CN`，另一个目录明确选择英文 `en`。
+- 保留默认 Git 约束，包括 `.husky/commit-msg`、`commitlint.config.cjs`、`.gitignore`。
+- 不启用任何 `github.*` 约束，根目录不得生成 `.github/`。
+- 部署后运行 `validate.sh --json`、`audit.sh --json`、`check-consistency.sh --json`。
+- 排除 `.git/`、`node_modules/`、Claude 日志和交互记录后，比较两套治理产物是否只有语言差异。
+
+默认 CI 不直接运行 Claude CLI，因为它依赖本机认证、网络和权限提示。维护者需要显式开启：
+
+```bash
+RUN_CLAUDE_I18N_SMOKE=1 tests/smoke/claude-i18n-deploy-smoke.sh
+RUN_CLAUDE_I18N_SMOKE=1 bats tests/unit/test-skill-interaction-e2e.bats
+```
 
 运行方式：
 
