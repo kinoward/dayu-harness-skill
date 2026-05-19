@@ -541,11 +541,11 @@ expected_agents_h1() {
     [ "$status" -eq 0 ]
 }
 
-@test "environment preflight policy is documented across Q&A/Skill/README/maintenance" {
+@test "environment preflight policy is documented across Skill maintenance surfaces" {
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/SKILL.md"
-    grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/README.md"
     grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    ! grep -Eq 'ensure-environment\.sh .*--check|ensure-environment\.sh --check' "$REPO_ROOT/README.md"
     grep -q -- '--capabilities' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -q "缺失依赖" "$REPO_ROOT/templates/docs/harness/maintenance.md"
     grep -q "git init" "$REPO_ROOT/templates/docs/harness/maintenance.md"
