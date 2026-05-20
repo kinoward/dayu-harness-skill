@@ -34,7 +34,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 项目已有完整体系，用户要求检查完整性 → 进入诊断模式
 - 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问；默认治理与 Git 能力不作为是否启用的问题，只在已有配置需要合并策略时确认
 - 所有面向用户的提问和选项必须中英双语展示，格式为中文在前、英文在后；选项使用 `[1] 中文 / English`，默认项写明 `（默认，推荐）/ (default, recommended)`
-- 可选的 GitHub 仓库设置/Issue/PR/TDD/发布能力默认只输出配置、策略文件和执行说明，不直接调用 GitHub API 修改仓库远端设置；是否应用远端变更由用户在目标仓库确认。
+- 可选的 `github.repository-settings` 在用户选择启用并进入 `scaffold.sh --apply` 后，会直接调用 GitHub API 同步 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；dry-run 只预览，不修改远端。Issue/PR/TDD/发布能力仍以配置、策略文件、工作流和说明为主。
 - 部署/融合前统一执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`；尚未确定可选能力时不传 `--capabilities`，脚本按默认必选能力检查。若返回 `needs_install`、`needs_initialization` 或 `needs_user_action`，先向用户展示安装/初始化建议并确认；若用户拒绝，当前流程终止
 - 任何涉及已有配置的操作，按能力清单中的可管理项/联动组件逐项处理：installer-backed 组件（如 husky hook 片段、`.gitignore`）先走 manifest installer 的 `--check`；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置文件、`.github/workflows`、ruleset JSON）改用 `scaffold.sh --dry-run` 输出变更预览；若可提供现有文件与目标文件对，优先调用 `diff-helper.sh merge-plan <existing> <incoming>`；否则继续基于 `scaffold.sh --dry-run` 做人工确认
 - **不覆盖已有配置**，必须经用户确认

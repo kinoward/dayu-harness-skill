@@ -1,7 +1,7 @@
 {
   "id": "github.repository-settings",
   "description": "Repository pull request automation settings",
-  "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置。",
+  "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置，并在 apply 阶段同步远端设置。",
   "default": false,
   "dependencies": [
     "core"
@@ -22,7 +22,7 @@
   "acceptance": [
     "Repository pull request settings file exists",
     "Repository settings guide exists",
-    "Repository auto-merge and delete-branch-on-merge are enabled"
+    "Repository auto-merge and delete-branch-on-merge are enabled through GitHub API during apply"
   ],
   "suggested_when": "Enable when release automation requires deterministic PR merge behavior.",
   "template_files_i18n": {

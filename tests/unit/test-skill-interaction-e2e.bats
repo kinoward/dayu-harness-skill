@@ -48,9 +48,23 @@ EOF
 if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
   exit 0
 fi
+if [ "${1:-}" = "repo" ] && [ "${2:-}" = "view" ]; then
+  printf '%s\n' "kinoward/dayu-harness-skill-test"
+  exit 0
+fi
+if [ "${1:-}" = "api" ]; then
+  if [ -n "${DAYU_HARNESS_GH_CALL_LOG:-}" ]; then
+    printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
+  fi
+  if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
+    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+  fi
+  exit 0
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/gh"
+    export DAYU_HARNESS_GH_CALL_LOG="$TEST_DIR/gh-calls.log"
 
     export PATH="$WRAPPER_DIR:$PATH"
 }
@@ -185,6 +199,8 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.delivery --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
+	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
 	    assert_path "$project_dir/.github/workflows/pr-lint.yml"
@@ -208,6 +224,8 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable release.automated --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
+	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/workflows/release-please.yml"
 	    assert_path "$project_dir/.github/release-please-policy.json"

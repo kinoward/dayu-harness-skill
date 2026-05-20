@@ -187,7 +187,7 @@ dayu-harness-skill/
 │   ├── knowledge.research.json                   # 研究资料沉淀能力
 │   ├── knowledge.archive.json                    # 历史归档能力
 │   ├── project.context.json                      # 产品/项目上下文目录能力
-│   ├── github.repository-settings.json           # GitHub 仓库设置策略能力（不直接改动远端）
+│   ├── github.repository-settings.json           # GitHub 仓库设置策略能力（apply 时同步远端）
 │   ├── github.pr.json                            # PR 指南、PR lint 和审查清单能力
 │   ├── github.issue.json                         # Issue 依赖关系与流程能力
 │   ├── github.branch-protection.json             # GitHub 分支保护规则能力

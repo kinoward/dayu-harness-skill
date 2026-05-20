@@ -91,14 +91,17 @@ Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
 
 ## 专项能力提问示例（覆盖 /dayu-harness 关键能力）
 
-- `github.repository-settings`：仓库设置能力不做远端自动修改，只提供配置文件与操作说明。请明确是否需要自动化脚手架同步仓库设置素材。
+- `github.repository-settings`：仓库设置能力在用户选择启用后，会由脚手架直接同步远端 GitHub 仓库设置。请明确说明这一步需要 GitHub CLI 登录和仓库 administration 权限。
 
 ```markdown
-你的仓库有固定的 GitHub 仓库设置策略吗（例如 PR 自动合并、关闭分支、规则执行入口）？
-Do you want the Skill to prepare repository settings policy files and operational steps?
+是否立即启用 GitHub 仓库 PR 设置（PR 自动合并、合并后删除分支）？
+Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)?
 
-这类项只生成配置文件和执行操作说明，不会直接调用 GitHub API 修改远端仓库设置。首次启用后仍需在仓库端手动应用或确认。
-This type of item only creates settings policy files and operation steps; it does not modify GitHub repository settings through API.
+选择启用后，`scaffold.sh --apply` 会直接调用 GitHub API 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；不会再要求后续手动确认。
+After you choose Enable, `scaffold.sh --apply` directly calls the GitHub API to set `allow_auto_merge=true` and `delete_branch_on_merge=true`; no later manual confirmation is required.
+
+执行前必须已通过 `gh auth status`，且当前账号具备目标仓库 administration 权限。
+Before applying, `gh auth status` must pass and the current account must have administration permission on the target repository.
 
 选项 / Options:
 [1] 启用 / Enable
@@ -176,7 +179,7 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.repository-settings` | 是否需要 Skill 生成仓库设置策略文件与操作步骤（仅辅助，不直接修改远端）？<br>Do you want the Skill to prepare repository settings policy files and manual steps (without directly changing remote settings)? | 仅输出仓库设置策略模板与操作说明，用户在仓库端手动应用；无 API 自动修改。 | GitHub 项目 |
+| `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | 部署仓库设置策略模板，并在 `--apply` 阶段直接调用 GitHub API 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；dry-run 只预览。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、signature、troubleshooting index 与 issue closing 位置校验；不限制提交/正文语言。 | GitHub 项目 |
 | `github.issue` | 是否需要 issue 依赖检查，支持 `Depends on: #N` 的顺序组织？<br>Do you need issue dependency checking with `Depends on: #N` ordering support? | 部署 issue lint workflow 与脚本。仅校验依赖顺序标记，不打标签、不评论、不做语言检查。 | GitHub 项目 |
 | `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |

@@ -187,7 +187,7 @@ dayu-harness-skill/
 │   ├── knowledge.research.json                   # Research artifact retention capability
 │   ├── knowledge.archive.json                    # Historical archive capability
 │   ├── project.context.json                      # Product/project context directory capability
-│   ├── github.repository-settings.json           # GitHub repository settings policy capability (no remote auto-editing)
+│   ├── github.repository-settings.json           # GitHub repository settings policy capability (syncs remote on apply)
 │   ├── github.pr.json                            # PR guide, PR lint, and review checklist capability
 │   ├── github.issue.json                         # Issue dependency workflow capability
 │   ├── github.branch-protection.json             # GitHub branch protection rules capability

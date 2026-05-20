@@ -2,7 +2,7 @@
 
 > 可选能力：`github.repository-settings`
 
-本文件说明仓库级 PR 设置如何和项目内治理资产保持一致。Skill 只部署配置文件和操作说明，不会自动修改 GitHub 远端仓库。
+本文件说明仓库级 PR 设置如何和项目内治理资产保持一致。用户在 `/dayu-harness` 问答中选择启用后，`scaffold.sh --apply` 会直接调用 GitHub API 修改目标远端仓库设置；`--dry-run` 只预览，不修改远端。
 
 ## 部署文件
 
@@ -17,9 +17,9 @@
 }
 ```
 
-## 应用到远端
+## 远端应用行为
 
-确认仓库 owner/name 后，由维护者在目标项目中执行：
+启用 `github.repository-settings` 后，脚手架会在 apply 阶段自动执行等价操作：
 
 ```bash
 gh api -X PATCH "repos/<owner>/<repo>" \
@@ -27,11 +27,19 @@ gh api -X PATCH "repos/<owner>/<repo>" \
   -F delete_branch_on_merge=true
 ```
 
-执行前确认：
+执行前必须满足：
 
 - `gh auth status` 已登录目标 GitHub 账号。
 - 当前账号具备仓库 administration 权限。
 - release-please 或其他自动合并流程已经使用 GitHub auto-merge，而不是人工 label gate。
+
+脚手架按以下顺序识别目标仓库：
+
+1. `DAYU_HARNESS_GITHUB_REPOSITORY=owner/repo`
+2. 目标项目的 GitHub `origin` 远端
+3. `gh repo view` 当前仓库识别结果
+
+如需手动重放远端设置，可以在目标项目中执行上面的 `gh api` 命令。
 
 ## 维护规则
 

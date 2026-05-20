@@ -128,6 +128,19 @@ EOF
 if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
   exit 0
 fi
+if [ "${1:-}" = "repo" ] && [ "${2:-}" = "view" ]; then
+  printf '%s\n' "kinoward/dayu-harness-skill-test"
+  exit 0
+fi
+if [ "${1:-}" = "api" ]; then
+  if [ -n "${DAYU_HARNESS_GH_CALL_LOG:-}" ]; then
+    printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
+  fi
+  if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
+    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+  fi
+  exit 0
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/gh"
@@ -135,6 +148,7 @@ EOF
     export BATS_MKTEMP_ROOT="$WORK_DIR/.mktemp"
     mkdir -p "$BATS_MKTEMP_ROOT"
     export WRAPPER_BIN="$WRAPPER_DIR"
+    export DAYU_HARNESS_GH_CALL_LOG="$WORK_DIR/gh-calls.log"
 
     FIXTURE_EMPTY="$WORK_DIR/empty"
     cp -R "$REPO_ROOT/tests/fixtures/empty-project/." "$FIXTURE_EMPTY"
@@ -597,6 +611,14 @@ expected_agents_h1() {
 	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/workflows/issue-lint.yml")] | length == 1'
 	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
 	}
+
+@test "github.repository-settings dry-run plans direct remote settings apply" {
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.repository-settings
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.capabilities | map(.id) | index("github.repository-settings") != null'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="planned" and .allow_auto_merge == true and .delete_branch_on_merge == true)'
+}
 
 	@test "quality.tdd deploys policy and checker script" {
 	    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.tdd

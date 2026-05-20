@@ -638,6 +638,96 @@ collect_installer_entry_dry() {
     DRY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":$safe_strategies,\"needs_strategy\":false,\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
+is_valid_github_repository_full_name() {
+    printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+}
+
+resolve_github_repository_full_name() {
+    local candidate="${DAYU_HARNESS_GITHUB_REPOSITORY:-${GITHUB_REPOSITORY:-}}"
+    candidate="$(trim "$candidate")"
+    if [ -n "$candidate" ] && is_valid_github_repository_full_name "$candidate"; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    local remote_url
+    remote_url="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
+    case "$remote_url" in
+        https://github.com/*)
+            candidate="${remote_url#https://github.com/}"
+            ;;
+        http://github.com/*)
+            candidate="${remote_url#http://github.com/}"
+            ;;
+        git@github.com:*)
+            candidate="${remote_url#git@github.com:}"
+            ;;
+        ssh://git@github.com/*)
+            candidate="${remote_url#ssh://git@github.com/}"
+            ;;
+        *)
+            candidate=""
+            ;;
+    esac
+    candidate="${candidate%.git}"
+    candidate="$(trim "$candidate")"
+    if [ -n "$candidate" ] && is_valid_github_repository_full_name "$candidate"; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+
+    local gh_repo gh_rc
+    set +e
+    gh_repo="$(cd "$TARGET" && gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
+    gh_rc=$?
+    set -e
+    gh_repo="$(trim "$gh_repo")"
+    if [ "$gh_rc" -eq 0 ] && [ -n "$gh_repo" ] && is_valid_github_repository_full_name "$gh_repo"; then
+        printf '%s\n' "$gh_repo"
+        return 0
+    fi
+
+    return 1
+}
+
+collect_repository_settings_remote_entry_dry() {
+    local cap_id="$1"
+    [ "$cap_id" = "github.repository-settings" ] || return 0
+
+    DRY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"planned\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"Apply 阶段会在用户启用该能力后直接调用 GitHub API，同步 allow_auto_merge=true 与 delete_branch_on_merge=true。\"}" )
+}
+
+collect_repository_settings_remote_entry_apply() {
+    local cap_id="$1"
+    [ "$cap_id" = "github.repository-settings" ] || return 0
+
+    local repo_full_name status description api_output api_rc
+    repo_full_name=""
+    status="error"
+    description=""
+    api_output=""
+
+    if ! repo_full_name="$(resolve_github_repository_full_name)"; then
+        APPLY_ERROR=$((APPLY_ERROR + 1))
+        description="无法识别目标 GitHub 仓库 owner/name；请配置 origin 为 GitHub 远端，或设置 DAYU_HARNESS_GITHUB_REPOSITORY=owner/repo 后重试。"
+    else
+        set +e
+        api_output="$(gh api -X PATCH "repos/$repo_full_name" -F allow_auto_merge=true -F delete_branch_on_merge=true 2>&1)"
+        api_rc=$?
+        set -e
+
+        if [ "$api_rc" -eq 0 ]; then
+            status="applied"
+            description="已通过 GitHub API 同步仓库设置：allow_auto_merge=true, delete_branch_on_merge=true。"
+        else
+            APPLY_ERROR=$((APPLY_ERROR + 1))
+            description="GitHub API 同步仓库设置失败：$api_output"
+        fi
+    fi
+
+    APPLY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/$(json_escape "$repo_full_name")\",\"status\":\"$(json_escape "$status")\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"$(json_escape "$description")\"}" )
+}
+
 collect_installer_entry_apply() {
     local manifest_path="$1"
     local cap_id="$2"
@@ -820,6 +910,7 @@ do_dry_run() {
         collect_file_entries "$manifest_path" "template" "dry"
         collect_file_entries "$manifest_path" "asset" "dry"
         collect_installer_entry_dry "$manifest_path" "$cap_id"
+        collect_repository_settings_remote_entry_dry "$cap_id"
 
         local cap_new=$((DRY_NEW - pre_new))
         local cap_existing=$((DRY_EXISTING - pre_existing))
@@ -1022,6 +1113,7 @@ JSONEOF
             collect_file_entries "$manifest_path" "template" "apply"
             collect_file_entries "$manifest_path" "asset" "apply"
             collect_installer_entry_apply "$manifest_path" "$cap_id" "$effective_strategy"
+            collect_repository_settings_remote_entry_apply "$cap_id"
         else
             collect_file_entries_blocked "$manifest_path" "template" "$strategy_state" "$blocked_desc"
             collect_file_entries_blocked "$manifest_path" "asset" "$strategy_state" "$blocked_desc"
