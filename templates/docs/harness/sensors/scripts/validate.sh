@@ -93,6 +93,176 @@ log_text() {
     fi
 }
 
+check_json_file() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+    local err=""
+
+    if [ -f "$file_path" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            if jq -e . "$file_path" >/dev/null 2>&1; then
+                record_check "$item" "pass" "${rel_path} JSON 语法有效"
+                log_text "  ✓ ${rel_path} JSON 语法有效"
+            else
+                err="$(jq -e . "$file_path" 2>&1 | sed -n '1,1p' || true)"
+                record_check "$item" "fail" "${rel_path} JSON 语法错误: ${err:-未知}"
+                log_text "  ✗ ${rel_path} JSON 语法错误: ${err:-未知}"
+            fi
+        elif command -v python3 >/dev/null 2>&1; then
+            if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file_path" >/dev/null 2>&1; then
+                record_check "$item" "pass" "${rel_path} JSON 语法有效"
+                log_text "  ✓ ${rel_path} JSON 语法有效"
+            else
+                err="$(python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file_path" 2>&1 | sed -n '1,1p' || true)"
+                record_check "$item" "fail" "${rel_path} JSON 语法错误: ${err:-未知}"
+                log_text "  ✗ ${rel_path} JSON 语法错误: ${err:-未知}"
+            fi
+        else
+            record_check "$item" "skip" "缺少 jq/python3，跳过 ${rel_path} JSON 语法校验"
+            log_text "  - 缺少 jq/python3，跳过 ${rel_path} JSON 语法校验"
+        fi
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} 缺失（功能可能未正确部署）"
+            log_text "  ✗ ${rel_path} 缺失（功能可能未正确部署）"
+        else
+            record_check "$item" "skip" "${rel_path} 未部署（按可选能力处理）"
+            log_text "  - ${rel_path} 未部署（按可选能力处理）"
+        fi
+    fi
+}
+
+check_pull_request_settings_json() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+
+    if [ -f "$file_path" ]; then
+        local allow_auto_merge
+        local delete_branch_on_merge
+        local parse_error=""
+
+        if command -v jq >/dev/null 2>&1; then
+            allow_auto_merge="$(jq -r '.allow_auto_merge // empty' "$file_path" 2>/dev/null || true)"
+            delete_branch_on_merge="$(jq -r '.delete_branch_on_merge // empty' "$file_path" 2>/dev/null || true)"
+            if ! jq -e . "$file_path" >/dev/null 2>&1; then
+                parse_error="JSON 语法错误"
+            fi
+        elif command -v python3 >/dev/null 2>&1; then
+            local settings_json
+            settings_json="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print("%s %s" % (str(data.get("allow_auto_merge")).lower(), str(data.get("delete_branch_on_merge")).lower()))' "$file_path" 2>/dev/null || true)"
+            allow_auto_merge="$(echo "$settings_json" | awk '{print $1}')"
+            delete_branch_on_merge="$(echo "$settings_json" | awk '{print $2}')"
+            if [ -z "$settings_json" ]; then
+                parse_error="JSON 语法错误"
+            fi
+        else
+            record_check "$item" "skip" "缺少 jq/python3，跳过 ${rel_path} 仓库设置严格校验"
+            log_text "  - 缺少 jq/python3，跳过 ${rel_path} 仓库设置严格校验"
+            return
+        fi
+
+        if [ -n "$parse_error" ]; then
+            record_check "$item" "fail" "${rel_path} 配置解析失败（${parse_error}）"
+            log_text "  ✗ ${rel_path} 配置解析失败（${parse_error}）"
+            return
+        fi
+
+        if [ "$allow_auto_merge" != "true" ] || [ "$delete_branch_on_merge" != "true" ]; then
+            local failures=""
+            [ "$allow_auto_merge" != "true" ] && failures="allow_auto_merge=true"
+            [ "$delete_branch_on_merge" != "true" ] && failures="${failures:+$failures, }delete_branch_on_merge=true"
+            record_check "$item" "fail" "${rel_path} 未满足仓库级自动合并策略：${failures}"
+            log_text "  ✗ ${rel_path} 未满足仓库级自动合并策略：${failures}"
+            return
+        fi
+
+        record_check "$item" "pass" "${rel_path} 自动合并与删除分支设置正确"
+        log_text "  ✓ ${rel_path} 自动合并与删除分支设置正确"
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} 缺失（功能可能未正确部署）"
+            log_text "  ✗ ${rel_path} 缺失（功能可能未正确部署）"
+        else
+            record_check "$item" "skip" "${rel_path} 未部署（按可选能力处理）"
+            log_text "  - ${rel_path} 未部署（按可选能力处理）"
+        fi
+    fi
+}
+
+check_python_script() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+
+    if [ -f "$file_path" ]; then
+        if command -v python3 >/dev/null 2>&1; then
+            if python3 -m py_compile "$file_path" >/dev/null 2>&1; then
+                record_check "$item" "pass" "${rel_path} Python 语法有效"
+                log_text "  ✓ ${rel_path} Python 语法有效"
+            else
+                local err
+                err="$(python3 -m py_compile "$file_path" 2>&1 | sed -n '1,1p' || true)"
+                record_check "$item" "fail" "${rel_path} Python 语法错误: ${err:-未知}"
+                log_text "  ✗ ${rel_path} Python 语法错误: ${err:-未知}"
+            fi
+        else
+            record_check "$item" "skip" "缺少 python3，跳过 ${rel_path} 语法校验"
+            log_text "  - 缺少 python3，跳过 ${rel_path} 语法校验"
+        fi
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} 缺失（功能可能未正确部署）"
+            log_text "  ✗ ${rel_path} 缺失（功能可能未正确部署）"
+        else
+            record_check "$item" "skip" "${rel_path} 未部署（按可选能力处理）"
+            log_text "  - ${rel_path} 未部署（按可选能力处理）"
+        fi
+    fi
+}
+
+check_workflow_file() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+
+    if [ -f "$file_path" ]; then
+        if command -v python3 >/dev/null 2>&1; then
+            if ! python3 -c "import yaml" >/dev/null 2>&1; then
+                record_check "$item" "skip" "缺少 python3 yaml 库，跳过 ${rel_path} YAML 语法校验"
+                log_text "  - 缺少 python3 yaml 库，跳过 ${rel_path} YAML 语法校验"
+                return
+            fi
+
+            if python3 -c "import yaml; yaml.safe_load(open('$file_path'))" >/dev/null 2>&1; then
+                record_check "$item" "pass" "${rel_path} YAML 语法有效"
+                log_text "  ✓ ${rel_path} YAML 语法有效"
+            else
+                local yaml_err
+                yaml_err="$(python3 -c "import yaml; yaml.safe_load(open('$file_path'))" 2>&1 | sed -n '1,1p' || true)"
+                record_check "$item" "fail" "${rel_path} YAML 语法错误: ${yaml_err:-未知}"
+                log_text "  ✗ ${rel_path} YAML 语法错误: ${yaml_err:-未知}"
+            fi
+        else
+            record_check "$item" "skip" "缺少 python3，跳过 ${rel_path} YAML 语法校验"
+            log_text "  - 缺少 python3，跳过 ${rel_path} YAML 语法校验"
+        fi
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} 缺失（功能可能未正确部署）"
+            log_text "  ✗ ${rel_path} 缺失（功能可能未正确部署）"
+        else
+            record_check "$item" "skip" "${rel_path} 未部署（按可选能力处理）"
+            log_text "  - ${rel_path} 未部署（按可选能力处理）"
+        fi
+    fi
+}
+
 # ---- 主逻辑 ----
 
 if [ "$JSON_MODE" = false ]; then
@@ -196,7 +366,73 @@ else
     log_text "  - .github/workflows/ 目录不存在（可能未启用 CI）"
 fi
 
-# 4. 校验 ESLint 配置
+# 4. 校验 GitHub 资产（JSON + 脚本）
+log_text "--- GitHub assets ---"
+if [ -f "$PROJECT_ROOT/.github/workflows/issue-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/issue_depends_on.py" ]; then
+    check_workflow_file "repo-workflow/issue-lint" ".github/workflows/issue-lint.yml" required
+    check_python_script "repo-script/issue_depends_on.py" ".github/scripts/issue_depends_on.py" required
+else
+    record_check "repo-workflow/issue-lint" "skip" "issue-lint 工作流未部署（按可选能力处理）"
+    record_check "repo-script/issue_depends_on.py" "skip" "issue 依赖检查脚本未部署（按可选能力处理）"
+    log_text "  - issue-lint 工作流与脚本未部署（按可选能力处理）"
+fi
+
+if [ -f "$PROJECT_ROOT/.github/workflows/pr-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_body_structure.py" ]; then
+    check_workflow_file "repo-workflow/pr-lint" ".github/workflows/pr-lint.yml" required
+    check_python_script "repo-script/pr-body-structure.py" ".github/scripts/pr_body_structure.py" required
+else
+    record_check "repo-workflow/pr-lint" "skip" "pr-lint 工作流未部署（按可选能力处理）"
+    record_check "repo-script/pr-body-structure.py" "skip" "PR body 结构检查脚本未部署（按可选能力处理）"
+    log_text "  - pr-lint 工作流与 PR body 结构检查脚本未部署（按可选能力处理）"
+fi
+
+check_json_file "repo-config/pull-request-settings" ".github/repository/pull-request-settings.json"
+check_pull_request_settings_json "repo-config/pull-request-settings-auto" ".github/repository/pull-request-settings.json"
+
+if [ -f "$PROJECT_ROOT/.github/workflows/release-please.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/release_please_policy.py" ] || [ -f "$PROJECT_ROOT/.github/release-please-policy.json" ] || [ -f "$PROJECT_ROOT/release-please-config.json" ] || [ -f "$PROJECT_ROOT/.release-please-manifest.json" ]; then
+    check_json_file "release/repository-settings-policy" ".github/release-please-policy.json" required
+    check_json_file "release/release-please-config" "release-please-config.json" required
+    check_json_file "release/release-please-manifest" ".release-please-manifest.json" required
+    check_workflow_file "release/workflow" ".github/workflows/release-please.yml" required
+    check_python_script "release/release-please-policy-script" ".github/scripts/release_please_policy.py" required
+    if [ -f "$PROJECT_ROOT/.github/scripts/release_please_policy.py" ] && [ -f "$PROJECT_ROOT/.github/release-please-policy.json" ]; then
+        if command -v python3 >/dev/null 2>&1; then
+            if (cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" ".") >/dev/null 2>&1; then
+                record_check "release/release-please-policy" "pass" "release-please 策略校验通过"
+                log_text "  ✓ release-please 策略校验通过"
+            else
+                policy_err="$(cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" "." 2>&1 | sed -n '1,3p' | tr '\n' ' ' || true)"
+                record_check "release/release-please-policy" "fail" "release-please 策略校验失败: ${policy_err:-未知}"
+                log_text "  ✗ release-please 策略校验失败: ${policy_err:-未知}"
+            fi
+        else
+            record_check "release/release-please-policy" "skip" "缺少 python3，跳过 release-please 策略执行校验"
+            log_text "  - 缺少 python3，跳过 release-please 策略执行校验"
+        fi
+    else
+        record_check "release/release-please-policy" "fail" "release-please 策略文件或脚本缺失"
+        log_text "  ✗ release-please 策略文件或脚本缺失"
+    fi
+else
+    record_check "release/repository-settings-policy" "skip" "release-please 策略未部署（按可选能力处理）"
+    record_check "release/release-please-config" "skip" "release-please 配置未部署（按可选能力处理）"
+    record_check "release/release-please-manifest" "skip" "release-please manifest 未部署（按可选能力处理）"
+    record_check "release/workflow" "skip" "release-please 工作流未部署（按可选能力处理）"
+    record_check "release/release-please-policy-script" "skip" "release-please 策略脚本未部署（按可选能力处理）"
+    record_check "release/release-please-policy" "skip" "release-please 策略执行校验未部署（按可选能力处理）"
+    log_text "  - release-please 相关资产未部署（按可选能力处理）"
+fi
+
+if [ -f "$PROJECT_ROOT/.github/dayu-harness/pr-tdd-policy.json" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_tdd_check.py" ]; then
+    check_json_file "quality/pr-tdd-policy" ".github/dayu-harness/pr-tdd-policy.json" required
+    check_python_script "quality/pr-tdd-check-script" ".github/scripts/pr_tdd_check.py" required
+else
+    record_check "quality/pr-tdd-policy" "skip" "TDD 策略未部署（按可选能力处理）"
+    record_check "quality/pr-tdd-check-script" "skip" "TDD 检查脚本未部署（按可选能力处理）"
+    log_text "  - TDD 策略与脚本未部署（按可选能力处理）"
+fi
+
+# 5. 校验 ESLint 配置
 log_text "--- ESLint ---"
 eslint_found=false
 eslint_file=""
@@ -215,7 +451,7 @@ else
     log_text "  - ESLint 配置文件不存在（可能未启用）"
 fi
 
-# 5. 校验 Prettier 配置
+# 6. 校验 Prettier 配置
 log_text "--- Prettier ---"
 prettier_found=false
 prettier_file=""
@@ -234,7 +470,7 @@ else
     log_text "  - Prettier 配置文件不存在（可能未启用）"
 fi
 
-# 6. 校验 .gitignore
+# 7. 校验 .gitignore
 log_text "--- .gitignore ---"
 if [ -f "$PROJECT_ROOT/.gitignore" ]; then
     record_check ".gitignore" "pass" ".gitignore 存在"

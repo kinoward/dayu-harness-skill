@@ -238,6 +238,9 @@ fi
 if contains_capability "github.pr"; then
     requires_python3=true
 fi
+if contains_capability "github.issue" || contains_capability "quality.tdd"; then
+    requires_python3=true
+fi
 if has_capability_prefix "github." || contains_capability "release.versioning"; then
     requires_gh=true
 fi

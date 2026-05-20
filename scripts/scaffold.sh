@@ -274,10 +274,10 @@ map_legacy_category() {
             echo "quality.practices project.gitignore quality.node-tooling"
             ;;
         github.delivery)
-            echo "git.commit-format github.pr github.branch-protection"
+            echo "git.commit-format github.repository-settings github.issue github.pr github.branch-protection"
             ;;
         release.automated)
-            echo "release.versioning github.release-please"
+            echo "github.repository-settings release.versioning github.release-please"
             ;;
         *)
             echo "$1"

@@ -396,7 +396,10 @@ expected_agents_h1() {
             echo "missing manifest source: $source_path"
             return 1
         }
-    done < <(jq -r '.template_files[]?.src, .asset_files[]?.src' "$REPO_ROOT"/capabilities/*.json)
+    done < <(
+        jq -r '.template_files[]?.src, .asset_files[]?.src, (.template_files_i18n? // {} | .. | objects | select(has("src")) | .src)' \
+            "$REPO_ROOT"/capabilities/*.json
+    )
 
     while IFS= read -r installer_script; do
         [ -z "$installer_script" ] && continue
@@ -430,6 +433,7 @@ expected_agents_h1() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/AGENTS.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/generated/AGENTS.md")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/product-specs/project-status.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/audit.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/check-consistency.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/diff-helper.sh")] | length == 1'
@@ -557,12 +561,12 @@ expected_agents_h1() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.mode == "dry-run"'
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning"]'
-    echo "$output" | jq -e '.capability_count == 14'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","github.repository-settings","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning"]'
+    echo "$output" | jq -e '.capability_count == 15'
 }
 
-@test "legacy capability ids and presets expand to new capability set" {
-    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,github.branch-release,quality.tooling,ai.collaboration,project.docs,archive.project
+	@test "legacy capability ids and presets expand to new capability set" {
+	    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,github.branch-release,quality.tooling,ai.collaboration,project.docs,archive.project
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices","release.versioning"]'
@@ -570,16 +574,42 @@ expected_agents_h1() {
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.delivery
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","github.pr","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore"]'
-    echo "$output" | jq -e '.capability_count == 13'
+    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.branch-protection","github.issue","github.pr","github.repository-settings","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore"]'
+    echo "$output" | jq -e '.capability_count == 15'
 
-    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.standard
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable release.automated
     [ "$status" -eq 0 ]
-    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices"]'
-    echo "$output" | jq -e '.capability_count == 13'
-}
+	    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","github.release-please","github.repository-settings","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","release.versioning"]'
+	    echo "$output" | jq -e '.capability_count == 15'
 
-@test "legacy language IDs are rejected as unknown capability" {
+	    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.standard
+	    [ "$status" -eq 0 ]
+	    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices"]'
+	    echo "$output" | jq -e '.capability_count == 13'
+	}
+
+	@test "github.issue does not auto-deploy PR lint workflow" {
+	    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.issue
+
+	    [ "$status" -eq 0 ]
+	    echo "$output" | jq -e '.capabilities | map(.id) | index("github.issue") != null'
+	    echo "$output" | jq -e '.capabilities | map(.id) | index("github.pr") | not'
+	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/workflows/issue-lint.yml")] | length == 1'
+	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
+	}
+
+	@test "quality.tdd deploys policy and checker script" {
+	    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable quality.tdd
+
+	    [ "$status" -eq 0 ]
+	    echo "$output" | jq -e '.capabilities | map(.id) | index("quality.tdd") != null'
+	    echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","github.pr","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.tdd"]'
+	    echo "$output" | jq -e '.capability_count == 13'
+	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/dayu-harness/pr-tdd-policy.json")] | length == 1'
+	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/scripts/pr_tdd_check.py")] | length == 1'
+	}
+
+	@test "legacy language IDs are rejected as unknown capability" {
     run bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable git.commit,repo.language
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown capability 'repo.language'"* ]]
@@ -880,6 +910,96 @@ expected_agents_h1() {
     echo "$output" | jq -e '.summary.passed | type == "number"'
 }
 
+@test "validate flags invalid pull-request settings flags" {
+    local target="$WORK_DIR/validate-pull-request-settings-invalid"
+    mkdir -p "$target/.github/repository"
+    cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
+{
+  "allow_auto_merge": true,
+  "delete_branch_on_merge": false
+}
+JSON
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="fail" and (.detail | contains("delete_branch_on_merge=true")))'
+}
+
+@test "validate passes valid pull-request settings flags" {
+    local target="$WORK_DIR/validate-pull-request-settings-valid"
+    mkdir -p "$target/.github/repository"
+    cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
+{
+  "allow_auto_merge": true,
+  "delete_branch_on_merge": true
+}
+JSON
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="pass")'
+    echo "$output" | jq -e '.summary.failed == 0'
+}
+
+@test "validate reports release-please policy failures as structured JSON" {
+    local target="$WORK_DIR/validate-release-policy-invalid"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$target/.release-please-manifest.json"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+
+    awk '
+        $0 == "  workflow_dispatch:" {
+            print "      - \"docs/**\""
+        }
+        { print }
+    ' "$target/.github/workflows/release-please.yml" > "$target/.github/workflows/release-please.yml.tmp"
+    mv "$target/.github/workflows/release-please.yml.tmp" "$target/.github/workflows/release-please.yml"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e 'has("checks") and has("summary") and has("description_nl")'
+    echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy" and .status=="fail" and (.detail | contains("unexpected push paths: docs/**")))'
+}
+
+@test "release-please policy includes PR lint workflow for release safety scanning" {
+    jq -e '.workflow.additional_workflows | type == "array"' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.additional_workflows | index(".github/workflows/pr-lint.yml")' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.allowed_actors_variable == "RELEASE_PLEASE_ALLOWED_ACTORS"' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.require_allowed_actors_reference == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.label_gate_required == false' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_pr.branch_prefix == "release-please--"' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_pr.title_pattern == "Release ${version}"' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_pr.allowed_paths | length > 0' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_pr.allowed_paths | index("CHANGELOG.md")' "$REPO_ROOT/assets/github/release-please-policy.json"
+}
+
+@test "release-please documentation lists manifest dependencies and policy assets" {
+    local zh_dependency='依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`'
+    local en_dependency='depends on `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`'
+
+    grep -Fq "$zh_dependency" "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -Fq "$en_dependency" "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
+    grep -Fq 'GitHub + `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`' "$REPO_ROOT/Q&A-TEMPLATE.md"
+
+    grep -Fq '.github/release-please-policy.json' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -Fq '.github/release-please-policy.json' "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
+    grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
+    grep -Fq '.github/release-please-policy.json' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/Q&A-TEMPLATE.md"
+}
+
+@test "maintenance docs align quality.tdd applicability conditions" {
+    grep -Eq '\| `quality.tdd` \| .* \| .* \| .* \| 通用代码项目 \|' "$REPO_ROOT/templates/docs/harness/maintenance.md"
+    grep -Eq '\| `quality.tdd` \| .* \| .* \| .* \| Code projects \|' "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
+}
+
 @test "check-consistency --json returns expected schema" {
     run_with_wrapper bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/check-consistency.sh" --json "$FIXTURE_EMPTY"
 
@@ -1124,8 +1244,474 @@ EOF
 
 @test "PR lint workflow explicitly skips release-please PRs" {
     grep -q 'Detect release-please PR' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
-    grep -q 'release-please--' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'branch_prefix' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'title_pattern' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'allowed_paths' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'base_ref == default_branch' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'repo_full_name' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     grep -q "steps.detect-release-please.outputs.skip != 'true'" "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'HAS_AUTORELEASE_LABEL' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+}
+
+@test "PR lint release-please detection checks previous_filename as a touched path" {
+    grep -q 'previous_filename' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'touched_file_paths(item)' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'if not files_allowed and disallowed_paths' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'disallowed_paths.append(path)' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'was_candidate_touched(".github/scripts/release_please_policy.py")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'PR candidate release policy script path missing' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'python3 -m py_compile "pr/.github/scripts/release_please_policy.py"' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+}
+
+@test "PR lint compiles candidate release policy script before trusted policy availability check" {
+    run python3 - "$REPO_ROOT/assets/github/workflows/pr-lint.yml" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+compile_pos = text.index('python3 -m py_compile "pr/.github/scripts/release_please_policy.py"')
+candidate_policy_missing_pos = text.index('PR candidate release policy path missing: pr/.github/release-please-policy.json')
+candidate_self_check_pos = text.index('python3 "pr/.github/scripts/release_please_policy.py" "pr/.github/release-please-policy.json" "pr"')
+trusted_guard_pos = text.index('if [ -f "$RELEASE_POLICY_SCRIPT_PATH" ] && [ -f "$RELEASE_POLICY_POLICY_PATH" ]; then')
+if compile_pos > trusted_guard_pos:
+    raise SystemExit("candidate release policy script compile check must run before trusted release policy availability guard")
+if candidate_policy_missing_pos > trusted_guard_pos:
+    raise SystemExit("candidate release policy file existence check must run before trusted release policy availability guard")
+if candidate_self_check_pos < trusted_guard_pos:
+    raise SystemExit("candidate release policy self-check should be in the trusted-missing fallback branch")
+PY
+    [ "$status" -eq 0 ]
+}
+
+@test "validate fails when pr-lint workflow exists without PR body structure script" {
+    local target="$WORK_DIR/validate-pr-body-script-missing"
+    mkdir -p "$target/.github/workflows" "$target/.github"
+
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="fail")'
+}
+
+@test "validate fails when PR body structure script exists without pr-lint workflow" {
+    local target="$WORK_DIR/validate-pr-body-script-only"
+    mkdir -p "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-workflow/pr-lint" and .status=="fail")'
+}
+
+@test "validate passes when pr-lint workflow and PR body structure script are present" {
+    local target="$WORK_DIR/validate-pr-body-script-present"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="pass")'
+}
+
+@test "validate en fails when only pr-lint workflow is present" {
+    local target="$WORK_DIR/validate-pr-body-script-missing-en"
+    mkdir -p "$target/.github/workflows" "$target/.github"
+
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="fail")'
+}
+
+@test "validate en fails when only PR body structure script is present" {
+    local target="$WORK_DIR/validate-pr-body-script-only-en"
+    mkdir -p "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-workflow/pr-lint" and .status=="fail")'
+}
+
+@test "validate en passes when pr-lint workflow and PR body structure script are present" {
+    local target="$WORK_DIR/validate-pr-body-script-present-en"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="pass")'
+}
+
+@test "validate fails when issue lint script exists without workflow" {
+    local target="$WORK_DIR/validate-issue-lint-script-only"
+    mkdir -p "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$target/.github/scripts/issue_depends_on.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-workflow/issue-lint" and .status=="fail")'
+}
+
+@test "validate en fails when issue lint script exists without workflow" {
+    local target="$WORK_DIR/validate-issue-lint-script-only-en"
+    mkdir -p "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$target/.github/scripts/issue_depends_on.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-workflow/issue-lint" and .status=="fail")'
+}
+
+@test "PR lint workflow adds structured gates and excludes retired language checks" {
+    grep -q 'Check PR title' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Check PR body structure' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Fetch PR files and commits' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Troubleshooting index/tldr checks' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Detect candidate policy files in PR' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'candidate-policy-files.outputs.release_policy_candidate' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'candidate-policy-files.outputs.tdd_policy_candidate' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'files_path="${{ steps.detect-release-please.outputs.files_path }}"' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'if [ "$files_path" != "$RUNNER_TEMP/pr-lint-files.json" ]; then' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'if [ "$commits_path" != "$RUNNER_TEMP/pr-lint-commits.json" ]; then' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'entry_still_exists = status not in ("removed", "deleted")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'Troubleshooting AGENTS index must remove deleted entry reference' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'docs/troubleshooting/[^/]+/AGENTS\.md' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'docs/troubleshooting/[^/]+/[^/]+\.md' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'Troubleshooting entry must be referenced in' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 'expected_agents_file = Path("pr") / expected_agents' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -Fq 'AGENTS\\.md' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -Fq '[^/]+\\.md' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Optional release policy check' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Optional TDD policy check' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'pr/.github/release-please-policy.json' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'pr/.github/dayu-harness/pr-tdd-policy.json' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q -- '--validate-policy-only' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'RELEASE_POLICY_POLICY_PATH: trusted/.github/release-please-policy.json' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'TDD_CHECK_POLICY_PATH: trusted/.github/dayu-harness/pr-tdd-policy.json' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'commit_records.sort' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+
+    ! rg -n 'CJK|English only|needs-english|needs english' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+}
+
+@test "PR lint detects sub-commit close/fix closing keywords" {
+    local workflow_file="$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    local pattern
+    pattern="$(python3 - "$workflow_file" <<'PY'
+import sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+marker = 'forbidden_re = re.compile(r"'
+start = text.find(marker)
+if start == -1:
+    raise SystemExit("forbidden_re not found")
+start += len(marker)
+
+end = text.find('", re.IGNORECASE)', start)
+if end == -1:
+    raise SystemExit("forbidden_re expression form not found")
+
+print(text[start:end])
+PY
+    )"
+
+    run python3 - "$pattern" <<'PY'
+import re
+import sys
+
+pattern = sys.argv[1]
+compiled = re.compile(pattern, re.IGNORECASE)
+
+samples = [
+    "Fix #123",
+    "Fixes #124",
+    "closed #123",
+    "Resolves #456",
+    "Refs #789",
+    "close #456",
+    "resolved #101",
+]
+
+for sample in samples:
+    if not compiled.search(sample):
+        print(f"Pattern does not match expected trailer: {sample}", file=sys.stderr)
+        raise SystemExit(1)
+
+print("OK: sub-commit trailer keywords are covered.")
+PY
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: sub-commit trailer keywords are covered."* ]]
+}
+
+@test "Issue lint workflow only validates depends-on trailer" {
+    grep -q 'issue_depends_on.py' "$REPO_ROOT/assets/github/workflows/issue-lint.yml"
+    grep -q 'depends-on line' "$REPO_ROOT/assets/github/workflows/issue-lint.yml"
+
+    ! rg -n 'pr_body_structure|release-policy|tdd-policy|sub-commit|troubleshooting|release-please|language|CJK|English only|needs-english' "$REPO_ROOT/assets/github/workflows/issue-lint.yml"
+}
+
+@test "Release workflow enables merge path + dispatch and enforce merge command" {
+    grep -q 'workflow_dispatch:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'paths:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release-please-config.json' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'gh pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '--auto --merge --delete-branch' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '--repo "$REPO"' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'name: Checkout repository for policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'uses: actions/checkout@v4' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'persist-credentials: false' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'branch_prefix' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'title_pattern' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'allowed_paths' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'base_ref == default_branch' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'head_repo != repo' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'previous_filename = item.get("previous_filename")' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'for path in touched' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'has_autorelease_label' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+}
+
+@test "PR lint troubleshooting sync checks include previous_filename in rename handling" {
+    grep -q 'record_troubleshooting_entry(previous_filename, "deleted")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'previous_filename = item.get("previous_filename", "")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -Fq 're.fullmatch(r"docs/troubleshooting/[^/]+/AGENTS\.md", previous_filename)' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 'Troubleshooting AGENTS index must remove deleted entry reference' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+}
+
+@test "PR lint troubleshooting matcher ignores AGENTS.md entries" {
+    grep -q 'if path.endswith("/AGENTS.md")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+
+    run python3 - "$REPO_ROOT/assets/github/workflows/pr-lint.yml" <<'PY'
+import re
+import textwrap
+import sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+start = text.find('def record_troubleshooting_entry(path: str, status: str) -> None:')
+end = text.find('\n\n          for item in files:', start)
+if start == -1 or end == -1 or end <= start:
+    raise SystemExit("failed to locate record_troubleshooting_entry block")
+
+block = text[start:end]
+if 'path.endswith("/AGENTS.md")' not in block:
+    raise SystemExit("missing AGENTS.md exclusion in troubleshooting entry matcher")
+if 're.fullmatch(r"docs/troubleshooting/[^/]+/[^/]+\\.md", path)' not in block:
+    raise SystemExit("missing troubleshooting entry regex in matcher block")
+
+ns = {
+    "re": re,
+    "changed_entries": [],
+    "changed_agents": set(),
+}
+exec(textwrap.dedent(block), ns)
+
+record_troubleshooting_entry = ns["record_troubleshooting_entry"]
+record_troubleshooting_entry("docs/troubleshooting/api/AGENTS.md", "added")
+if ns["changed_entries"]:
+    raise SystemExit("AGENTS.md should be ignored as troubleshooting entry")
+
+record_troubleshooting_entry("docs/troubleshooting/api/request-timeout.md", "added")
+if ns["changed_entries"] != [("docs/troubleshooting/api/request-timeout.md", "api", True)]:
+    raise SystemExit("regular troubleshooting entry path not recorded correctly")
+PY
+    [ "$status" -eq 0 ]
+}
+
+@test "release-please workflow fails merge step when detection script fails" {
+    run python3 - "$REPO_ROOT/assets/github/workflows/release-please.yml" <<'PY'
+import sys
+
+text = open(sys.argv[1], encoding="utf-8").read()
+required_tokens = [
+    "if ! RELEASE_PLEASE_PRS=\"$(python3 - \"$PR_LIST_FILE\" \"$REPO\" \"$DEFAULT_BRANCH\" <<'PY'",
+    "Failed to detect release-please PR candidates.",
+    "rm -f \"$PR_LIST_FILE\"",
+    ')"; then',
+]
+
+for token in required_tokens:
+    if token not in text:
+        raise SystemExit(f"missing guard token: {token}")
+PY
+    [ "$status" -eq 0 ]
+}
+
+@test "release-please merge detection hard-fails on missing or invalid policy data" {
+    run python3 - "$REPO_ROOT/assets/github/workflows/release-please.yml" <<'PY'
+import re
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+from pathlib import Path
+
+
+def assert_fails(func, label):
+    try:
+        func()
+    except SystemExit as exc:
+        if exc.code == 0:
+            raise SystemExit(f"{label} should fail with non-zero status")
+        return
+    raise SystemExit(f"{label} should fail but did not")
+
+
+workflow_path = Path(sys.argv[1])
+text = workflow_path.read_text(encoding="utf-8")
+
+policy_loader_start = text.index("          import json")
+policy_loader_end = text.index("          policy = load_release_policy(os.getenv(\"RELEASE_PLEASE_POLICY_PATH\", \".github/release-please-policy.json\"))")
+policy_snippet = textwrap.dedent(text[policy_loader_start:policy_loader_end])
+detector_start = text.index("          import fnmatch")
+detector_end = text.index("          PY\n          )\"; then", detector_start)
+detector_snippet = textwrap.dedent(text[detector_start:detector_end])
+detector_functions = detector_snippet[:detector_snippet.index("\npolicy = load_release_policy(")]
+if 'allowed_paths = policy.get("allowed_paths", [])' in detector_snippet:
+    raise SystemExit("release-please detector still defaults missing allowed_paths")
+if "allowed_paths = []" in detector_snippet:
+    raise SystemExit("release-please detector still collapses invalid allowed_paths to an empty list")
+if "release_pr.allowed_paths must be a non-empty array" not in detector_snippet:
+    raise SystemExit("release-please detector must hard-fail on missing or empty allowed_paths")
+if "decoder.raw_decode(raw_content, index)" not in detector_snippet:
+    raise SystemExit("release-please detector must parse full JSON documents, not line-delimited fragments")
+if "def load_release_policy(path):" not in policy_snippet:
+    raise SystemExit("could not locate load_release_policy in release-please workflow")
+policy_func_start = policy_snippet.index("def load_release_policy(path):")
+policy_func_end = policy_snippet.index("def load_release_config(path):")
+policy_block = policy_snippet[policy_func_start:policy_func_end]
+if "return {}" in policy_block:
+    raise SystemExit("load_release_policy still contains permissive fallback")
+
+ns = {}
+ns["sys"] = __import__("sys")
+ns["sys"].argv = ["x", "a", "b", "c"]
+exec(policy_snippet, ns)
+load_release_policy = ns["load_release_policy"]
+
+detector_ns = {}
+detector_ns["sys"] = __import__("sys")
+detector_ns["sys"].argv = ["x", "a", "owner/repo", "main"]
+exec(detector_functions, detector_ns)
+parse_open_prs = detector_ns["parse_open_prs"]
+
+workdir = Path(tempfile.mkdtemp())
+try:
+    list_file = workdir / "prs.jsonl"
+    list_file.write_text("", encoding="utf-8")
+    detector_file = workdir / "release_detector.py"
+    detector_file.write_text(detector_snippet, encoding="utf-8")
+
+    def run_detector(policy_text):
+        policy_path = workdir / "runtime-policy.json"
+        policy_path.write_text(policy_text, encoding="utf-8")
+        env = os.environ.copy()
+        env["RELEASE_PLEASE_POLICY_PATH"] = str(policy_path)
+        env.pop("RELEASE_PLEASE_CONFIG_PATH", None)
+        env.pop("RELEASE_PLEASE_PR_OUTPUT", None)
+        return subprocess.run(
+            [sys.executable, str(detector_file), str(list_file), "owner/repo", "main"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+    missing_policy = workdir / "missing.json"
+    assert_fails(lambda: load_release_policy(str(missing_policy)), "missing policy file")
+
+    dir_path = workdir / "unreadable.json"
+    dir_path.mkdir()
+    assert_fails(lambda: load_release_policy(str(dir_path)), "unreadable policy path")
+
+    invalid_policy = workdir / "invalid.json"
+    invalid_policy.write_text("{", encoding="utf-8")
+    assert_fails(lambda: load_release_policy(str(invalid_policy)), "invalid policy JSON")
+
+    non_object_release_pr = workdir / "non_object.json"
+    non_object_release_pr.write_text("{\"release_pr\": []}", encoding="utf-8")
+    assert_fails(lambda: load_release_policy(str(non_object_release_pr)), "non-object release_pr section")
+
+    wrong_root_type = workdir / "wrong_root.json"
+    wrong_root_type.write_text("[{\"release_pr\": {}}]", encoding="utf-8")
+    assert_fails(lambda: load_release_policy(str(wrong_root_type)), "non-object release-please policy root")
+
+    valid_policy = workdir / "valid.json"
+    valid_policy.write_text(
+        "{\"release_pr\": {\"branch_prefix\": \"release-please--\", \"title_pattern\": \"Release ${version}\", \"allowed_paths\": [\"**\"]}}",
+        encoding="utf-8",
+    )
+    policy = load_release_policy(str(valid_policy))
+    if not isinstance(policy, dict) or policy.get("branch_prefix") != "release-please--":
+        raise SystemExit("valid policy should load as dict")
+
+    pretty_prs = workdir / "pretty-prs.json"
+    pretty_prs.write_text(
+        "[\n"
+        "  {\"number\": 1},\n"
+        "  {\"number\": 2}\n"
+        "]\n",
+        encoding="utf-8",
+    )
+    if [item.get("number") for item in parse_open_prs(pretty_prs)] != [1, 2]:
+        raise SystemExit("parse_open_prs should parse pretty-printed JSON arrays")
+
+    paginated_prs = workdir / "paginated-prs.json"
+    paginated_prs.write_text(
+        "[{\"number\": 3}]\n[{\"number\": 4}]\n",
+        encoding="utf-8",
+    )
+    if [item.get("number") for item in parse_open_prs(paginated_prs)] != [3, 4]:
+        raise SystemExit("parse_open_prs should parse concatenated paginated JSON documents")
+
+    invalid_allowed_paths = [
+        "{}",
+        "{\"release_pr\": {\"allowed_paths\": []}}",
+        "{\"release_pr\": {\"allowed_paths\": \"CHANGELOG.md\"}}",
+        "{\"release_pr\": {\"allowed_paths\": [\"\"]}}",
+    ]
+    for payload in invalid_allowed_paths:
+        result = run_detector(payload)
+        if result.returncode == 0:
+            raise SystemExit(f"invalid allowed_paths should fail: {payload}")
+
+    valid_result = run_detector(
+        "{\"release_pr\": {\"branch_prefix\": \"release-please--\", \"title_pattern\": \"Release ${version}\", \"allowed_paths\": [\"CHANGELOG.md\"]}}"
+    )
+    if valid_result.returncode != 0:
+        raise SystemExit(f"valid allowed_paths should pass: {valid_result.stderr}")
+finally:
+    shutil.rmtree(workdir)
+PY
+    [ "$status" -eq 0 ]
 }
 
 @test "GitHub workflows do not shell-interpolate user-controlled PR or issue text" {
