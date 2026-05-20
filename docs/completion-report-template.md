@@ -21,7 +21,8 @@
 2. 运行 `docs/harness/sensors/scripts/audit.sh --json <project-root>`，确认项目入口、文档索引和维护说明完整。
 3. 运行 `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`，确认文档之间能互相找到，旧文档没有被遗漏。
 4. 如果启用了 Git 约束，抽查提交信息检查和推送保护是否存在且可执行。
-5. 如果某项检查失败，先自行修复可确定的问题，再重新检查；只有需要用户取舍时才把问题交给用户确认。
+5. 如果启用了 GitHub/release 能力，抽查仓库设置策略文件、PR/Issue 检查项是否存在且可执行。
+6. 如果某项检查失败，先自行修复可确定的问题，再重新检查；只有需要用户取舍时才把问题交给用户确认。
 
 ## 汇报原则
 
@@ -49,7 +50,7 @@
 - 这次启用的自动检查可以运行。
 - {如启用 Git 约束：提交规范检查和推送前保护已经生效。}
 - {如启用质量工具：提交前质量与格式化配置已经就绪。}
-- {如启用 GitHub 能力：PR/Issue、分支与发布协作检查已经就位。}
+- {如启用 GitHub/release 能力：仓库设置说明、PR/Issue 检查、分支与发布协作检查已经就位。}
 
 这次没有启用：
 - {未启用能力的自然语言说明，例如“GitHub 发布自动化”，如果没有则省略本段。}
@@ -69,10 +70,13 @@
 | `quality.practices` | 通用开发纪律和测试策略 |
 | `quality.node-tooling` | Node.js 代码质量与格式化工具 |
 | `project.gitignore` | 忽略文件配置 |
+| `github.repository-settings` | 仓库设置策略说明 |
 | `github.pr` | PR/Issue 协作质量护栏 |
 | `github.branch-protection` | 分支保护 |
+| `github.issue` | Issue 依赖关系与顺序约束检查 |
 | `release.versioning` | 版本与标签保护 |
 | `github.release-please` | 自动化版本发布流程 |
+| `quality.tdd` | PR TDD 门禁 |
 | `ai.execution` | AI 执行边界和协作方式 |
 | `ai.memory` | AI 记忆边界与经验沉淀 |
 | `knowledge.adr` | 重要架构决策记录 |

@@ -77,7 +77,7 @@ The target project needs environment preparation first.
 
 Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。只有 GitHub、发布自动化、Node.js 工具等可选能力需要询问。
 
-可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 自定义需求 / Custom request。
+可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 稍后手动 / Configure later manually。某些能力仍可附带 `自定义需求 / Custom request` 分支，但不作为默认选项。
 
 ```markdown
 Q: 是否使用 GitHub 远程托管？
@@ -87,6 +87,71 @@ Q: Do you use GitHub as the remote hosting platform?
 Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
    选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 自定义工具链 / Custom toolchain
+```
+
+## 专项能力提问示例（覆盖 /dayu-harness 关键能力）
+
+- `github.repository-settings`：仓库设置能力不做远端自动修改，只提供配置文件与操作说明。请明确是否需要自动化脚手架同步仓库设置素材。
+
+```markdown
+你的仓库有固定的 GitHub 仓库设置策略吗（例如 PR 自动合并、关闭分支、规则执行入口）？
+Do you want the Skill to prepare repository settings policy files and operational steps?
+
+这类项只生成配置文件和执行操作说明，不会直接调用 GitHub API 修改远端仓库设置。首次启用后仍需在仓库端手动应用或确认。
+This type of item only creates settings policy files and operation steps; it does not modify GitHub repository settings through API.
+
+选项 / Options:
+[1] 启用 / Enable
+[2] 跳过 / Skip
+[3] 稍后手动 / Configure later manually
+```
+
+- `github.pr`：PR 质量治理只关注结构、签名、Troubleshooting 索引与 issue closing 位置；不做语言约束。
+
+```markdown
+是否启用 PR 协作治理（结构化 PR body、提交签名、review 检查与 issue closing 位置）？
+Do you want PR collaboration governance (structured PR body, commit/trailer checks, review checks, and issue-closing location)?
+
+说明：该能力不限制语言，只检查模板结构、签名、troubleshooting 索引、Issue 关闭位置。不会做 PR 全文语言校验。
+Note: This capability does not enforce language. It checks structure, signatures, troubleshooting index linkage, and issue-closing position only.
+
+选项 / Options:
+[1] 启用 / Enable
+[2] 跳过 / Skip
+[3] 稍后手动 / Configure later manually
+```
+
+- `github.issue`：Issues 工作流按 `Depends on: #N` 维护前后置序；不打标签、不评论、不过滤语言。
+
+```markdown
+是否启用 Issue workflow（包含依赖关系校验）？
+Do you want to enable Issue workflow validation (including dependency ordering)?
+
+`Depends on: #N` 只用于人工与自动化判断 Issue 处理顺序，不作为 issue 描述语言规范。
+`Depends on: #N` is only used for humans and automation to determine issue dependency order, not as a language rule.
+
+该能力不自动打标签，不自动发布评论，且不做正文语言检查。
+This capability does not add labels, does not post comments, and does not enforce body language constraints.
+
+选项 / Options:
+[1] 启用 / Enable
+[2] 跳过 / Skip
+[3] 稍后手动 / Configure later manually
+```
+
+- `quality.tdd`：TDD gate 使用策略文件定义路径；未配置路径不应阻断。
+
+```markdown
+是否启用 PR TDD Gate（按策略文件判定测试路径）？
+Do you want to enable PR TDD gate checks driven by a policy file?
+
+TDD 策略只会在配置了检查路径时执行；未配置路径则不拦截。
+TDD checks only run on configured paths; if no paths are configured, no blocking is enforced.
+
+选项 / Options:
+[1] 启用 / Enable
+[2] 跳过 / Skip
+[3] 稍后手动 / Configure later manually
 ```
 
 ## 必选治理能力清单
@@ -104,19 +169,25 @@ Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
 | `knowledge.adr` | 必须有稳定的项目技术决策记录位点，避免关键架构讨论只留在会话里。 | 部署 ADR 目录与模板，作为项目知识/经验的一部分。 | 默认启用 |
 | `knowledge.troubleshooting` | 排障经验必须可复用、可检索。 | 部署排障目录与入口说明，作为项目知识/经验的一部分。 | 默认启用 |
 | `knowledge.research` | 研究结论必须可版本化沉淀，避免重复探索。 | 部署版本化研究目录，作为项目知识/经验的一部分。 | 默认启用 |
-| `project.context` | 必须搭好产品规格与项目上下文文档区，避免需求与实现反复漂移。 | 部署项目内容骨架（产品规格入口）。 | 默认启用 |
+| `project.context` | 必须搭好产品规格与项目上下文文档区，避免需求与实现反复漂移。 | 部署项目内容骨架（产品规格入口）和 `project-status.md` 状态快照。 | 默认启用 |
 | `knowledge.archive` | 必须有统一归档入口，减少当前上下文被历史信息淹没。 | 部署历史档案区与索引，存放过时的项目知识、项目内容或治理资料。 | 默认启用 |
 
 ## 可选治理能力提问清单
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、closing trailer 与 AI watermark 检查（`Summary` / `Implementation notes` / `Test plan`）。 | GitHub 项目 |
+| `github.repository-settings` | 是否需要 Skill 生成仓库设置策略文件与操作步骤（仅辅助，不直接修改远端）？<br>Do you want the Skill to prepare repository settings policy files and manual steps (without directly changing remote settings)? | 仅输出仓库设置策略模板与操作说明，用户在仓库端手动应用；无 API 自动修改。 | GitHub 项目 |
+| `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、signature、troubleshooting index 与 issue closing 位置校验；不限制提交/正文语言。 | GitHub 项目 |
+| `github.issue` | 是否需要 issue 依赖检查，支持 `Depends on: #N` 的顺序组织？<br>Do you need issue dependency checking with `Depends on: #N` ordering support? | 部署 issue lint workflow 与脚本。仅校验依赖顺序标记，不打标签、不评论、不做语言检查。 | GitHub 项目 |
 | `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
 | `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？<br>Do you need unified version and release tag rules to reduce release mistakes? | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
 | `quality.practices` | 是否希望建立通用开发纪律和测试策略？<br>Do you want general development discipline and testing strategy? | 部署 dev hygiene 与 testing strategy 文档，不安装 Node.js 工具。 | 含代码项目 |
 | `quality.node-tooling` | 是否希望在提交前自动拦截常见 Node.js 代码质量与格式问题？<br>Do you want common Node.js quality and formatting issues blocked before commit? | 通过 ESLint、Prettier、lint-staged 和 pre-commit hook snippet 实现。 | Node.js 项目；复杂配置默认 `manual_required` |
-| `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？<br>Do you want reusable and traceable releases with fewer manual versioning and publishing mistakes? | 通过 release-please guide、workflow 与配置文件实现自动发布节奏。 | 仅在 GitHub + `git.commit-format` + `github.pr` 后建议；不自动启用 |
+| `quality.tdd` | 是否启用可配置的 PR TDD 门禁策略（基于路径/触发事件）？<br>Do you want configurable PR TDD gate policy (path/event based)? | 部署 TDD 策略检查脚本。未配置检查路径时不阻断。 | 启用时需在仓库确认策略文件 |
+| `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？<br>Do you want reusable and traceable releases with fewer manual versioning and publishing mistakes? | 通过 `release-please` guide、workflow、策略文件和校验器联动：`docs/harness/guides/release-please.md`、`.github/workflows/release-please.yml`、`release-please-config.json`、`.release-please-manifest.json`、`.github/release-please-policy.json`、`.github/scripts/release_please_policy.py`。<br>Deploy `github.release-please` via linked deliverables: guide + workflow + config + manifest + policy + checker script; release filter policy is managed in the policy file. | 仅在 GitHub + `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning` 后建议；不自动启用 |
+
+项目状态快照（`docs/product-specs/project-status.md`）为 `project.context` 默认能力的一部分，不另外提问；在每次部署完成后可由用户/AI 补充。
+Project status snapshot (`docs/product-specs/project-status.md`) is part of default `project.context` and does not require a separate question; it can be filled by users or AI after completion.
 
 ## 确认汇总
 

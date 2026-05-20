@@ -147,6 +147,8 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 - `docs/harness/` 下的协作指南、维护说明和检查脚本。
 - Git hooks、CI 工作流、提交规范、PR 指南和质量检查配置。
 - `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/` 等长期知识目录。
+- 仓库设置策略说明、Issue 依赖治理说明（仅生成策略与说明，不改动远端设置）以及可配置的 TDD 门禁策略文件。
+- `docs/product-specs/project-status.md` 及项目背景状态短快照入口。
 
 这些文件会留在目标项目中，成为后续协作的权威入口。
 
@@ -185,12 +187,15 @@ dayu-harness-skill/
 │   ├── knowledge.research.json                   # 研究资料沉淀能力
 │   ├── knowledge.archive.json                    # 历史归档能力
 │   ├── project.context.json                      # 产品/项目上下文目录能力
+│   ├── github.repository-settings.json           # GitHub 仓库设置策略能力（不直接改动远端）
 │   ├── github.pr.json                            # PR 指南、PR lint 和审查清单能力
+│   ├── github.issue.json                         # Issue 依赖关系与流程能力
 │   ├── github.branch-protection.json             # GitHub 分支保护规则能力
 │   ├── github.release-please.json                # release-please 发布自动化能力
 │   ├── release.versioning.json                   # 版本号、tag 和发布约束能力
 │   ├── quality.practices.json                    # 通用质量实践与测试策略能力
 │   ├── quality.node-tooling.json                 # ESLint、Prettier、lint-staged 和 pre-commit 能力
+│   ├── quality.tdd.json                          # TDD 门禁能力
 │   └── git.hooks.json                            # hook 片段内部承载能力
 ├── templates/                                    # 会复制到目标项目的文档模板
 │   ├── AGENTS.md                                 # 目标项目根级 Agent 索引模板
@@ -206,6 +211,8 @@ dayu-harness-skill/
 │       │   │   ├── ai-memory.md                  # 长期记忆、经验沉淀和外部记忆回写规则
 │       │   │   ├── branch-protection.md          # 分支保护规则说明
 │       │   │   ├── commit-guidelines.md          # 提交信息规范
+│       │   │   ├── github-repository-settings.md # GitHub 仓库 PR 设置策略
+│       │   │   ├── issue-guidelines.md           # Issue 依赖与处理顺序治理
 │       │   │   ├── dev-hygiene.md                # 开发卫生和本地质量约束
 │       │   │   ├── pr-guidelines.md              # PR 编写、审查和合并约束
 │       │   │   ├── release-please.md             # release-please 工作流说明
@@ -233,7 +240,9 @@ dayu-harness-skill/
 │       ├── references/
 │       │   ├── AGENTS.md                         # 参考资料索引
 │       │   └── research/AGENTS.md                # 研究资料目录
-│       ├── product-specs/AGENTS.md               # 产品/项目上下文目录
+│       ├── product-specs/
+│       │   ├── AGENTS.md                         # 产品/项目上下文目录
+│       │   └── project-status.md                 # 项目状态快照（简版）
 │       ├── generated/AGENTS.md                   # 生成内容暂存目录
 │       └── archive/
 │           ├── AGENTS.md                         # 历史归档索引
@@ -256,13 +265,23 @@ dayu-harness-skill/
 │   │   ├── node.gitignore                        # Node 项目忽略规则
 │   │   └── python.gitignore                      # Python 项目忽略规则
 │   └── github/
+│       ├── repository/
+│       │   └── pull-request-settings.json        # PR 仓库设置策略模板
+│       ├── dayu-harness/
+│       │   └── pr-tdd-policy.json               # PR TDD 门禁策略文件
+│       ├── release-please-policy.json           # release-please 与仓库策略文件
+│       ├── scripts/
+│       │   ├── issue_depends_on.py             # Issue 依赖关系解析脚本
+│       │   ├── pr_body_structure.py            # PR 正文结构检查脚本
+│       │   ├── pr_tdd_check.py                 # PR TDD 门禁脚本
+│       │   └── release_please_policy.py        # release-please 策略脚本
 │       ├── workflows/
-│       │   ├── pr-lint.yml                       # PR 正文结构检查 workflow
-│       │   └── release-please.yml                # release-please workflow
-│       ├── scripts/pr_body_structure.py          # PR 正文结构检查脚本
+│       │   ├── issue-lint.yml                  # Issue 依赖治理 workflow
+│       │   ├── pr-lint.yml                     # PR 正文结构检查 workflow
+│       │   └── release-please.yml              # release-please workflow
 │       ├── rulesets/
-│       │   ├── protect-main.json                 # main 分支保护规则集
-│       │   └── protect-tags.json                 # release tag 保护规则集
+│       │   ├── protect-main.json               # main 分支保护规则集
+│       │   └── protect-tags.json               # release tag 保护规则集
 │       ├── release-please-config.json            # release-please 配置
 │       └── .release-please-manifest.json         # release-please manifest
 ├── marketing/                                    # 独立对外传播物料，不参与 Skill 功能或部署产物

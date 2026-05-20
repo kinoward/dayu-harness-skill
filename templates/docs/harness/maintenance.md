@@ -150,6 +150,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
 | `github.pr` | PR 工作流规范 | 文档约定 + 可选 CI | pr-lint.yml（仅 GitHub） | GitHub 项目 |
+| `github.repository-settings` | 仓库 PR 自动合并设置 | 文档约定 + 设置文件 | `.github/repository/pull-request-settings.json` | GitHub 项目 |
+| `github.issue` | Issue 约束约定 | 文档约定 + CI 校验 | issue-lint.yml | GitHub 项目 |
 | `github.branch-protection` | 分支保护 | 文档约定 + ruleset + hook snippet | protect-main ruleset + pre-push snippet | GitHub 项目 |
 | `release.versioning` | 版本与标签保护 | 文档约定 + tag ruleset + hook snippet | protect-tags ruleset + pre-push snippet | 发布项目 |
 
@@ -159,6 +161,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 |---|------|---------|---------|---------|
 | `quality.practices` | 开发纪律与测试策略 | 文档指引 | dev-hygiene + testing-strategy | 含代码项目 |
 | `quality.node-tooling` | Node.js 代码风格与格式化 | ESLint + Prettier + lint-staged + hook snippet | eslint config + prettier config + lint-staged config + pre-commit snippet | Node.js 项目 |
+| `quality.tdd` | PR 变更实现与测试约束 | PR 变更策略配置 + TDD 检查脚本 | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | 通用代码项目 |
 
 ### 开发规范
 
@@ -186,9 +189,12 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `github.pr` | PR 本体化检查（pr-lint.yml + pr_body_structure.py） | 仅 GitHub 项目联动 CI |
 | `github.branch-protection` | protect-main ruleset + pre-push branch snippet | GitHub ruleset（远程）+ pre-push snippet（本地）双重保护 |
 | `release.versioning` | protect-tags ruleset + pre-push tag snippet | 标签保护和版本规范 |
+| `github.repository-settings` | `.github/repository/pull-request-settings.json` | PR 自动合并默认行为约束 |
+| `github.issue` | issue-lint.yml + issue_depends_on.py | Issue depends-on 校验 |
+| `quality.tdd` | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | PR TDD 检查 |
 | `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | 复杂配置默认人工确认 |
 | `project.gitignore` | .gitignore installer | 按项目类型合并 universal/node/python 模板 |
-| `github.release-please` | release-please.yml + guide + config + manifest | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr`；需要 PAT |
+| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；需要 PAT |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
 > 默认纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）由 `default=true` manifest 强制部署，不通过用户问答决定；可选能力仍由 manifest 控制。

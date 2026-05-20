@@ -3,6 +3,7 @@
 本文件是项目级路由入口。先按任务读取这里，再进入 [docs/AGENTS.md](docs/AGENTS.md) 或已启用能力模块的文档。
 > **阶段**: ACTIVE
 > **聚焦**: Git / GitHub / 文档治理
+> **状态快照**: [docs/product-specs/project-status.md](docs/product-specs/project-status.md)
 > **规则**: 以本文件与 `docs/` 规则为准
 
 ## 目录索引

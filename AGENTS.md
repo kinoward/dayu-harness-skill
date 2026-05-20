@@ -86,9 +86,9 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 | Git 基线 | `git.commit-format`、`project.gitignore` | 约定式提交指南、`commitlint.config.cjs`、commit-msg hook 片段和可合并 `.gitignore`。 |
 | AI 协作 | `ai.execution`、`ai.memory` | AI 执行边界、协作姿态、自动重试、汇报规则、长期记忆边界和外部记忆回写规则。 |
 | 知识沉淀 | `knowledge.adr`、`knowledge.troubleshooting`、`knowledge.research`、`project.context`、`knowledge.archive` | ADR、排障、研究资料、产品上下文和历史归档目录。 |
-| GitHub 可选 | `github.pr`、`github.branch-protection` | PR 指南、审查清单、PR 正文检查工作流、分支保护规则集和 pre-push 片段。 |
+| GitHub 可选 | `github.repository-settings`、`github.pr`、`github.issue`、`github.branch-protection` | 仓库设置说明、PR 指南、Issue 依赖约定、审查清单、PR 正文检查工作流、分支保护规则集和 pre-push 片段。 |
 | 发布可选 | `release.versioning`、`github.release-please` | 版本与 tag 规则、发布指南、release-please 工作流和配置。 |
-| 质量可选 | `quality.practices`、`quality.node-tooling` | 通用开发纪律、测试策略、ESLint、Prettier、lint-staged 和 pre-commit hook 片段。 |
+| 质量可选 | `quality.practices`、`quality.node-tooling`、`quality.tdd` | 通用开发纪律、测试策略、ESLint、Prettier、lint-staged、pre-commit hook 片段和可配置 TDD 门禁。 |
 | 内部承载 | `git.hooks` | hook 片段的内部承载能力，不作为独立业务治理入口。 |
 
 ## 运行流程
@@ -151,7 +151,9 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 │   │   │   ├── ai-execution.md
 │   │   │   ├── ai-memory.md
 │   │   │   ├── commit-guidelines.md
+│   │   │   ├── github-repository-settings.md # 可选：github.repository-settings
 │   │   │   ├── pr-guidelines.md       # 可选：github.pr
+│   │   │   ├── issue-guidelines.md    # 可选：github.issue
 │   │   │   ├── branch-protection.md   # 可选：github.branch-protection
 │   │   │   ├── release-versioning.md  # 可选：release.versioning
 │   │   │   ├── release-please.md      # 可选：github.release-please
@@ -172,11 +174,27 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 │   ├── exec-plans/
 │   ├── generated/
 │   ├── product-specs/
+│   │   ├── AGENTS.md                        # 约定：项目上下文与状态文档目录
+│   │   └── project-status.md                # 可选：project.context 的默认部署文件，简版项目状态快照
 │   ├── references/
 │   ├── troubleshooting/
 │   └── archive/
 ├── .husky/                            # 默认：git.hooks + hook 承载的 Git 能力
-├── .github/                           # 可选：GitHub 工作流、规则集、release 资产
+├── .github/                           # 可选：GitHub 工作流、规则集、仓库设置与 release 资产
+│   ├── repository/                    # 可选：仓库设置策略模板区
+│   │   └── pull-request-settings.json  # 可选：PR 设置策略模板
+│   ├── dayu-harness/                  # 可选：TDD 策略文件目录
+│   │   └── pr-tdd-policy.json         # 可选：PR TDD 门禁策略文件
+│   ├── release-please-policy.json      # 可选：仓库策略与 release-please 过滤策略
+│   ├── scripts/
+│       ├── issue_depends_on.py         # 可选：Issue 依赖关系解析脚本
+│       ├── pr_body_structure.py        # 可选：PR 正文结构校验脚本
+│       ├── pr_tdd_check.py             # 可选：PR TDD 门禁脚本
+│       └── release_please_policy.py    # 可选：release-please 策略校验脚本
+│   └── workflows/
+│       ├── issue-lint.yml              # 可选：Issue 依赖治理 workflow
+│       ├── pr-lint.yml                 # 可选：PR 正文结构治理 workflow
+│       └── release-please.yml          # 可选：release-please workflow
 ├── commitlint.config.cjs              # 默认：git.commit-format
 ├── eslint.config.cjs                  # 可选：quality.node-tooling
 ├── .prettierrc                        # 可选：quality.node-tooling
@@ -186,6 +204,8 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 └── .release-please-manifest.json      # 可选：github.release-please
 ```
 
+项目状态短快照位点：`docs/product-specs/project-status.md`
+
 沉淀位置：
 
 | 类型 | 沉淀位置 |
@@ -194,7 +214,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 | 问题排障 | `docs/troubleshooting/` |
 | 研究发现 | `docs/references/research/` |
 | 约束变更 | `docs/harness/guides/` + `AGENTS.md` |
-| 项目背景和产品上下文 | `docs/product-specs/` |
+| 项目背景和产品上下文 | `docs/product-specs/`（含 `project-status.md`） |
 | 历史内容 | `docs/archive/` |
 
 ## 依赖兼容

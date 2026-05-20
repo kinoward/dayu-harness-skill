@@ -6,7 +6,9 @@
 
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [commit-guidelines.md](commit-guidelines.md) - 默认：提交格式约束
+- 可选：`github.repository-settings` [github-repository-settings.md](github-repository-settings.md) - GitHub 仓库 PR 设置策略
 - 可选：`github.pr` [pr-guidelines.md](pr-guidelines.md) - PR 工作流规范
+- 可选：`github.issue` [issue-guidelines.md](issue-guidelines.md) - Issue 依赖与处理顺序
 - 可选：`github.branch-protection` [branch-protection.md](branch-protection.md) - 分支保护流程
 - 可选：`release.versioning` [release-versioning.md](release-versioning.md) - 版本与标签规则
 - 可选：`github.release-please` [release-please.md](release-please.md) - 自动发布工作流
@@ -20,7 +22,9 @@
 ## 文档与能力
 
 - `git.commit-format`：`commit-guidelines.md`
+- `github.repository-settings`：`github-repository-settings.md`
 - `github.pr`：`pr-guidelines.md`，review checklist 见 `../sensors/reviews/`
+- `github.issue`：`issue-guidelines.md`
 - `github.branch-protection`：`branch-protection.md`
 - `release.versioning`：`release-versioning.md`
 - `github.release-please`：`release-please.md`

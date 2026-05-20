@@ -20,6 +20,8 @@ Use `YYYY-MM-DD-vN` format, e.g. `2026-04-17-v3`. Each version directory contain
 <!-- List currently active research directories -->
 <!-- Example: `2026-04-17-v3/` -->
 
+- Active research should maintain `status.md` to record current scope, conclusions, milestones, and next actions.
+
 ## Archived Research
 
 <!-- Move completed or obsolete research to archive/. -->
