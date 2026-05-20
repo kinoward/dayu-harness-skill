@@ -29,7 +29,10 @@
   "installer": null,
   "acceptance": [
     "PR lint workflow exists",
-    "PR body validator script exists"
+    "PR body validator script exists",
+    "PR title lint check exists",
+    "Sub-commit trailer policy check exists",
+    "Troubleshooting entry changes require synced AGENTS and TL;DR in first 20 lines"
   ],
   "suggested_when": "Enable when project uses GitHub pull requests.",
   "template_files_i18n": {
