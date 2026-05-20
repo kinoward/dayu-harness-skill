@@ -147,6 +147,8 @@ Dayu Harness Skill organizes project collaboration rules into the target reposit
 - Collaboration guides, maintenance instructions, and check scripts under `docs/harness/`.
 - Git hooks, CI workflows, commit conventions, PR guidelines, and quality check configs.
 - Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
+- Repository settings policy docs, Issue dependency guidance (strategy files only), and configurable TDD gate strategy files.
+- `docs/product-specs/project-status.md` as a short project status snapshot entry point.
 
 These files stay in the target project and become the authority for future collaboration.
 
@@ -185,12 +187,15 @@ dayu-harness-skill/
 │   ├── knowledge.research.json                   # Research artifact retention capability
 │   ├── knowledge.archive.json                    # Historical archive capability
 │   ├── project.context.json                      # Product/project context directory capability
+│   ├── github.repository-settings.json           # GitHub repository settings policy capability (syncs remote on apply)
 │   ├── github.pr.json                            # PR guide, PR lint, and review checklist capability
+│   ├── github.issue.json                         # Issue dependency workflow capability
 │   ├── github.branch-protection.json             # GitHub branch protection rules capability
 │   ├── github.release-please.json                # release-please publishing automation capability
 │   ├── release.versioning.json                   # Version, tag, and release constraint capability
 │   ├── quality.practices.json                    # General quality practices and testing strategy capability
 │   ├── quality.node-tooling.json                 # ESLint, Prettier, lint-staged, and pre-commit capability
+│   ├── quality.tdd.json                          # Configurable TDD gate capability
 │   └── git.hooks.json                            # Internal hook snippet carrier capability
 ├── templates/                                    # Documentation templates copied into the target project
 │   ├── AGENTS.md                                 # Target project root Agent index template
@@ -206,6 +211,8 @@ dayu-harness-skill/
 │       │   │   ├── ai-memory.md                  # Long-term memory, experience retention, and external memory writeback rules
 │       │   │   ├── branch-protection.md          # Branch protection rule explanation
 │       │   │   ├── commit-guidelines.md          # Commit message standards
+│       │   │   ├── github-repository-settings.md # GitHub repository PR settings policy
+│       │   │   ├── issue-guidelines.md           # Issue dependency and sequencing governance
 │       │   │   ├── dev-hygiene.md                # Development hygiene and local quality constraints
 │       │   │   ├── pr-guidelines.md              # PR authoring, review, and merge constraints
 │       │   │   ├── release-please.md             # release-please workflow notes
@@ -233,7 +240,9 @@ dayu-harness-skill/
 │       ├── references/
 │       │   ├── AGENTS.md                         # Reference material index
 │       │   └── research/AGENTS.md                # Research material directory
-│       ├── product-specs/AGENTS.md               # Product/project context directory
+│       ├── product-specs/
+│       │   ├── AGENTS.md                         # Product/project context directory
+│       │   └── project-status.md                 # Project status snapshot (brief)
 │       ├── generated/AGENTS.md                   # Generated content staging directory
 │       └── archive/
 │           ├── AGENTS.md                         # Historical archive index
@@ -256,13 +265,23 @@ dayu-harness-skill/
 │   │   ├── node.gitignore                        # Node project ignore rules
 │   │   └── python.gitignore                      # Python project ignore rules
 │   └── github/
+│       ├── repository/
+│       │   └── pull-request-settings.json        # PR repository settings policy template
+│       ├── dayu-harness/
+│       │   └── pr-tdd-policy.json               # PR TDD gate policy file
+│       ├── release-please-policy.json           # release-please and repository policy file
+│       ├── scripts/
+│       │   ├── issue_depends_on.py             # Issue dependency parsing script
+│       │   ├── pr_body_structure.py            # PR body structure check script
+│       │   ├── pr_tdd_check.py                 # PR TDD gate script
+│       │   └── release_please_policy.py        # release-please policy script
 │       ├── workflows/
-│       │   ├── pr-lint.yml                       # PR body structure check workflow
-│       │   └── release-please.yml                # release-please workflow
-│       ├── scripts/pr_body_structure.py          # PR body structure check script
+│       │   ├── issue-lint.yml                  # Issue dependency governance workflow
+│       │   ├── pr-lint.yml                     # PR body governance workflow
+│       │   └── release-please.yml              # release-please workflow
 │       ├── rulesets/
-│       │   ├── protect-main.json                 # main branch protection ruleset
-│       │   └── protect-tags.json                 # release tag protection ruleset
+│       │   ├── protect-main.json               # main branch protection ruleset
+│       │   └── protect-tags.json               # release tag protection ruleset
 │       ├── release-please-config.json            # release-please config
 │       └── .release-please-manifest.json         # release-please manifest
 ├── marketing/                                    # Independent external promotion material, not part of Skill function or deployment output

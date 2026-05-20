@@ -1,0 +1,25 @@
+name: Issue Lint
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  issue-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check issue body depends-on line
+        id: issue-depends-on
+        run: |
+          python3 .github/scripts/issue_depends_on.py "$GITHUB_EVENT_PATH"

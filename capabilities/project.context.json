@@ -10,12 +10,17 @@
     {
       "src": "templates/docs/product-specs/AGENTS.md",
       "dst": "docs/product-specs/AGENTS.md"
+    },
+    {
+      "src": "templates/docs/product-specs/project-status.md",
+      "dst": "docs/product-specs/project-status.md"
     }
   ],
   "asset_files": [],
   "installer": null,
   "acceptance": [
-    "Product specs AGENTS exists"
+    "Product specs AGENTS exists",
+    "Project status snapshot exists"
   ],
   "suggested_when": "Enable for repositories with durable product specs or project-specific documentation.",
   "template_files_i18n": {
@@ -23,6 +28,10 @@
       {
         "src": "templates.en/docs/product-specs/AGENTS.md",
         "dst": "docs/product-specs/AGENTS.md"
+      },
+      {
+        "src": "templates.en/docs/product-specs/project-status.md",
+        "dst": "docs/product-specs/project-status.md"
       }
     ]
   }

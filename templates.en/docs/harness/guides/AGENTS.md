@@ -5,7 +5,9 @@ This directory index contains pre-action rule cards for AI. Default governance a
 ## Directory Index
 - [AGENTS.md](AGENTS.md) - Current index
 - [commit-guidelines.md](commit-guidelines.md) - Default: commit message format constraints
+- Optional: `github.repository-settings` [github-repository-settings.md](github-repository-settings.md) - GitHub repository PR settings policy
 - Optional: `github.pr` [pr-guidelines.md](pr-guidelines.md) - PR workflow conventions
+- Optional: `github.issue` [issue-guidelines.md](issue-guidelines.md) - Issue dependencies and processing order
 - Optional: `github.branch-protection` [branch-protection.md](branch-protection.md) - Branch protection flow
 - Optional: `release.versioning` [release-versioning.md](release-versioning.md) - Version and tag rules
 - Optional: `github.release-please` [release-please.md](release-please.md) - Automated release workflow
@@ -18,7 +20,9 @@ Keep this section synchronized with directory, file, or capability manifest chan
 
 ## Documents and Capabilities
 - `git.commit-format`: `commit-guidelines.md`
+- `github.repository-settings`: `github-repository-settings.md`
 - `github.pr`: `pr-guidelines.md`; review checklist in `../sensors/reviews/`
+- `github.issue`: `issue-guidelines.md`
 - `github.branch-protection`: `branch-protection.md`
 - `release.versioning`: `release-versioning.md`
 - `github.release-please`: `release-please.md`

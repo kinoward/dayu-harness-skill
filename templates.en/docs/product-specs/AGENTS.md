@@ -4,11 +4,14 @@ This directory contains product specs and project-specific context. These docs d
 
 ## Directory Index
 - [AGENTS.md](AGENTS.md) - Current index
+- [project-status.md](project-status.md) - Project status snapshot (brief)
 - `*.md` - Project-specific specs and content added for this project
 
 Keep this section updated when directory/file/capability manifests change.
 
 ## Content Documents
+
+`project-status.md`: short project status snapshot.
 
 <!-- List project-specific documents, for example: -->
 <!-- - Product specs / project outline -->

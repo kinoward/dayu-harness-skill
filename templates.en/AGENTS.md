@@ -4,6 +4,7 @@ This file is the project-level routing entry. Read it first for task-based direc
 
 > **Phase**: ACTIVE
 > **Focus**: Git / GitHub / Documentation Governance
+> **Status Snapshot**: [docs/product-specs/project-status.md](docs/product-specs/project-status.md)
 > **Rule**: Follow this file and `docs/` rules
 
 ## Directory Index

@@ -152,6 +152,8 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 | capability | Constraint | Implementation | Coupled components | Applicable when |
 |---|------|---------|---------|---------|
 | `github.pr` | PR workflow standards | Documentation rules + optional CI | pr-lint.yml (GitHub-only) | GitHub projects |
+| `github.repository-settings` | Pull request automation settings | Documentation rules + repository settings file | `.github/repository/pull-request-settings.json` | GitHub projects |
+| `github.issue` | Issue-body constraint checks | Documentation rules + issue lint CI | issue-lint.yml | GitHub projects |
 | `github.branch-protection` | Branch protection | Documentation rules + ruleset + hook snippet | protect-main ruleset + pre-push snippet | GitHub projects |
 | `release.versioning` | Version and tag protection | Documentation rules + tag ruleset + hook snippet | protect-tags ruleset + pre-push snippet | Release-based projects |
 
@@ -161,6 +163,7 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 |---|------|---------|---------|---------|
 | `quality.practices` | Development discipline and testing strategy | Documentation guidance | dev-hygiene + testing-strategy | Code projects |
 | `quality.node-tooling` | Node.js style and formatting | ESLint + Prettier + lint-staged + hook snippet | eslint config + prettier config + lint-staged config + pre-commit snippet | Node.js projects |
+| `quality.tdd` | PR implementation-vs-test constraint policy | Policy-driven PR checks | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | Code projects |
 
 ### Development Guidelines
 
@@ -186,11 +189,14 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 |------|---------|------|
 | `git.commit-format` | commit-msg commitlint snippet + commitlint config | Enforces commit format validation only |
 | `github.pr` | PR validation (`pr-lint.yml` + `pr_body_structure.py`) | GitHub CI integration only |
+| `github.repository-settings` | `.github/repository/pull-request-settings.json` | PR merge automation and repository merge behavior constraints |
+| `github.issue` | `issue-lint.yml` + `issue_depends_on.py` | Issue depends-on validation |
 | `github.branch-protection` | protect-main ruleset + pre-push branch snippet | Double protection: remote GitHub ruleset + local pre-push snippet |
+| `quality.tdd` | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | PR-driven TDD checks |
 | `release.versioning` | protect-tags ruleset + pre-push tag snippet | Tag protection and version conventions |
 | `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | Complex configuration should still be reviewed by humans |
 | `project.gitignore` | .gitignore installer | Merge universal/node/python templates by project type |
-| `github.release-please` | release-please.yml + guide + config + manifest | GitHub-only; depends on `git.commit-format` + `github.pr`; requires PAT |
+| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | GitHub-only; depends on `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`; requires PAT |
 | `diagnostics` | audit.sh + check-consistency.sh | Automated documentation integrity checks |
 
 > Document-only capabilities (`ai.execution`, `ai.memory`, knowledge directories) are enforced with `default=true` and are not asked in capability questions. Optional capabilities remain under manifest control.

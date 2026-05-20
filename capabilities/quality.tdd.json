@@ -1,0 +1,28 @@
+{
+  "id": "quality.tdd",
+  "description": "Configurable Test-Driven Development policy check for pull requests.",
+  "description_nl": "可配置的 PR TDD 检查，支持实现路径/测试路径策略和可替换策略文件。",
+  "default": false,
+  "dependencies": [
+    "core",
+    "github.pr"
+  ],
+  "template_files": [],
+  "asset_files": [
+    {
+      "src": "assets/github/scripts/pr_tdd_check.py",
+      "dst": ".github/scripts/pr_tdd_check.py"
+    },
+    {
+      "src": "assets/github/dayu-harness/pr-tdd-policy.json",
+      "dst": ".github/dayu-harness/pr-tdd-policy.json"
+    }
+  ],
+  "installer": null,
+  "acceptance": [
+    "TDD policy file exists",
+    "TDD checker script exists",
+    "TDD checker script is executable"
+  ],
+  "suggested_when": "Enable when PR quality requires configurable TDD constraints."
+}

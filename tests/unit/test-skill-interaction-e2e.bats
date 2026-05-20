@@ -48,9 +48,23 @@ EOF
 if [ "${1:-}" = "auth" ] && [ "${2:-}" = "status" ]; then
   exit 0
 fi
+if [ "${1:-}" = "repo" ] && [ "${2:-}" = "view" ]; then
+  printf '%s\n' "kinoward/dayu-harness-skill-test"
+  exit 0
+fi
+if [ "${1:-}" = "api" ]; then
+  if [ -n "${DAYU_HARNESS_GH_CALL_LOG:-}" ]; then
+    printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
+  fi
+  if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
+    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+  fi
+  exit 0
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/gh"
+    export DAYU_HARNESS_GH_CALL_LOG="$TEST_DIR/gh-calls.log"
 
     export PATH="$WRAPPER_DIR:$PATH"
 }
@@ -105,7 +119,7 @@ json_from_output() {
     printf '%s\n' "$output" | awk 'BEGIN {emit=0} /^[[:space:]]*\{/ {emit=1} emit {print}'
 }
 
-@test "conversation replay: empty project expands legacy aliases into split capabilities" {
+	@test "conversation replay: empty project expands legacy aliases into split capabilities" {
     local project_dir="$TEST_DIR/empty-nongithub"
     cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"
     rm -f "$project_dir/.gitkeep"
@@ -126,7 +140,7 @@ json_from_output() {
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable "$enabled" --strategy merge
     echo "$output" | jq -e '.status == "ok"'
-    echo "$output" | jq -e '.applied_count == 34'
+    echo "$output" | jq -e '.applied_count == 35'
     echo "$output" | jq -e '.validation == "passed"'
 
     assert_path "$project_dir/.husky/commit-msg"
@@ -136,10 +150,11 @@ json_from_output() {
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.cjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
+    assert_path "$project_dir/docs/product-specs/project-status.md"
     assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
     assert_no_path "$project_dir/.github/rulesets"
-    assert_no_path "$project_dir/release-please-config.json"
-    assert_no_path "$project_dir/.release-please-manifest.json"
+	    assert_no_path "$project_dir/release-please-config.json"
+	    assert_no_path "$project_dir/.release-please-manifest.json"
 
     run_json "$project_dir/docs/harness/sensors/scripts/validate.sh" --json "$project_dir"
     json_from_output | jq -e '.summary.failed == 0'
@@ -152,12 +167,91 @@ json_from_output() {
     json_from_output | jq -e '.summary.failed == 0'
     json_from_output | jq -e '.checks | all(.status == "pass")'
 
-    write_file "$project_dir/.test-msg-cjk" "feat: 提交治理文档"
-    run bash -c 'cd "$1" && .husky/commit-msg .test-msg-cjk' _ "$project_dir"
-    [ "$status" -eq 0 ]
-}
+	    write_file "$project_dir/.test-msg-cjk" "feat: 提交治理文档"
+	    run bash -c 'cd "$1" && .husky/commit-msg .test-msg-cjk' _ "$project_dir"
+	    [ "$status" -eq 0 ]
+	}
 
-@test "conversation replay: zh-CN and English default deployments differ only by locale" {
+	@test "conversation replay: no GitHub optional capabilities in default deployment" {
+	    local project_dir="$TEST_DIR/default-no-github-optional"
+	    cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"
+	    rm -f "$project_dir/.gitkeep"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --strategy merge
+	    echo "$output" | jq -e '.status == "ok"'
+
+	    assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
+	    assert_no_path "$project_dir/.github/workflows/issue-lint.yml"
+	    assert_no_path "$project_dir/.github/rulesets/protect-main.json"
+	    assert_no_path "$project_dir/.github/rulesets/protect-tags.json"
+	    assert_no_path "$project_dir/release-please-config.json"
+	    assert_no_path "$project_dir/.github/workflows/release-please.yml"
+	    assert_no_path "$project_dir/.release-please-manifest.json"
+
+	    run_json "$project_dir/docs/harness/sensors/scripts/validate.sh" --json "$project_dir"
+	    json_from_output | jq -e '.summary.failed == 0'
+	}
+
+	@test "conversation replay: github.delivery deploys repository settings, PR lint, issue lint and rulesets" {
+	    local project_dir="$TEST_DIR/enable-github-delivery"
+	    cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"
+	    rm -f "$project_dir/.gitkeep"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.delivery --strategy merge
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
+	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+
+	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
+	    assert_path "$project_dir/.github/workflows/pr-lint.yml"
+	    assert_path "$project_dir/.github/workflows/issue-lint.yml"
+	    assert_path "$project_dir/.github/rulesets/protect-main.json"
+	    assert_no_path "$project_dir/.github/rulesets/protect-tags.json"
+	    assert_path "$project_dir/docs/harness/guides/issue-guidelines.md"
+	    assert_no_path "$project_dir/.github/workflows/release-please.yml"
+	    assert_no_path "$project_dir/.github/release-please-policy.json"
+
+	    run_json "$project_dir/docs/harness/sensors/scripts/validate.sh" --json "$project_dir"
+	    json_from_output | jq -e '.summary.failed == 0'
+	    run_json "$project_dir/docs/harness/sensors/scripts/check-consistency.sh" --json "$project_dir"
+	    json_from_output | jq -e '.summary.failed == 0'
+	}
+
+	@test "conversation replay: release automation deploys release workflow, policy, and repo settings" {
+	    local project_dir="$TEST_DIR/enable-release-automated"
+	    cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"
+	    rm -f "$project_dir/.gitkeep"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable release.automated --strategy merge
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
+	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+
+	    assert_path "$project_dir/.github/workflows/release-please.yml"
+	    assert_path "$project_dir/.github/release-please-policy.json"
+	    assert_path "$project_dir/.github/scripts/release_please_policy.py"
+	    assert_path "$project_dir/release-please-config.json"
+	    assert_path "$project_dir/.release-please-manifest.json"
+	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
+
+	    assert_no_path "$project_dir/.github/workflows/issue-lint.yml"
+
+	    run_json "$project_dir/docs/harness/sensors/scripts/validate.sh" --json "$project_dir"
+	    json_from_output | jq -e '.summary.failed == 0'
+	    run_json "$project_dir/docs/harness/sensors/scripts/audit.sh" --json "$project_dir"
+	    json_from_output | jq -e '.summary.failed == 0'
+	}
+
+	@test "legacy language capability aliases remain rejected in e2e path" {
+	    local project_dir="$TEST_DIR/legacy-language-capability-e2e"
+	    mkdir -p "$project_dir"
+
+	    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable github.language
+	    [ "$status" -eq 2 ]
+	    [[ "$output" == *"unknown capability 'github.language'"* ]]
+	}
+
+	@test "conversation replay: zh-CN and English default deployments differ only by locale" {
     local zh_project_dir="$TEST_DIR/i18n-zh"
     local en_project_dir="$TEST_DIR/i18n-en"
     mkdir -p "$zh_project_dir" "$en_project_dir"
