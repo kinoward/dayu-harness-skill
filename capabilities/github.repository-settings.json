@@ -1,0 +1,36 @@
+{
+  "id": "github.repository-settings",
+  "description": "Repository pull request automation settings",
+  "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置。",
+  "default": false,
+  "dependencies": [
+    "core"
+  ],
+  "template_files": [
+    {
+      "src": "templates/docs/harness/guides/github-repository-settings.md",
+      "dst": "docs/harness/guides/github-repository-settings.md"
+    }
+  ],
+  "asset_files": [
+    {
+      "src": "assets/github/repository/pull-request-settings.json",
+      "dst": ".github/repository/pull-request-settings.json"
+    }
+  ],
+  "installer": null,
+  "acceptance": [
+    "Repository pull request settings file exists",
+    "Repository settings guide exists",
+    "Repository auto-merge and delete-branch-on-merge are enabled"
+  ],
+  "suggested_when": "Enable when release automation requires deterministic PR merge behavior.",
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/github-repository-settings.md",
+        "dst": "docs/harness/guides/github-repository-settings.md"
+      }
+    ]
+  }
+}

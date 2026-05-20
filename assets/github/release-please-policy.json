@@ -1,0 +1,81 @@
+{
+  "workflow": {
+    "file": ".github/workflows/release-please.yml",
+    "dispatch_enabled": true,
+    "additional_workflows": [
+      ".github/workflows/pr-lint.yml"
+    ],
+    "push_paths": [
+      "src/**",
+      "app/**",
+      "apps/**",
+      "lib/**",
+      "packages/**",
+      "server/**",
+      "extension/**",
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "pyproject.toml",
+      "uv.lock",
+      "Cargo.toml",
+      "Cargo.lock",
+      "go.mod",
+      "go.sum",
+      "release-please-config.json",
+      ".release-please-manifest.json",
+      "VERSION"
+    ],
+    "merge_command": "gh pr merge --auto --merge --delete-branch",
+    "label_gate_required": false,
+    "allowed_actors_variable": "RELEASE_PLEASE_ALLOWED_ACTORS",
+    "require_allowed_actors_reference": true
+  },
+  "release_pr": {
+    "branch_prefix": "release-please--",
+    "title_pattern": "Release ${version}",
+    "allowed_paths": [
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "npm-shrinkwrap.json",
+      "bun.lockb",
+      "go.mod",
+      "go.sum",
+      "Cargo.toml",
+      "Cargo.lock",
+      "pyproject.toml",
+      "uv.lock",
+      "VERSION",
+      "CHANGELOG.md",
+      ".release-please-manifest.json",
+      "release-please-config.json",
+      "**/CHANGELOG.md"
+    ]
+  },
+  "release_please_config": {
+    "file": "release-please-config.json",
+    "pull_request_title_pattern": "Release ${version}",
+    "require_full_changelog_types": true,
+    "required_changelog_types": [
+      "feat",
+      "fix",
+      "perf",
+      "docs",
+      "style",
+      "refactor",
+      "test",
+      "build",
+      "ci",
+      "chore",
+      "revert"
+    ]
+  },
+  "repository_settings": {
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
+  }
+}

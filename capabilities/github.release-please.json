@@ -7,6 +7,7 @@
     "core",
     "git.commit-format",
     "github.pr",
+    "github.repository-settings",
     "release.versioning"
   ],
   "template_files": [
@@ -16,6 +17,10 @@
     }
   ],
   "asset_files": [
+    {
+      "src": "assets/github/release-please-policy.json",
+      "dst": ".github/release-please-policy.json"
+    },
     {
       "src": "assets/github/workflows/release-please.yml",
       "dst": ".github/workflows/release-please.yml"
@@ -27,6 +32,10 @@
     {
       "src": "assets/github/.release-please-manifest.json",
       "dst": ".release-please-manifest.json"
+    },
+    {
+      "src": "assets/github/scripts/release_please_policy.py",
+      "dst": ".github/scripts/release_please_policy.py"
     }
   ],
   "installer": null,
@@ -34,7 +43,9 @@
     "release-please workflow exists",
     "release-please guide exists",
     "release-please config exists",
-    "release-please manifest exists"
+    "release-please manifest exists",
+    "release-please policy file exists",
+    "release-please policy script exists"
   ],
   "suggested_when": "Enable for GitHub-backed automated release management.",
   "template_files_i18n": {

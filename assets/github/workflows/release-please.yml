@@ -4,6 +4,28 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "src/**"
+      - "app/**"
+      - "apps/**"
+      - "lib/**"
+      - "packages/**"
+      - "server/**"
+      - "extension/**"
+      - "package.json"
+      - "package-lock.json"
+      - "pnpm-lock.yaml"
+      - "yarn.lock"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "go.mod"
+      - "go.sum"
+      - "release-please-config.json"
+      - ".release-please-manifest.json"
+      - "VERSION"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,6 +41,319 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Checkout repository for policy/config checks
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Merge release-please PR
+        if: ${{ steps.release.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_PLEASE_ALLOWED_ACTORS: ${{ vars.RELEASE_PLEASE_ALLOWED_ACTORS }}
+          RELEASE_PLEASE_POLICY_PATH: .github/release-please-policy.json
+          RELEASE_PLEASE_CONFIG_PATH: release-please-config.json
+          RELEASE_PLEASE_PR_OUTPUT: ${{ steps.release.outputs.prs }}
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "gh CLI not available."
+            exit 1
+          fi
+
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "python3 not available."
+            exit 1
+          fi
+
+          if ! DEFAULT_BRANCH="$(gh api "repos/$REPO" --jq '.default_branch' 2>/dev/null)"; then
+            echo "Failed to read repository default branch."
+            exit 1
+          fi
+
+          PR_LIST_FILE="$(mktemp)"
+          if ! gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate > "$PR_LIST_FILE"; then
+            echo "Failed to fetch open pull requests."
+            rm -f "$PR_LIST_FILE"
+            exit 1
+          fi
+
+          if ! RELEASE_PLEASE_PRS="$(python3 - "$PR_LIST_FILE" "$REPO" "$DEFAULT_BRANCH" <<'PY'
+          import fnmatch
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          list_path, repo, default_branch = sys.argv[1:4]
+
+          def load_json(path):
+              with open(path, encoding="utf-8") as file_obj:
+                  return json.load(file_obj)
+
+          def fetch_json(url, headers):
+              request = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  payload = response.read().decode("utf-8")
+              return json.loads(payload)
+
+          def fetch_pages(base_url, headers):
+              page = 1
+              while True:
+                  data = fetch_json(f"{base_url}?per_page=100&page={page}", headers)
+                  if not isinstance(data, list):
+                      raise RuntimeError(f"unexpected API response for {base_url}")
+                  if not data:
+                      break
+                  for item in data:
+                      yield item
+                  if len(data) < 100:
+                      break
+                  page += 1
+
+          def parse_title_pattern(raw_pattern):
+              if not isinstance(raw_pattern, str) or not raw_pattern.strip():
+                  return None
+              escaped = re.escape(raw_pattern.strip())
+              escaped = escaped.replace(r"\$\{version\}", r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
+              return re.compile(f"^{escaped}$")
+
+          def load_release_policy(path):
+              if not os.path.exists(path):
+                  print(f"Missing release-please policy file: {path}", file=sys.stderr)
+                  raise SystemExit(1)
+              try:
+                  data = load_json(path)
+              except (json.JSONDecodeError, OSError) as exc:
+                  print(f"Invalid release-please policy file '{path}': {exc}", file=sys.stderr)
+                  raise SystemExit(1)
+              if not isinstance(data, dict):
+                  print(f"Release-please policy file '{path}' must be a JSON object.", file=sys.stderr)
+                  raise SystemExit(1)
+
+              section = data.get("release_pr")
+              if not isinstance(section, dict):
+                  print(f"Release-please policy file '{path}' must define release_pr as an object.", file=sys.stderr)
+                  raise SystemExit(1)
+
+              return section
+
+          def load_release_config(path):
+              if not os.path.exists(path):
+                  return {}
+              data = load_json(path)
+              return data if isinstance(data, dict) else {}
+
+          def normalize_actor(value):
+              return (value or "").strip().lower()
+
+          def actor_allowed(author):
+              author_norm = normalize_actor(author)
+              if not author_norm:
+                  return False
+              if author_norm in {"github-actions[bot]", "release-please[bot]"}:
+                  return True
+
+              allowed_actors = {
+                  normalize_actor(item)
+                  for item in normalize_actor(os.getenv("RELEASE_PLEASE_ALLOWED_ACTORS", "")).split(",")
+                  if normalize_actor(item)
+              }
+              return author_norm in allowed_actors
+
+          def is_allowed_file(filename, patterns):
+              return any(
+                  fnmatch.fnmatch(filename, pattern)
+                  for pattern in patterns
+                  if isinstance(pattern, str) and pattern.strip()
+              )
+
+          def parse_candidate_numbers(raw):
+              raw = (raw or "").strip()
+              if not raw:
+                  return []
+
+              numbers = []
+
+              try:
+                  payload = json.loads(raw)
+                  if isinstance(payload, int):
+                      return [payload]
+                  if isinstance(payload, dict):
+                      if isinstance(payload.get("number"), int):
+                          return [payload.get("number")]
+                      nested = payload.get("prs")
+                      if isinstance(nested, list):
+                          payload = nested
+                      else:
+                          return []
+                  if isinstance(payload, list):
+                      for item in payload:
+                          if isinstance(item, int):
+                              numbers.append(item)
+                          elif isinstance(item, str) and item.isdigit():
+                              numbers.append(int(item))
+                          elif isinstance(item, dict) and isinstance(item.get("number"), int):
+                              numbers.append(item["number"])
+                      return sorted(set(numbers))
+                  if isinstance(payload, str):
+                      raw = payload
+              except json.JSONDecodeError:
+                  pass
+
+              for token in re.split(r"[\n,\s]+", raw):
+                  token = token.strip()
+                  if token and token.isdigit():
+                      numbers.append(int(token))
+
+              return sorted(set(numbers))
+
+          def parse_open_prs(path):
+              items = []
+              raw_content = open(path, encoding="utf-8").read()
+              decoder = json.JSONDecoder()
+              index = 0
+              while index < len(raw_content):
+                  while index < len(raw_content) and raw_content[index].isspace():
+                      index += 1
+                  if index >= len(raw_content):
+                      break
+
+                  page_data, index = decoder.raw_decode(raw_content, index)
+                  if isinstance(page_data, dict):
+                      items.append(page_data)
+                  elif isinstance(page_data, list):
+                      items.extend(page_data)
+              return items
+
+          def has_allowed_files(pr_number, repo_name, allowed_patterns):
+              token = os.getenv("GH_TOKEN")
+              if not token:
+                  return False
+
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "User-Agent": "dayu-harness-release",
+              }
+
+              if not allowed_patterns:
+                  return False
+
+              for item in fetch_pages(
+                  f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/files",
+                  headers,
+              ):
+                  if not isinstance(item, dict):
+                      return False
+                  filename = item.get("filename")
+                  previous_filename = item.get("previous_filename")
+
+                  touched = []
+                  if isinstance(filename, str):
+                      touched.append(filename)
+                  if isinstance(previous_filename, str) and previous_filename:
+                      touched.append(previous_filename)
+
+                  if not touched:
+                      return False
+
+                  for path in touched:
+                      if not is_allowed_file(path, allowed_patterns):
+                          return False
+
+              return True
+
+          policy = load_release_policy(os.getenv("RELEASE_PLEASE_POLICY_PATH", ".github/release-please-policy.json"))
+          config = load_release_config(os.getenv("RELEASE_PLEASE_CONFIG_PATH", "release-please-config.json"))
+
+          branch_prefix = policy.get("branch_prefix", "release-please--")
+          if not isinstance(branch_prefix, str) or not branch_prefix.strip():
+              branch_prefix = "release-please--"
+
+          title_pattern = policy.get("title_pattern", "")
+          if not isinstance(title_pattern, str) or not title_pattern.strip():
+              title_pattern = config.get("pull-request-title-pattern", "Release ${version}")
+
+          allowed_paths = policy.get("allowed_paths")
+          if not isinstance(allowed_paths, list) or not allowed_paths:
+              print("Release-please policy release_pr.allowed_paths must be a non-empty array.", file=sys.stderr)
+              raise SystemExit(1)
+          if any(not isinstance(item, str) or not item.strip() for item in allowed_paths):
+              print("Release-please policy release_pr.allowed_paths entries must be non-empty strings.", file=sys.stderr)
+              raise SystemExit(1)
+
+          title_re = parse_title_pattern(title_pattern)
+
+          open_prs = parse_open_prs(list_path)
+          candidate_prs = parse_candidate_numbers(os.getenv("RELEASE_PLEASE_PR_OUTPUT", ""))
+          if candidate_prs:
+              candidate_prs = set(candidate_prs)
+          else:
+              candidate_prs = None
+
+          selected_numbers = []
+          for item in open_prs:
+              if not isinstance(item, dict):
+                  continue
+
+              pr_number = item.get("number")
+              if not isinstance(pr_number, int):
+                  continue
+
+              if candidate_prs is not None and pr_number not in candidate_prs:
+                  continue
+
+              head_ref = (item.get("head") or {}).get("ref", "")
+              if not isinstance(head_ref, str) or not head_ref.startswith(branch_prefix):
+                  continue
+
+              author = (item.get("user") or {}).get("login", "")
+              if not actor_allowed(author):
+                  continue
+
+              base_ref = (item.get("base") or {}).get("ref", "")
+              if not (isinstance(base_ref, str) and base_ref and base_ref == default_branch):
+                  continue
+
+              head_repo = ((item.get("head") or {}).get("repo") or {}).get("full_name", "")
+              if not isinstance(head_repo, str) or not head_repo:
+                  head_repo = repo
+              if head_repo != repo:
+                  continue
+
+              title = str(item.get("title", "") or "").strip()
+              if not (title_re and title_re.fullmatch(title)):
+                  continue
+
+              if not has_allowed_files(pr_number, repo, allowed_paths):
+                  continue
+
+              selected_numbers.append(str(pr_number))
+
+          print("\n".join(selected_numbers))
+          PY
+          )"; then
+            echo "Failed to detect release-please PR candidates."
+            rm -f "$PR_LIST_FILE"
+            exit 1
+          fi
+
+          rm -f "$PR_LIST_FILE"
+
+          if [ -z "$RELEASE_PLEASE_PRS" ]; then
+            echo "No open release-please-owned PR to merge."
+            exit 0
+          fi
+
+          while IFS= read -r pr_number; do
+            [ -z "$pr_number" ] && continue
+            echo "Merging release PR #${pr_number}..."
+            gh pr merge "$pr_number" --auto --merge --delete-branch --repo "$REPO"
+          done <<< "$RELEASE_PLEASE_PRS"
 
       # Publish step: runs only when a release is created.
       # Uncomment and customize for your project:
