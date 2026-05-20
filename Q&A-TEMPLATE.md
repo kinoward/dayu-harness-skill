@@ -16,12 +16,17 @@
 - 选项格式固定为 `[1] 中文选项 / English option`；默认项必须写明 `（默认，推荐）/ (default, recommended)`。
 - 问题正文使用两行或同段双语均可，但不能只显示中文，也不能只显示英文。
 - `description_nl`、dry-run、merge plan 或检查报告中的关键结论如要转成问题，也必须补充英文说明后再让用户选择。
+- 本节只约束 Skill 运行时问答，不属于部署到目标项目的治理内容。
+- 问答必须优先使用当前宿主已经暴露且可调用的原生交互能力（选择器、确认对话、计划审批控件或等价交互机制），不能默认把连续问题写成普通说明文本。
+- 如果宿主客户端没有暴露可调用的结构化交互能力，采用兼容降级：一次只提出一个阻塞问题，随后立即结束当前回复并等待用户输入；不得在同一轮继续执行命令、不得把语言选择、环境初始化、能力选择或 merge 策略合并成一个长问题，也不得声称已经打开原生交互控件。
+- 若用户已经在当前请求中明确给出完整预设（例如部署语言、初始化许可、可选能力启用/跳过策略），可跳过对应问题，但必须在确认汇总中列明这些预设来源。
+- This section governs only Skill runtime Q&A, not deployed target-project governance content. Use native host interaction only when it is explicitly exposed and callable; otherwise ask exactly one blocking question per turn, stop immediately, and wait for the user's answer before running more commands.
 
 ## 前置问题
 
 ### 部署语言
 
-进入能力问答前，先询问部署到目标项目的文档语言：
+进入能力问答前，先询问部署到目标项目的文档语言。除非用户已经明确给出部署语言，否则本问题是第一个阻塞交互点；提出后必须等待回答，不得同时执行环境检查。
 
 ```markdown
 请选择部署到目标项目的文档语言。推荐使用中文，因为中文是本 Skill 的源语言，更贴近作者意图。
@@ -35,7 +40,7 @@ Please choose the documentation language to deploy to the target project. Chines
 
 ### 环境前置检查
 
-进入能力问答前，先执行：
+部署语言确认后，再进入环境前置检查：
 
 ```bash
 scripts/ensure-environment.sh <project-root> --check
@@ -44,7 +49,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 ```
 
 - `status == "ok"`：继续问题收集与能力选配。
-- `status == "needs_install"`、`status == "needs_initialization"` 或 `status == "needs_user_action"`：展示缺失依赖与 `items`，提示用户选择「安装/初始化/登录」或「终止流程」。
+- `status == "needs_install"`、`status == "needs_initialization"` 或 `status == "needs_user_action"`：展示缺失依赖与 `items`，提示用户选择「安装/初始化/登录」或「终止流程」；提出该选择后必须停止并等待用户回答。
 - 未显式传入 `--capabilities` 时，环境脚本按默认必选能力检查；可选能力确定后，必须用完整 resolved capability ids 重新检查或通过 `scaffold.sh --dry-run` 查看内嵌的 `environment` 结果。
 - 默认 Git 约束缺失时提示执行 `git init`。
 - 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化。
