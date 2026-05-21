@@ -75,16 +75,16 @@ When `gh pr create` fails:
 
 ## PR Merge
 
-Use `gh pr merge <PR-number> --merge` (merge commit) to keep all child commits intact in main.
+Use `gh pr merge <PR-number> --merge` (merge commit) to keep all child commits intact in `__DAYU_DEFAULT_BRANCH__`.
 
 Post-merge cleanup:
 ```bash
-git checkout main
-git pull origin main
+git checkout __DAYU_DEFAULT_BRANCH__
+git pull origin __DAYU_DEFAULT_BRANCH__
 ```
 
 Auto-retry on merge failures:
-1. **Merge conflict** → switch to PR branch, rebase main, resolve conflict, and re-push
+1. **Merge conflict** → switch to PR branch, rebase `__DAYU_DEFAULT_BRANCH__`, resolve conflict, and re-push
 2. **CI check failed** → wait or fix
 3. **Permission denied** → report to user
 4. **Network error** → retry; report to user after 3 failed attempts

@@ -75,16 +75,16 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## PR 合并
 
-使用 `gh pr merge <PR-number> --merge`（merge commit），PR 内所有子 commit 完整保留进入 main 分支。
+使用 `gh pr merge <PR-number> --merge`（merge commit），PR 内所有子 commit 完整保留进入默认分支（`__DAYU_DEFAULT_BRANCH__`）。
 
 合并后清理：
 ```bash
-git checkout main
-git pull origin main
+git checkout __DAYU_DEFAULT_BRANCH__
+git pull origin __DAYU_DEFAULT_BRANCH__
 ```
 
 合并失败自动重试：
-1. **合并冲突** → 切换到 PR 分支，rebase main 解决冲突后重新推送
+1. **合并冲突** → 切换到 PR 分支，rebase `__DAYU_DEFAULT_BRANCH__` 解决冲突后重新推送
 2. **CI check 未通过** → 等待或修复
 3. **权限不足** → 报告用户
 4. **网络错误** → 重试，连续 3 次失败报告用户

@@ -38,6 +38,28 @@
       "dst": ".github/scripts/release_please_policy.py"
     }
   ],
+  "remote_actions": [
+    {
+      "kind": "secret_check",
+      "name": "RELEASE_TOKEN",
+      "api": "GET /repos/{owner}/{repo}/actions/secrets",
+      "requires": [
+        "gh_auth",
+        "repo_admin"
+      ],
+      "manual_value_required": true
+    },
+    {
+      "kind": "variable_check",
+      "name": "RELEASE_PLEASE_ALLOWED_ACTORS",
+      "api": "GET /repos/{owner}/{repo}/actions/variables",
+      "requires": [
+        "gh_auth",
+        "repo_admin"
+      ],
+      "manual_value_required": false
+    }
+  ],
   "installer": null,
   "acceptance": [
     "release-please workflow exists",

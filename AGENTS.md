@@ -21,9 +21,11 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [marketing/](marketing/) - 独立对外传播物料，不参与 Skill 功能或部署产物
 - [scripts/](scripts/) - Skill 内部环境前置、初始化与安装脚本
 - [scripts/check-i18n-drift.sh](scripts/check-i18n-drift.sh) - README 与部署模板镜像漂移检查
+- [scripts/github-remote.sh](scripts/github-remote.sh) - GitHub 远端检查、创建/绑定、推送与远端能力验证脚本
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
+- [tests/smoke/dayu-harness-profile.sh](tests/smoke/dayu-harness-profile.sh) - local-fast / remote-smoke / remote-release 分层测试入口
 
 目录索引变化时，必须同步更新本区块。README 面向使用者，不维护完整仓库目录树；如目录变化影响使用方式或对外说明，再同步更新 [README.md](README.md) 的简版介绍。
 
@@ -181,6 +183,9 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 │   └── archive/
 ├── .husky/                            # 默认：git.hooks + hook 承载的 Git 能力
 ├── .github/                           # 可选：GitHub 工作流、规则集、仓库设置与 release 资产
+│   ├── ISSUE_TEMPLATE/                # 可选：Issue 模板目录
+│   │   └── dayu-harness-issue.md     # 可选：Issue 输入模板
+│   ├── pull_request_template.md        # 可选：PR 输入模板
 │   ├── repository/                    # 可选：仓库设置策略模板区
 │   │   └── pull-request-settings.json  # 可选：PR 设置策略模板
 │   ├── dayu-harness/                  # 可选：TDD 策略文件目录

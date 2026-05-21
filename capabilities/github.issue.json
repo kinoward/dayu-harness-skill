@@ -18,6 +18,10 @@
       "dst": ".github/workflows/issue-lint.yml"
     },
     {
+      "src": "assets/github/ISSUE_TEMPLATE/dayu-harness-issue.md",
+      "dst": ".github/ISSUE_TEMPLATE/dayu-harness-issue.md"
+    },
+    {
       "src": "assets/github/scripts/issue_depends_on.py",
       "dst": ".github/scripts/issue_depends_on.py"
     }

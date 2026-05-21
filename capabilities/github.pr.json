@@ -22,6 +22,10 @@
       "dst": ".github/workflows/pr-lint.yml"
     },
     {
+      "src": "assets/github/pull_request_template.md",
+      "dst": ".github/pull_request_template.md"
+    },
+    {
       "src": "assets/github/scripts/pr_body_structure.py",
       "dst": ".github/scripts/pr_body_structure.py"
     }

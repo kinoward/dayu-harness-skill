@@ -38,9 +38,10 @@ Please choose the documentation language to deploy to the target project. Chines
 
 用户选择中文或未明确选择时，后续 `scaffold.sh` 使用默认 `--locale zh-CN`；用户明确选择英文时，执行 `scaffold.sh --locale en`。无论选择哪种语言，写入目标项目的路径保持不变，只改变部署内容语言。
 
-### 环境前置检查
+### 本地初始化与项目基线
 
-部署语言确认后，再进入环境前置检查：
+部署语言确认后，先完成本地初始化与项目基线检查：
+After confirming the documentation language, complete local initialization and baseline checks first:
 
 ```bash
 scripts/ensure-environment.sh <project-root> --check
@@ -51,8 +52,11 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - `status == "ok"`：继续问题收集与能力选配。
 - `status == "needs_install"`、`status == "needs_initialization"` 或 `status == "needs_user_action"`：展示缺失依赖与 `items`，提示用户选择「安装/初始化/登录」或「终止流程」；提出该选择后必须停止并等待用户回答。
 - 未显式传入 `--capabilities` 时，环境脚本按默认必选能力检查；可选能力确定后，必须用完整 resolved capability ids 重新检查或通过 `scaffold.sh --dry-run` 查看内嵌的 `environment` 结果。
-- 默认 Git 约束缺失时提示执行 `git init`。
-- 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化。
+- 全新 Git 仓库必须使用 `git init -b main`；老 Git 版本 fallback 为 `git init && git branch -M main`。已有仓库保留当前默认分支，并把该分支作为后续 GitHub workflow、ruleset 和文档命令的默认分支。
+- New Git repositories must use `git init -b main`; older Git falls back to `git init && git branch -M main`. Existing repositories keep their current default branch, and that branch becomes the default for later GitHub workflows, rulesets, and documented commands.
+- 初始化时若缺少 `README.md`、`VERSION` 或 `CHANGELOG.md`，apply 阶段会补齐。空项目初始版本为 `0.1.0`；已有 `package.json.version` 时以现有版本为准创建 `VERSION` 和起始 CHANGELOG。
+- During initialization, missing `README.md`, `VERSION`, or `CHANGELOG.md` will be created during apply. Empty projects start at `0.1.0`; if `package.json.version` already exists, that version is used for `VERSION` and the initial CHANGELOG entry.
+- 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化；若 Skill 新建 package 或 package 缺 version，则写入 `0.1.0`。
 - 说明：Node/npm/npx、`package.json`、`devDependencies` 仅用于安装/运行治理工具链（如 husky、commitlint、lint-staged），不是目标项目必须是 Node.js 应用的前提。
 - 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或能力关联 installer 脚本。
 
@@ -67,6 +71,38 @@ The target project needs environment preparation first.
 [3] 取消本次部署 / Cancel this deployment
 ```
 
+### GitHub remote / push
+
+本地初始化确认后，再询问是否开启 GitHub 远端托管。用户选择不开启时，GitHub 能力保持未启用，仅继续本地治理能力。
+After local initialization is confirmed, ask whether to enable GitHub remote hosting. If the user declines, keep GitHub capabilities disabled and continue with local governance only.
+
+```markdown
+是否现在开启 GitHub 远端托管并推送当前仓库？
+Do you want to enable GitHub remote hosting and push the current repository now?
+
+[1] 开启 / Enable
+[2] 跳过 / Skip
+[3] 稍后手动 / Configure later manually
+```
+
+用户选择开启后，流程固定为：
+After the user chooses Enable, the flow is fixed:
+
+1. 执行 `gh auth status`；若未登录，提示用户执行 `gh auth login`，并允许用户中断，此时结束 GitHub 能力开启流程。
+2. 询问仓库可见性：
+
+```markdown
+请选择 GitHub 仓库可见性。
+Please choose the GitHub repository visibility.
+
+[1] 私有仓库（默认，推荐）/ Private repository (default, recommended)
+[2] 公开仓库 / Public repository
+```
+
+3. 运行 `scripts/github-remote.sh <project-root> --check` 解析可连接账户、origin 与 `owner/repo`。
+4. 用户确认仓库名与可见性后，运行 `scripts/github-remote.sh <project-root> --apply` 创建或绑定远端，并执行 `git push -u origin <default-branch>`。
+5. 推送成功后，再询问 GitHub/Git 相关能力。启用后，`scaffold.sh --apply --github-remote apply` 会应用 repo settings、rulesets，并用 `scripts/github-remote.sh <project-root> --verify` 回读远端状态。
+
 默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
 
 - `core`
@@ -80,7 +116,7 @@ The target project needs environment preparation first.
 - `project.context`
 - `knowledge.archive`
 
-Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。只有 GitHub、发布自动化、Node.js 工具等可选能力需要询问。
+Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。GitHub remote/push 完成后，再询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力。
 
 可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 稍后手动 / Configure later manually。某些能力仍可附带 `自定义需求 / Custom request` 分支，但不作为默认选项。
 
@@ -96,14 +132,14 @@ Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
 
 ## 专项能力提问示例（覆盖 /dayu-harness 关键能力）
 
-- `github.repository-settings`：仓库设置能力在用户选择启用后，会由脚手架直接同步远端 GitHub 仓库设置。请明确说明这一步需要 GitHub CLI 登录和仓库 administration 权限。
+- `github.repository-settings`：仓库设置能力在用户选择启用后，只会在用户明确进入 GitHub remote apply 流程时同步远端 GitHub 仓库设置。请明确说明这一步需要 GitHub CLI 登录和仓库 administration 权限。
 
 ```markdown
 是否立即启用 GitHub 仓库 PR 设置（PR 自动合并、合并后删除分支）？
 Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)?
 
-选择启用后，`scaffold.sh --apply` 会直接调用 GitHub API 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；不会再要求后续手动确认。
-After you choose Enable, `scaffold.sh --apply` directly calls the GitHub API to set `allow_auto_merge=true` and `delete_branch_on_merge=true`; no later manual confirmation is required.
+选择启用后，只有在用户明确选择 `--github-remote apply` 时，`scaffold.sh --apply` 才会委托 `scripts/github-remote.sh` 调用 GitHub API 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；`auto`、`check`、`verify`、`skip` 不会隐式写入远端。
+After you choose Enable, `scaffold.sh --apply` delegates the GitHub API write to `scripts/github-remote.sh` only when the user explicitly chooses `--github-remote apply`; `auto`, `check`, `verify`, and `skip` do not write remote settings implicitly.
 
 执行前必须已通过 `gh auth status`，且当前账号具备目标仓库 administration 权限。
 Before applying, `gh auth status` must pass and the current account must have administration permission on the target repository.
@@ -184,10 +220,10 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | 部署仓库设置策略模板，并在 `--apply` 阶段直接调用 GitHub API 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；dry-run 只预览。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
+| `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | 部署仓库设置策略模板；只有 `--github-remote apply` 会委托 `scripts/github-remote.sh` 写入 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`，dry-run 和 skip 只预览/跳过。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、signature、troubleshooting index 与 issue closing 位置校验；不限制提交/正文语言。 | GitHub 项目 |
 | `github.issue` | 是否需要 issue 依赖检查，支持 `Depends on: #N` 的顺序组织？<br>Do you need issue dependency checking with `Depends on: #N` ordering support? | 部署 issue lint workflow 与脚本。仅校验依赖顺序标记，不打标签、不评论、不做语言检查。 | GitHub 项目 |
-| `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过 main/master ruleset 与本地 pre-push branch snippet 实现。 | GitHub 项目 |
+| `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过实际默认分支 ruleset 与本地 pre-push branch snippet 实现；新仓库默认 `main`，已有仓库保留当前默认分支。 | GitHub 项目 |
 | `release.versioning` | 是否需要统一版本号和 release tag 规则，降低误发风险？<br>Do you need unified version and release tag rules to reduce release mistakes? | 通过版本规约、tag ruleset 与本地 pre-push tag snippet 实现。 | 有发布流程的项目 |
 | `quality.practices` | 是否希望建立通用开发纪律和测试策略？<br>Do you want general development discipline and testing strategy? | 部署 dev hygiene 与 testing strategy 文档，不安装 Node.js 工具。 | 含代码项目 |
 | `quality.node-tooling` | 是否希望在提交前自动拦截常见 Node.js 代码质量与格式问题？<br>Do you want common Node.js quality and formatting issues blocked before commit? | 通过 ESLint、Prettier、lint-staged 和 pre-commit hook snippet 实现。 | Node.js 项目；复杂配置默认 `manual_required` |
@@ -243,10 +279,13 @@ Merge plan:
 
 ## 执行规则
 
-1. `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`：先返回依赖检查结果；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行的安装、初始化或登录动作并等待用户确认；用户若拒绝则终止流程。
-2. `scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan；脚本会自动包含 `default=true` 的必选能力
-3. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --enable <optional ids>`；clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准
-4. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 `scaffold.sh --dry-run` 与 diff-helper/manual review 产出对比描述
-5. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`
-6. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`
-7. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项
+1. `scripts/ensure-environment.sh <project-root> --check --capabilities "<local/default capability ids>"`：先处理本地工具、Git 初始化、Node 初始化和 README/VERSION/CHANGELOG 基线；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行动作并等待用户确认；用户若拒绝则终止流程。
+2. 用户选择 GitHub remote/push 后，先运行 `gh auth status`；未登录则辅助用户执行 `gh auth login`，用户可中断并跳过 GitHub 能力。
+3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，再运行 `scripts/github-remote.sh <project-root> --check` 和 `--apply` 创建/绑定远端并 `git push -u origin <default-branch>`。
+4. 远端推送完成后，再询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力；`scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan，脚本会自动包含 `default=true` 的必选能力，并展示 `default_branch`、`project_baseline`、`github_remote`、`remote_validation` 与 `remote_actions`。
+5. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --enable <optional ids> --github-remote apply`；clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准。
+6. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 `scaffold.sh --dry-run` 与 diff-helper/manual review 产出对比描述。
+7. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`。
+8. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`；GitHub 能力启用时再执行 `scripts/github-remote.sh <project-root> --verify`。
+9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验，`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR，`remote-release` 只在显式开启时验证 release-please；不得用 `workflow_dispatch` 作为远端成功标准。
+10. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项。
