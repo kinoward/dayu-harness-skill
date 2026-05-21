@@ -20,6 +20,7 @@ ONLY_EXPLICIT="false"
 STRATEGY=""
 LOCALE="zh-CN"
 GITHUB_REMOTE_MODE="${DAYU_HARNESS_GITHUB_REMOTE:-auto}"
+FINALIZE_GIT="${DAYU_HARNESS_FINALIZE_GIT:-skip}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -66,6 +67,22 @@ while [ $# -gt 0 ]; do
             esac
             shift 2
             ;;
+        --finalize-git)
+            if [ $# -gt 1 ] && [[ "${2:-}" != --* ]]; then
+                FINALIZE_GIT="${2:-auto}"
+                shift 2
+            else
+                FINALIZE_GIT="auto"
+                shift
+            fi
+            case "$FINALIZE_GIT" in
+                auto|skip) ;;
+                *)
+                    echo "error: unsupported --finalize-git '$FINALIZE_GIT'. Supported: auto|skip" >&2
+                    exit 2
+                    ;;
+            esac
+            ;;
         --help|-h)
             MODE="help"
             shift
@@ -78,7 +95,7 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en] [--github-remote auto|check|apply|verify|skip]"
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en] [--github-remote auto|check|apply|verify|skip] [--finalize-git auto|skip]"
     echo "说明:"
     echo "  - default=true 的必选能力始终部署；--enable 在必选集上追加能力"
     echo "  - --enable 与 --only 支持逗号分隔；--only 保留历史兼容，不会排除必选能力"
@@ -88,6 +105,7 @@ usage() {
     echo "  - --apply 默认不替换已存在文件；安装器 clean 时自动 merge，已有配置需通过 --strategy 声明安全策略"
     echo "  - --locale 选择模板语言。默认 zh-CN；en 将优先使用 manifest.template_files_i18n.en（如存在）"
     echo "  - --github-remote 控制 GitHub remote 编排。默认 auto：dry-run/check 只检查，apply 不推送；apply 需用户显式选择"
+    echo "  - --finalize-git auto 会在部署和本地验证通过后精确 stage managed_paths 并创建初始化提交；默认 skip"
 }
 
 if [ "$MODE" = "help" ] || [ -z "${TARGET:-}" ]; then
@@ -140,6 +158,7 @@ DEFAULT_BRANCH="main"
 PROJECT_VERSION="0.1.0"
 GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was not requested."}'
 REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was not requested."}'
+MANAGED_PATHS=()
 
 if ! command -v jq >/dev/null 2>&1; then
     if [ -f "$ENVIRONMENT_SCRIPT" ] && [ -x "$ENVIRONMENT_SCRIPT" ]; then
@@ -185,6 +204,162 @@ join_json() {
         fi
     done
     printf '%s' "$out"
+}
+
+add_managed_path() {
+    local path="$1"
+    local existing
+    [ -n "$path" ] || return 0
+    path="${path#./}"
+    case "$path" in
+        .claude|.claude/*|skills-lock.json|./skills-lock.json)
+            return 0
+            ;;
+    esac
+    if [ "${#MANAGED_PATHS[@]}" -gt 0 ]; then
+        for existing in "${MANAGED_PATHS[@]}"; do
+            [ "$existing" = "$path" ] && return 0
+        done
+    fi
+    MANAGED_PATHS+=( "$path" )
+}
+
+json_array_from_lines() {
+    local out="["
+    local sep=""
+    local item
+    for item in "$@"; do
+        [ -n "$item" ] || continue
+        out="${out}${sep}\"$(json_escape "$item")\""
+        sep=","
+    done
+    out="${out}]"
+    printf '%s' "$out"
+}
+
+installer_managed_paths() {
+    case "$1" in
+        install-gitignore.sh)
+            printf '%s\n' ".gitignore"
+            ;;
+        install-husky.sh)
+            printf '%s\n' ".husky/commit-msg" ".husky/pre-commit" ".husky/pre-push"
+            ;;
+    esac
+}
+
+collect_managed_paths_for_capability() {
+    local manifest_path="$1"
+    local kind items_json dst_rel installer_script installer_path
+
+    for kind in template asset; do
+        items_json="$(get_kind_items_json "$manifest_path" "$kind")"
+        while IFS= read -r dst_rel; do
+            add_managed_path "$dst_rel"
+        done < <(echo "$items_json" | jq -r '.[].dst? // empty')
+    done
+
+    installer_script="$(jq -r '.installer.script // empty' "$manifest_path")"
+    [ -n "$installer_script" ] || return 0
+    while IFS= read -r installer_path; do
+        add_managed_path "$installer_path"
+    done < <(installer_managed_paths "$installer_script")
+}
+
+collect_managed_paths_for_apply() {
+    local cap_id manifest_path
+    MANAGED_PATHS=()
+    add_managed_path "README.md"
+    add_managed_path "VERSION"
+    add_managed_path "CHANGELOG.md"
+    add_managed_path "package.json"
+    add_managed_path "package-lock.json"
+
+    for cap_id in "$@"; do
+        manifest_path="$(manifest_path_for_id "$cap_id")" || continue
+        collect_managed_paths_for_capability "$manifest_path"
+    done
+}
+
+managed_staging_policy_json() {
+    printf '{"command":"git add -- <managed_paths>","forbidden":["git add .","git add -A","git add --all"],"excluded":[".claude/","skills-lock.json"],"description_nl":"部署后提交只允许 stage Dayu 管理文件和初始化产物，禁止使用 git add .，并排除 .claude/ 与 skills-lock.json。"}'
+}
+
+managed_path_is_allowed_for_stage() {
+    local path="$1"
+    case "$path" in
+        .claude|.claude/*|skills-lock.json)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+finalize_git_after_apply() {
+    local apply_status="$1"
+    local checks_status="$2"
+    local name email commit_output commit_rc commit_sha
+    local stage_paths=()
+    local path
+
+    if [ "$FINALIZE_GIT" = "skip" ]; then
+        printf '{"status":"skipped","description_nl":"Git finalization was skipped by configuration."}'
+        return 0
+    fi
+
+    if [ "$apply_status" != "ok" ] || [ "$checks_status" != "passed" ]; then
+        printf '{"status":"skipped","description_nl":"Git finalization waits until deployment and post-apply checks are fully passed."}'
+        return 0
+    fi
+
+    if [ ! -d "$TARGET/.git" ]; then
+        printf '{"status":"needs_initialization","description_nl":"目标目录还不是 Git 仓库，无法创建初始化提交。"}'
+        return 0
+    fi
+
+    name="$(git -C "$TARGET" config user.name 2>/dev/null || true)"
+    email="$(git -C "$TARGET" config user.email 2>/dev/null || true)"
+    if [ -z "$name" ] || [ -z "$email" ]; then
+        printf '{"status":"needs_user_action","description_nl":"Git user.name 或 user.email 未配置，无法创建初始化提交。"}'
+        return 0
+    fi
+
+    for path in "${MANAGED_PATHS[@]}"; do
+        managed_path_is_allowed_for_stage "$path" || continue
+        [ -e "$TARGET/$path" ] || continue
+        stage_paths+=( "$path" )
+    done
+
+    if [ "${#stage_paths[@]}" -eq 0 ]; then
+        printf '{"status":"clean","description_nl":"没有可 stage 的 Dayu managed paths。"}'
+        return 0
+    fi
+
+    if ! git -C "$TARGET" add -- "${stage_paths[@]}" >/dev/null 2>&1; then
+        printf '{"status":"error","description_nl":"精确 stage managed paths 失败。"}'
+        return 0
+    fi
+    git -C "$TARGET" reset -q -- .claude skills-lock.json >/dev/null 2>&1 || true
+
+    if git -C "$TARGET" diff --cached --quiet --exit-code >/dev/null 2>&1; then
+        printf '{"status":"clean","description_nl":"managed paths 没有新的待提交变更。"}'
+        return 0
+    fi
+
+    set +e
+    commit_output="$(git -C "$TARGET" commit -m "chore: initialize Dayu Harness governance" 2>&1)"
+    commit_rc=$?
+    set -e
+
+    if [ "$commit_rc" -ne 0 ]; then
+        printf '{"status":"error","description_nl":"初始化提交失败：%s"}' "$(json_escape "$commit_output")"
+        return 0
+    fi
+
+    commit_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || true)"
+    printf '{"status":"committed","commit":"%s","staged_paths":%s,"description_nl":"已创建 Dayu Harness 初始化提交，只包含 managed paths。"}' \
+        "$(json_escape "$commit_sha")" \
+        "$(json_array_from_lines "${stage_paths[@]}")"
 }
 
 trim() {
@@ -970,6 +1145,80 @@ run_environment_gate() {
     bash "$ENVIRONMENT_SCRIPT" "$TARGET" "--$mode" --capabilities "$capabilities"
 }
 
+json_payload_from_output() {
+    awk 'BEGIN {emit=0} /^[[:space:]]*\{/ {emit=1} emit {print}'
+}
+
+run_post_apply_checks() {
+    local check_name rel_path fallback_path script_path check_output check_rc payload desc status
+    local items=()
+    local failed=0
+    local skipped=0
+    POST_VALIDATE_STATUS="skipped"
+    POST_VALIDATE_DESC=""
+
+    run_one_check() {
+        check_name="$1"
+        rel_path="$2"
+        fallback_path="$3"
+        script_path="$TARGET/$rel_path"
+        if [ ! -f "$script_path" ]; then
+            script_path="$fallback_path"
+        fi
+
+        if [ ! -f "$script_path" ]; then
+            skipped=$((skipped + 1))
+            status="skipped"
+            desc="${rel_path} is missing."
+            items+=( "{\"name\":\"$(json_escape "$check_name")\",\"script\":\"$(json_escape "$rel_path")\",\"status\":\"$status\",\"exit_code\":0,\"description_nl\":\"$(json_escape "$desc")\"}" )
+            return 0
+        fi
+
+        set +e
+        check_output="$(bash "$script_path" --json "$TARGET" 2>&1)"
+        check_rc=$?
+        set -e
+        payload="$(printf '%s\n' "$check_output" | json_payload_from_output)"
+        desc="$(printf '%s' "$payload" | jq -r '.description_nl // .summary // empty' 2>/dev/null || true)"
+        if [ -z "$desc" ]; then
+            desc="$(printf '%s\n' "$check_output" | sed -n '1,4p' | tr '\n' ' ')"
+        fi
+
+        if [ "$check_rc" -eq 0 ]; then
+            status="passed"
+        else
+            status="failed"
+            failed=$((failed + 1))
+        fi
+
+        if [ "$check_name" = "validate" ]; then
+            POST_VALIDATE_STATUS="$status"
+            POST_VALIDATE_DESC="$desc"
+        fi
+
+        items+=( "{\"name\":\"$(json_escape "$check_name")\",\"script\":\"$(json_escape "$rel_path")\",\"status\":\"$status\",\"exit_code\":$check_rc,\"description_nl\":\"$(json_escape "$desc")\"}" )
+    }
+
+    run_one_check "validate" "docs/harness/sensors/scripts/validate.sh" "$SKILL_DIR/templates/docs/harness/sensors/scripts/validate.sh"
+    run_one_check "audit" "docs/harness/sensors/scripts/audit.sh" "$SKILL_DIR/templates/docs/harness/sensors/scripts/audit.sh"
+    run_one_check "check-consistency" "docs/harness/sensors/scripts/check-consistency.sh" "$SKILL_DIR/templates/docs/harness/sensors/scripts/check-consistency.sh"
+
+    local overall="passed"
+    local description="部署后 validate、audit 与 check-consistency 均通过。"
+    if [ "$failed" -gt 0 ]; then
+        overall="failed"
+        description="部署后验证存在 ${failed} 个失败项。"
+    elif [ "$skipped" -gt 0 ]; then
+        overall="partial"
+        description="部署后验证有 ${skipped} 个跳过项。"
+    fi
+
+    printf '{"status":"%s","checks":[%s],"description_nl":"%s"}' \
+        "$overall" \
+        "$(join_json "${items[@]}")" \
+        "$(json_escape "$description")"
+}
+
 do_dry_run() {
     local requested_ids=()
     local capability_ids=()
@@ -1067,6 +1316,7 @@ do_dry_run() {
     capabilities_json="$(join_json "${capability_jsons[@]}")"
     local summary
     summary="$(build_selected_list_summary "${capability_ids[@]}")"
+    collect_managed_paths_for_apply "${capability_ids[@]}"
 
     cat <<JSONEOF
 {
@@ -1079,6 +1329,8 @@ do_dry_run() {
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
+  "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),
+  "staging_policy":$(managed_staging_policy_json),
   "summary":"Selected capabilities: $(json_escape "$summary")",
   "description_nl":"$(json_escape "$top_desc")",
   "total_files":$DRY_FILES,
@@ -1277,14 +1529,59 @@ JSONEOF
         capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"remote_actions\":$remote_actions_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"items\":[$items_json]}" )
     done
 
+    local overall_status="ok"
+    if [ "$APPLY_ERROR" -gt 0 ] || [ "$APPLY_MISSING" -gt 0 ]; then
+        overall_status="error"
+    elif [ "$APPLY_STRATEGY_REQUIRED" -gt 0 ]; then
+        overall_status="needs_strategy"
+    elif [ "$APPLY_PARTIAL" -gt 0 ] || [ "$APPLY_SKIPPED" -gt 0 ]; then
+        overall_status="partial"
+    fi
+
+    local post_apply_checks_json post_apply_status validation_status validation_desc
+    post_apply_checks_json="$(run_post_apply_checks)"
+    post_apply_status="$(echo "$post_apply_checks_json" | jq -r '.status // "skipped"' 2>/dev/null || echo "skipped")"
+    validation_status="$(echo "$post_apply_checks_json" | jq -r '.checks[]? | select(.name == "validate") | .status' 2>/dev/null | sed -n '1p')"
+    validation_desc="$(echo "$post_apply_checks_json" | jq -r '.checks[]? | select(.name == "validate") | .description_nl' 2>/dev/null | sed -n '1p')"
+    [ -n "$validation_status" ] || validation_status="skipped"
+    if [ "$post_apply_status" = "failed" ] && [ "$overall_status" = "ok" ]; then
+        overall_status="error"
+    elif [ "$post_apply_status" = "partial" ] && [ "$overall_status" = "ok" ]; then
+        overall_status="partial"
+    fi
+
+    collect_managed_paths_for_apply "${capability_ids[@]}"
+
+    local git_finalization_json git_finalization_status
+    git_finalization_json="$(finalize_git_after_apply "$overall_status" "$post_apply_status")"
+    git_finalization_status="$(echo "$git_finalization_json" | jq -r '.status // "skipped"' 2>/dev/null || echo "error")"
+    if [ "$FINALIZE_GIT" = "auto" ]; then
+        if [ "$git_finalization_status" = "error" ]; then
+            overall_status="error"
+        elif [ "$git_finalization_status" = "needs_user_action" ] || [ "$git_finalization_status" = "needs_initialization" ]; then
+            if [ "$overall_status" = "ok" ]; then
+                overall_status="needs_user_action"
+            fi
+        fi
+    fi
+
     if [ "$has_remote_actions" = "true" ]; then
         case "$GITHUB_REMOTE_MODE" in
             apply)
-                GITHUB_REMOTE_JSON="$(run_github_remote apply "${capability_ids[@]}")"
-                REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                if [ "$overall_status" = "ok" ]; then
+                    GITHUB_REMOTE_JSON="$(run_github_remote apply "${capability_ids[@]}")"
+                    REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                else
+                    GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote sync waits until deployment, validation, and initialization commit are successful."}'
+                    REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was skipped because local finalization did not complete successfully."}'
+                fi
                 ;;
             verify)
-                REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                if [ "$overall_status" = "ok" ]; then
+                    REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                else
+                    REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation waits until deployment and local validation are successful."}'
+                fi
                 ;;
             skip)
                 GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was skipped by user choice."}'
@@ -1298,42 +1595,19 @@ JSONEOF
         remote_status="$(echo "$GITHUB_REMOTE_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "error")"
         remote_validation_status="$(echo "$REMOTE_VALIDATION_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "error")"
         if [ "$GITHUB_REMOTE_MODE" = "apply" ] && [ "$remote_status" = "error" ]; then
-            APPLY_ERROR=$((APPLY_ERROR + 1))
+            overall_status="error"
         elif [ "$GITHUB_REMOTE_MODE" = "apply" ] && [ "$remote_status" != "ok" ] && [ "$remote_status" != "skipped" ]; then
-            APPLY_PARTIAL=$((APPLY_PARTIAL + 1))
+            if [ "$overall_status" = "ok" ]; then
+                overall_status="partial"
+            fi
         fi
         if [ "$GITHUB_REMOTE_MODE" = "verify" ] || [ "$GITHUB_REMOTE_MODE" = "apply" ]; then
             if [ "$remote_validation_status" = "error" ]; then
-                APPLY_ERROR=$((APPLY_ERROR + 1))
-            elif [ "$remote_validation_status" != "ok" ] && [ "$remote_validation_status" != "skipped" ]; then
-                APPLY_PARTIAL=$((APPLY_PARTIAL + 1))
-            fi
-        fi
-    fi
-
-    local overall_status="ok"
-    if [ "$APPLY_ERROR" -gt 0 ] || [ "$APPLY_MISSING" -gt 0 ]; then
-        overall_status="error"
-    elif [ "$APPLY_STRATEGY_REQUIRED" -gt 0 ]; then
-        overall_status="needs_strategy"
-    elif [ "$APPLY_PARTIAL" -gt 0 ] || [ "$APPLY_SKIPPED" -gt 0 ]; then
-        overall_status="partial"
-    fi
-
-    local validation_status="skipped"
-    local validation_desc=""
-    if [ -f "$VALIDATE_SCRIPT" ] && [ -x "$VALIDATE_SCRIPT" ]; then
-        set +e
-        validate_output="$(bash "$VALIDATE_SCRIPT" --json "$TARGET" 2>&1)"
-        validate_rc=$?
-        set -e
-        if [ "$validate_rc" -eq 0 ]; then
-            validation_status="passed"
-        else
-            validation_status="failed"
-            validation_desc="$(echo "$validate_output" | jq -r '.description_nl // .summary // "validate failed"' 2>/dev/null || echo "validate failed")"
-            if [ "$overall_status" = "ok" ]; then
                 overall_status="error"
+            elif [ "$remote_validation_status" != "ok" ] && [ "$remote_validation_status" != "skipped" ]; then
+                if [ "$overall_status" = "ok" ]; then
+                    overall_status="partial"
+                fi
             fi
         fi
     fi
@@ -1341,6 +1615,8 @@ JSONEOF
     local top_desc="Apply completed with status $overall_status."
     if [ "$overall_status" = "needs_strategy" ]; then
         top_desc="Apply required a strategy for installer-backed capabilities. Re-run with an allowed --strategy value."
+    elif [ "$overall_status" = "needs_user_action" ]; then
+        top_desc="Apply wrote and validated files, but initialization commit or sync needs user action."
     elif [ "$overall_status" = "partial" ]; then
         if [ "$STRATEGY" = "skip" ]; then
             top_desc="Apply completed with partial changes. Installer-managed components were skipped, while static files were still processed."
@@ -1372,6 +1648,9 @@ JSONEOF
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
+  "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),
+  "staging_policy":$(managed_staging_policy_json),
+  "git_finalization":${git_finalization_json},
   "summary":"Applied capability set: $(json_escape "$summary")",
   "description_nl":"$(json_escape "$top_desc")",
   "applied_count":$APPLY_NEW,
@@ -1381,6 +1660,7 @@ JSONEOF
   "files_existing":$APPLY_EXISTING,
   "validation":"$(json_escape "$validation_status")",
   "validation_description_nl":"$(json_escape "$validation_desc")",
+  "post_apply_checks":${post_apply_checks_json},
   "applied":"$(json_escape "$applied_list")"
 }
 JSONEOF

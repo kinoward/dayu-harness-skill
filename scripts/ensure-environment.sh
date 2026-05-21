@@ -86,6 +86,7 @@ DEFAULT_BRANCH="main"
 PROJECT_VERSION="0.1.0"
 PACKAGE_CREATED=false
 PACKAGE_VERSION_WAS_MISSING=false
+PACKAGE_LOCK_CREATED=false
 
 DEFAULT_CAPABILITIES=(
     "core"
@@ -211,6 +212,17 @@ read_version_file() {
     fi
 }
 
+read_package_lock_version() {
+    if [ -f "$TARGET/package-lock.json" ] && command -v jq >/dev/null 2>&1; then
+        local lock_version=""
+        lock_version="$(jq -r '.packages[""].version // empty' "$TARGET/package-lock.json" 2>/dev/null || true)"
+        if [ -z "$lock_version" ] || [ "$lock_version" = "null" ]; then
+            lock_version="$(jq -r '.version // empty' "$TARGET/package-lock.json" 2>/dev/null || true)"
+        fi
+        printf '%s' "$lock_version"
+    fi
+}
+
 extract_semver_token() {
     local raw="$1"
     local parsed=""
@@ -250,14 +262,17 @@ read_release_manifest_version() {
 }
 
 refresh_project_version() {
-    local package_version version_file changelog_version manifest_version
+    local package_version package_lock_version version_file changelog_version manifest_version
     package_version="$(read_package_version)"
+    package_lock_version="$(read_package_lock_version)"
     version_file="$(read_version_file)"
     changelog_version="$(read_changelog_version)"
     manifest_version="$(read_release_manifest_version)"
 
     if [ -n "$package_version" ]; then
         PROJECT_VERSION="$package_version"
+    elif [ -n "$package_lock_version" ]; then
+        PROJECT_VERSION="$package_lock_version"
     elif [ -n "$version_file" ]; then
         PROJECT_VERSION="$version_file"
     elif [ -n "$changelog_version" ]; then
@@ -268,12 +283,13 @@ refresh_project_version() {
 }
 
 detect_version_conflict() {
-    local package_version version_file changelog_version manifest_version
+    local package_version package_lock_version version_file changelog_version manifest_version
     local first_version=""
     local conflict="false"
     local source_summary=""
 
     package_version="$(read_package_version)"
+    package_lock_version="$(read_package_lock_version)"
     version_file="$(read_version_file)"
     changelog_version="$(read_changelog_version)"
     manifest_version="$(read_release_manifest_version)"
@@ -295,6 +311,7 @@ detect_version_conflict() {
     }
 
     add_version_source "package.json" "$package_version"
+    add_version_source "package-lock.json" "$package_lock_version"
     add_version_source "VERSION" "$version_file"
     add_version_source "CHANGELOG.md" "$changelog_version"
     add_version_source ".release-please-manifest.json" "$manifest_version"
@@ -302,7 +319,7 @@ detect_version_conflict() {
 
     if [ "$conflict" = "true" ]; then
         USER_ACTIONS=$((USER_ACTIONS + 1))
-        add_item "project_version" "version_sources" "needs_user_action" "true" "manual_resolve_version_conflict" "检测到项目版本源不一致：${source_summary}。请先选择唯一版本并同步 package.json、VERSION、CHANGELOG.md 与 release manifest。"
+        add_item "project_version" "version_sources" "needs_user_action" "true" "manual_resolve_version_conflict" "检测到项目版本源不一致：${source_summary}。请先选择唯一版本并同步 package.json、package-lock.json、VERSION、CHANGELOG.md 与 release manifest。"
         return 0
     fi
     return 1
@@ -314,12 +331,74 @@ set_package_version() {
     command -v jq >/dev/null 2>&1 || return 0
 
     local tmp_file
-    tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-package.XXXXXX")" || return 1
+    tmp_file="$(mktemp "$TARGET/.dayu-package.XXXXXX")" || return 1
     if jq --arg version "$version" '.version = $version' "$TARGET/package.json" > "$tmp_file"; then
         mv "$tmp_file" "$TARGET/package.json"
         return 0
     fi
     rm -f "$tmp_file"
+    return 1
+}
+
+set_package_lock_version() {
+    local version="$1"
+    [ -f "$TARGET/package-lock.json" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp_file
+    tmp_file="$(mktemp "$TARGET/.dayu-package-lock.XXXXXX")" || return 1
+    if jq --arg version "$version" '
+        if has("packages") and (.packages | type == "object") and ((.packages[""]) | type == "object") then
+            .packages[""] += {version: $version}
+        else
+            .
+        end |
+        if has("version") then
+            .version = $version
+        else
+            .
+        end
+    ' "$TARGET/package-lock.json" > "$tmp_file"; then
+        mv "$tmp_file" "$TARGET/package-lock.json"
+        return 0
+    fi
+
+    rm -f "$tmp_file"
+    return 1
+}
+
+ensure_package_lock_file() {
+    [ "$MODE" = "apply" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    [ -f "$TARGET/package-lock.json" ] && return 0
+    [ -f "$TARGET/package.json" ] || return 0
+
+    local package_name package_lock_tmp lock_version
+    lock_version="${PROJECT_VERSION}"
+
+    package_name="$(jq -r '.name // "dayu-harness-project"' "$TARGET/package.json" 2>/dev/null || echo "dayu-harness-project")"
+    package_lock_tmp="$(mktemp "$TARGET/.dayu-package-lock.XXXXXX")" || return 1
+
+    jq -n --arg name "$package_name" --arg version "$lock_version" '{
+        name: $name,
+        version: $version,
+        lockfileVersion: 3,
+        requires: true,
+        packages: {
+            "": {
+                version: $version,
+                dependencies: {}
+            }
+        },
+        dependencies: {}
+    }' > "$package_lock_tmp"
+
+    if mv "$package_lock_tmp" "$TARGET/package-lock.json"; then
+        PACKAGE_LOCK_CREATED=true
+        return 0
+    fi
+
+    rm -f "$package_lock_tmp"
     return 1
 }
 
@@ -456,7 +535,7 @@ if detect_version_conflict; then
   "installs":0,
   "user_actions":$USER_ACTIONS,
   "errors":0,
-  "description_nl":"检测到项目版本源不一致。请先同步 package.json、VERSION、CHANGELOG.md 与 release manifest 后再部署。"
+  "description_nl":"检测到项目版本源不一致。请先同步 package.json、package-lock.json、VERSION、CHANGELOG.md 与 release manifest 后再部署。"
 }
 JSONEOF
     exit 0
@@ -568,9 +647,13 @@ if [ "$requires_node" = true ]; then
                 if (cd "$TARGET" && npm install --save-dev "${MISSING_NPM_DEPS[@]}" >/dev/null 2>&1); then
                     INSTALLS=$((INSTALLS + 1))
                     add_item "npm_dependencies" "devDependencies" "installed" "true" "npm install --save-dev ${dep_list}" "已安装必需 package.json devDependencies：${dep_list}。"
-                    if { [ "$PACKAGE_CREATED" = true ] || [ "$PACKAGE_VERSION_WAS_MISSING" = true ]; } && ! set_package_version "$PROJECT_VERSION"; then
+                    if ! set_package_version "$PROJECT_VERSION"; then
                         ERRORS=$((ERRORS + 1))
                         add_item "project" "package.version" "error" "false" "set package.json version" "安装依赖后重新同步 package.json version 失败。"
+                    fi
+                    if ! ensure_package_lock_file || ! set_package_lock_version "$PROJECT_VERSION"; then
+                        ERRORS=$((ERRORS + 1))
+                        add_item "project" "package-lock.version" "error" "false" "sync package-lock.json version" "安装依赖后同步 package-lock.json version 失败。"
                     fi
                 else
                     ERRORS=$((ERRORS + 1))
@@ -583,6 +666,28 @@ if [ "$requires_node" = true ]; then
         else
             add_item "npm_dependencies" "devDependencies" "ok" "true" "none" "必需 package.json devDependencies 已存在。"
         fi
+    fi
+fi
+
+if [ "$requires_node" = true ] && [ -f "$TARGET/package.json" ]; then
+    if [ "$MODE" = "apply" ]; then
+        if ensure_package_lock_file && set_package_lock_version "$PROJECT_VERSION"; then
+            if [ "$PACKAGE_LOCK_CREATED" = true ]; then
+                add_item "project" "package-lock.json" "created" "false" "create package-lock.json" "已创建 package-lock.json 并同步版本 ${PROJECT_VERSION}。"
+            elif [ -f "$TARGET/package-lock.json" ]; then
+                add_item "project" "package-lock.version" "configured" "false" "sync package-lock.json version" "package-lock.json version 已同步为 ${PROJECT_VERSION}。"
+            fi
+        else
+            ERRORS=$((ERRORS + 1))
+            add_item "project" "package-lock.version" "error" "false" "sync package-lock.json version" "同步 package-lock.json version 失败。"
+        fi
+    elif [ -f "$TARGET/package-lock.json" ]; then
+        add_item "project" "package-lock.version" "ok" "false" "none" "package-lock.json version 使用 $(read_package_lock_version)。"
+    elif [ "$INSTALLS" -gt 0 ]; then
+        add_item "project" "package-lock.json" "needs_install" "false" "npm install" "package-lock.json 缺失；apply 阶段安装依赖时会生成或补齐并同步版本 ${PROJECT_VERSION}。"
+    else
+        INITIALIZATIONS=$((INITIALIZATIONS + 1))
+        add_item "project" "package-lock.json" "needs_initialization" "false" "create package-lock.json" "项目缺少 package-lock.json，apply 阶段会创建并设置版本 ${PROJECT_VERSION}。"
     fi
 fi
 

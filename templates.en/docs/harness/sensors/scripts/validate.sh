@@ -221,6 +221,18 @@ read_json_value() {
     fi
 }
 
+read_package_lock_version() {
+    local file_path="$PROJECT_ROOT/package-lock.json"
+    local lock_version=""
+    if [ -f "$file_path" ] && command -v jq >/dev/null 2>&1; then
+        lock_version="$(jq -r '.packages[""].version // empty' "$file_path" 2>/dev/null || true)"
+        if [ -z "$lock_version" ] || [ "$lock_version" = "null" ]; then
+            lock_version="$(jq -r '.version // empty' "$file_path" 2>/dev/null || true)"
+        fi
+    fi
+    printf '%s' "$lock_version"
+}
+
 extract_semver_token() {
     local raw="$1"
     local parsed=""
@@ -254,8 +266,9 @@ read_changelog_version() {
 }
 
 check_release_version_sync() {
-    local package_version version_file manifest_version changelog_heading expected mismatches missing
+    local package_version package_lock_version version_file manifest_version changelog_heading expected mismatches missing
     package_version="$(read_json_value "$PROJECT_ROOT/package.json" '.version')"
+    package_lock_version="$(read_package_lock_version)"
     version_file=""
     manifest_version="$(read_json_value "$PROJECT_ROOT/.release-please-manifest.json" '."."')"
     changelog_heading=""
@@ -280,6 +293,7 @@ check_release_version_sync() {
 
     if [ -n "$expected" ]; then
         [ -z "$package_version" ] || [ "$package_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package.json=${package_version}"
+        [ -z "$package_lock_version" ] || [ "$package_lock_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package-lock.json=${package_lock_version}"
         [ -z "$version_file" ] || [ "$version_file" = "$expected" ] || mismatches="${mismatches:+$mismatches, }VERSION=${version_file}"
         [ -z "$manifest_version" ] || [ "$manifest_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }manifest=${manifest_version}"
         [ -z "$changelog_heading" ] || [ "$changelog_heading" = "$expected" ] || mismatches="${mismatches:+$mismatches, }CHANGELOG=${changelog_heading}"
@@ -289,8 +303,55 @@ check_release_version_sync() {
         record_check "release/version-sync" "fail" "Release version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
         log_text "  ✗ Release version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
     else
-        record_check "release/version-sync" "pass" "package.json, VERSION, release manifest, and initial CHANGELOG version match: ${expected}"
+        record_check "release/version-sync" "pass" "package.json, package-lock.json, VERSION, release manifest, and initial CHANGELOG version match: ${expected}"
         log_text "  ✓ Release version sources match: ${expected}"
+    fi
+}
+
+check_project_version_sync() {
+    local package_version package_lock_version version_file changelog_heading expected mismatches missing
+    package_version="$(read_json_value "$PROJECT_ROOT/package.json" '.version')"
+    package_lock_version="$(read_package_lock_version)"
+    version_file=""
+    changelog_heading="$(read_changelog_version)"
+    expected=""
+    mismatches=""
+    missing=""
+
+    if [ -f "$PROJECT_ROOT/VERSION" ]; then
+        version_file="$(sed -n '1p' "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
+    fi
+
+    if [ ! -f "$PROJECT_ROOT/package.json" ] && [ ! -f "$PROJECT_ROOT/package-lock.json" ] && [ ! -f "$PROJECT_ROOT/VERSION" ] && [ ! -f "$PROJECT_ROOT/CHANGELOG.md" ]; then
+        record_check "project/version-sync" "skip" "No initialization version sources found; skipping version sync check"
+        log_text "  - No initialization version sources found; skipping version sync check"
+        return
+    fi
+
+    if [ -f "$PROJECT_ROOT/package.json" ]; then
+        [ -n "$package_version" ] || missing="${missing:+$missing, }package.json.version"
+    fi
+    [ -n "$version_file" ] || missing="${missing:+$missing, }VERSION"
+    [ -n "$changelog_heading" ] || missing="${missing:+$missing, }CHANGELOG.md"
+
+    expected="$package_version"
+    [ -n "$expected" ] || expected="$package_lock_version"
+    [ -n "$expected" ] || expected="$version_file"
+    [ -n "$expected" ] || expected="$changelog_heading"
+
+    if [ -n "$expected" ]; then
+        [ -z "$package_version" ] || [ "$package_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package.json=${package_version}"
+        [ -z "$package_lock_version" ] || [ "$package_lock_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package-lock.json=${package_lock_version}"
+        [ -z "$version_file" ] || [ "$version_file" = "$expected" ] || mismatches="${mismatches:+$mismatches, }VERSION=${version_file}"
+        [ -z "$changelog_heading" ] || [ "$changelog_heading" = "$expected" ] || mismatches="${mismatches:+$mismatches, }CHANGELOG=${changelog_heading}"
+    fi
+
+    if [ -n "$missing" ] || [ -n "$mismatches" ]; then
+        record_check "project/version-sync" "fail" "Initialization version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+        log_text "  ✗ Initialization version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+    else
+        record_check "project/version-sync" "pass" "Initialization version sources match: ${expected}"
+        log_text "  ✓ Initialization version sources match: ${expected}"
     fi
 }
 
@@ -371,6 +432,9 @@ if [ "$JSON_MODE" = false ]; then
     echo "Project path: $PROJECT_ROOT"
     echo ""
 fi
+
+log_text "--- project version ---"
+check_project_version_sync
 
 # 1. Validate husky hooks are executable + parseable
 log_text "--- husky hooks ---"
