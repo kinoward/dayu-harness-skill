@@ -23,8 +23,8 @@ Examples:
 ## Commit Principles
 
 - Split commits by logical change; each commit should have a single purpose
-- Do not commit directly to main branch
-- Route all changes via feature branches + PR merge into main
+- Do not commit directly to the default branch (`__DAYU_DEFAULT_BRANCH__`)
+- Route all changes via feature branches + PR merge into the default branch (`__DAYU_DEFAULT_BRANCH__`)
 
 ## Automated Checks
 

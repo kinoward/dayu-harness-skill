@@ -1,11 +1,11 @@
 {
-  "name": "Protect main branch",
+  "name": "protect-main",
   "target": "branch",
   "enforcement": "active",
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "include": ["refs/heads/main"],
+      "include": ["refs/heads/__DAYU_DEFAULT_BRANCH__"],
       "exclude": []
     }
   },

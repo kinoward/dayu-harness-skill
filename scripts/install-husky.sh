@@ -27,6 +27,7 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
 
 HOOKS_DIR="$TARGET/.husky"
 CAPABILITY="${DAYU_HARNESS_CAPABILITY:-}"
+DEFAULT_BRANCH="${DAYU_HARNESS_DEFAULT_BRANCH:-}"
 
 json_escape() {
     local s="$1"
@@ -37,6 +38,36 @@ json_escape() {
     s="${s//$'\t'/\\t}"
     printf '%s' "$s"
 }
+
+detect_default_branch() {
+    local branch=""
+    if [ -d "$TARGET/.git" ]; then
+        branch="$(git -C "$TARGET" symbolic-ref --quiet --short HEAD 2>/dev/null \
+            || git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null \
+            || true)"
+    fi
+    [ -n "$branch" ] && [ "$branch" != "HEAD" ] || branch="main"
+    printf '%s\n' "$branch"
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed 's/[\/&]/\\&/g'
+}
+
+render_fragment() {
+    local src="$1"
+    local branch_replacement
+    branch_replacement="$(escape_sed_replacement "$DEFAULT_BRANCH")"
+    if grep -q "__DAYU_DEFAULT_BRANCH__" "$src" 2>/dev/null; then
+        sed -e "s/__DAYU_DEFAULT_BRANCH__/${branch_replacement}/g" "$src"
+    else
+        cat "$src"
+    fi
+}
+
+if [ -z "$DEFAULT_BRANCH" ]; then
+    DEFAULT_BRANCH="$(detect_default_branch)"
+fi
 
 fragment_entries() {
     case "$CAPABILITY" in
@@ -101,7 +132,7 @@ append_fragment() {
         echo "$marker_start"
         echo "# The following snippet is added by dayu-harness."
         echo "# Remove this marked section to revert this capability."
-        cat "$src"
+        render_fragment "$src"
         echo "$marker_end"
     } >> "$dst"
 }

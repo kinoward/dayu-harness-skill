@@ -19,6 +19,19 @@
       "dst": ".github/rulesets/protect-tags.json"
     }
   ],
+  "remote_actions": [
+    {
+      "kind": "ruleset",
+      "name": "protect-tags",
+      "api": "POST|PUT /repos/{owner}/{repo}/rulesets",
+      "target_path": ".github/rulesets/protect-tags.json",
+      "target": "tag",
+      "requires": [
+        "gh_auth",
+        "admin"
+      ]
+    }
+  ],
   "installer": {
     "script": "install-husky.sh",
     "safe_strategies": [

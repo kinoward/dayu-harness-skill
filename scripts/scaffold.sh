@@ -9,6 +9,7 @@ MANIFEST_DIR="$SKILL_DIR/capabilities"
 SCRIPTS_DIR="$SKILL_DIR/scripts"
 VALIDATE_SCRIPT="$SKILL_DIR/templates/docs/harness/sensors/scripts/validate.sh"
 ENVIRONMENT_SCRIPT="$SCRIPTS_DIR/ensure-environment.sh"
+GITHUB_REMOTE_SCRIPT="$SCRIPTS_DIR/github-remote.sh"
 OUTPUT_BASE="$(pwd)"
 
 MODE="prompt"
@@ -18,6 +19,7 @@ ONLY_CATEGORY="all"
 ONLY_EXPLICIT="false"
 STRATEGY=""
 LOCALE="zh-CN"
+GITHUB_REMOTE_MODE="${DAYU_HARNESS_GITHUB_REMOTE:-auto}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,6 +55,17 @@ while [ $# -gt 0 ]; do
             esac
             shift 2
             ;;
+        --github-remote)
+            GITHUB_REMOTE_MODE="${2:-}"
+            case "$GITHUB_REMOTE_MODE" in
+                auto|check|apply|verify|skip) ;;
+                *)
+                    echo "error: unsupported --github-remote '$GITHUB_REMOTE_MODE'. Supported: auto|check|apply|verify|skip" >&2
+                    exit 2
+                    ;;
+            esac
+            shift 2
+            ;;
         --help|-h)
             MODE="help"
             shift
@@ -65,7 +78,7 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en]"
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en] [--github-remote auto|check|apply|verify|skip]"
     echo "说明:"
     echo "  - default=true 的必选能力始终部署；--enable 在必选集上追加能力"
     echo "  - --enable 与 --only 支持逗号分隔；--only 保留历史兼容，不会排除必选能力"
@@ -74,6 +87,7 @@ usage() {
     echo "  - --only all 表示部署全部公开能力；内部能力只通过依赖展开"
     echo "  - --apply 默认不替换已存在文件；安装器 clean 时自动 merge，已有配置需通过 --strategy 声明安全策略"
     echo "  - --locale 选择模板语言。默认 zh-CN；en 将优先使用 manifest.template_files_i18n.en（如存在）"
+    echo "  - --github-remote 控制 GitHub remote 编排。默认 auto：dry-run/check 只检查，apply 不推送；apply 需用户显式选择"
 }
 
 if [ "$MODE" = "help" ] || [ -z "${TARGET:-}" ]; then
@@ -122,6 +136,10 @@ relative_output_path() {
 }
 
 TARGET_DISPLAY="$(relative_output_path "$TARGET")"
+DEFAULT_BRANCH="main"
+PROJECT_VERSION="0.1.0"
+GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was not requested."}'
+REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was not requested."}'
 
 if ! command -v jq >/dev/null 2>&1; then
     if [ -f "$ENVIRONMENT_SCRIPT" ] && [ -x "$ENVIRONMENT_SCRIPT" ]; then
@@ -136,6 +154,10 @@ if ! command -v jq >/dev/null 2>&1; then
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"needs_install",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -177,6 +199,150 @@ contains_item() {
         [ "$item" = "$needle" ] && return 0
     done
     return 1
+}
+
+detect_default_branch() {
+    local branch=""
+    if [ -d "$TARGET/.git" ]; then
+        branch="$(git -C "$TARGET" symbolic-ref --quiet --short HEAD 2>/dev/null \
+            || git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null \
+            || true)"
+    fi
+    [ -n "$branch" ] && [ "$branch" != "HEAD" ] || branch="main"
+    printf '%s\n' "$branch"
+}
+
+detect_project_version() {
+    local version=""
+    if [ -f "$TARGET/package.json" ]; then
+        version="$(jq -r '.version // empty' "$TARGET/package.json" 2>/dev/null || true)"
+    fi
+    if [ -z "$version" ] && [ -f "$TARGET/VERSION" ]; then
+        version="$(sed -n '1p' "$TARGET/VERSION" | tr -d '[:space:]')"
+    fi
+    [ -n "$version" ] || version="0.1.0"
+    printf '%s\n' "$version"
+}
+
+refresh_project_context() {
+    local environment_json="${1:-}"
+    local env_branch=""
+    local env_version=""
+
+    if [ -n "$environment_json" ]; then
+        env_branch="$(echo "$environment_json" | jq -r '.default_branch // empty' 2>/dev/null || true)"
+        env_version="$(echo "$environment_json" | jq -r '.project_baseline.version // empty' 2>/dev/null || true)"
+    fi
+
+    if [ -n "$env_branch" ] && [ "$env_branch" != "HEAD" ] && [ "$env_branch" != "null" ]; then
+        DEFAULT_BRANCH="$env_branch"
+    else
+        DEFAULT_BRANCH="$(detect_default_branch)"
+    fi
+
+    if [ -n "$env_version" ]; then
+        PROJECT_VERSION="$env_version"
+    else
+        PROJECT_VERSION="$(detect_project_version)"
+    fi
+}
+
+project_baseline_json() {
+    local readme_state="missing"
+    local version_state="missing"
+    local changelog_state="missing"
+    [ -f "$TARGET/README.md" ] && readme_state="present"
+    [ -f "$TARGET/VERSION" ] && version_state="present"
+    [ -f "$TARGET/CHANGELOG.md" ] && changelog_state="present"
+    printf '{"version":"%s","readme":"%s","version_file":"%s","changelog":"%s"}' \
+        "$(json_escape "$PROJECT_VERSION")" \
+        "$readme_state" \
+        "$version_state" \
+        "$changelog_state"
+}
+
+escape_sed_replacement() {
+    printf '%s' "$1" | sed 's/[\/&]/\\&/g'
+}
+
+render_managed_file() {
+    local src_path="$1"
+    local dst_path="$2"
+    local branch_replacement version_replacement
+    branch_replacement="$(escape_sed_replacement "$DEFAULT_BRANCH")"
+    version_replacement="$(escape_sed_replacement "$PROJECT_VERSION")"
+
+    if LC_ALL=C grep -Iq . "$src_path" 2>/dev/null && grep -q "__DAYU_" "$src_path" 2>/dev/null; then
+        sed \
+            -e "s/__DAYU_DEFAULT_BRANCH__/${branch_replacement}/g" \
+            -e "s/__DAYU_PROJECT_VERSION__/${version_replacement}/g" \
+            "$src_path" > "$dst_path"
+    else
+        cp "$src_path" "$dst_path"
+    fi
+}
+
+manifest_remote_actions_json() {
+    local manifest_path="$1"
+    jq -c '.remote_actions // []' "$manifest_path"
+}
+
+selected_remote_actions_json() {
+    local cap_id manifest_path action
+    local actions=()
+
+    for cap_id in "$@"; do
+        manifest_path="$(manifest_path_for_id "$cap_id")" || continue
+        while IFS= read -r action; do
+            [ -n "$action" ] && actions+=( "$action" )
+        done < <(jq -c '.remote_actions[]?' "$manifest_path")
+    done
+
+    printf '[%s]' "$(join_json "${actions[@]}")"
+}
+
+capability_has_remote_actions() {
+    local cap_id="$1"
+    local manifest_path
+    manifest_path="$(manifest_path_for_id "$cap_id")" || return 1
+    jq -e '(.remote_actions // []) | length > 0' "$manifest_path" >/dev/null 2>&1
+}
+
+selected_has_remote_actions() {
+    local cap_id
+    for cap_id in "$@"; do
+        if capability_has_remote_actions "$cap_id"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+run_github_remote() {
+    local mode="$1"
+    shift || true
+    local remote_output remote_rc
+    local remote_actions_json
+    remote_actions_json="$(selected_remote_actions_json "$@")"
+
+    if [ ! -f "$GITHUB_REMOTE_SCRIPT" ] || [ ! -x "$GITHUB_REMOTE_SCRIPT" ]; then
+        printf '{"status":"skipped","description_nl":"github-remote.sh is missing or not executable."}'
+        return 0
+    fi
+
+    set +e
+    remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>&1)"
+    remote_rc=$?
+    set -e
+
+    if printf '%s' "$remote_output" | jq -e . >/dev/null 2>&1; then
+        printf '%s' "$remote_output"
+    else
+        printf '{"status":"error","exit_code":%s,"description_nl":"github-remote.sh %s failed or returned non-JSON output.","raw":"%s"}' \
+            "$remote_rc" \
+            "$(json_escape "$mode")" \
+            "$(json_escape "$remote_output")"
+    fi
 }
 
 # ------------------------------------------------------------
@@ -522,7 +688,7 @@ collect_file_entries() {
                     description="Target file exists; skipped by default."
                 else
                     mkdir -p "$(dirname "$dst_path")"
-                    if cp "$src_path" "$dst_path"; then
+                    if render_managed_file "$src_path" "$dst_path"; then
                         if [ "$executable" = "true" ]; then
                             chmod +x "$dst_path"
                         fi
@@ -638,94 +804,42 @@ collect_installer_entry_dry() {
     DRY_ITEMS+=( "{\"kind\":\"installer\",\"script\":\"$(json_escape "$installer_script")\",\"capability\":\"$(json_escape "$cap_id")\",\"status\":\"$(json_escape "$status")\",\"safe_strategies\":$safe_strategies,\"needs_strategy\":false,\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
-is_valid_github_repository_full_name() {
-    printf '%s' "$1" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
-}
-
-resolve_github_repository_full_name() {
-    local candidate="${DAYU_HARNESS_GITHUB_REPOSITORY:-${GITHUB_REPOSITORY:-}}"
-    candidate="$(trim "$candidate")"
-    if [ -n "$candidate" ] && is_valid_github_repository_full_name "$candidate"; then
-        printf '%s\n' "$candidate"
-        return 0
-    fi
-
-    local remote_url
-    remote_url="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
-    case "$remote_url" in
-        https://github.com/*)
-            candidate="${remote_url#https://github.com/}"
-            ;;
-        http://github.com/*)
-            candidate="${remote_url#http://github.com/}"
-            ;;
-        git@github.com:*)
-            candidate="${remote_url#git@github.com:}"
-            ;;
-        ssh://git@github.com/*)
-            candidate="${remote_url#ssh://git@github.com/}"
-            ;;
-        *)
-            candidate=""
-            ;;
-    esac
-    candidate="${candidate%.git}"
-    candidate="$(trim "$candidate")"
-    if [ -n "$candidate" ] && is_valid_github_repository_full_name "$candidate"; then
-        printf '%s\n' "$candidate"
-        return 0
-    fi
-
-    local gh_repo gh_rc
-    set +e
-    gh_repo="$(cd "$TARGET" && gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
-    gh_rc=$?
-    set -e
-    gh_repo="$(trim "$gh_repo")"
-    if [ "$gh_rc" -eq 0 ] && [ -n "$gh_repo" ] && is_valid_github_repository_full_name "$gh_repo"; then
-        printf '%s\n' "$gh_repo"
-        return 0
-    fi
-
-    return 1
-}
-
 collect_repository_settings_remote_entry_dry() {
     local cap_id="$1"
     [ "$cap_id" = "github.repository-settings" ] || return 0
 
-    DRY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"planned\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"Apply 阶段会在用户启用该能力后直接调用 GitHub API，同步 allow_auto_merge=true 与 delete_branch_on_merge=true。\"}" )
+    DRY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"planned\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"启用 --github-remote apply 后，会由 scripts/github-remote.sh 统一同步 allow_auto_merge=true 与 delete_branch_on_merge=true。\"}" )
 }
 
 collect_repository_settings_remote_entry_apply() {
     local cap_id="$1"
     [ "$cap_id" = "github.repository-settings" ] || return 0
 
-    local repo_full_name status description api_output api_rc
-    repo_full_name=""
-    status="error"
-    description=""
-    api_output=""
+    local status description
+    case "$GITHUB_REMOTE_MODE" in
+        apply)
+            status="delegated"
+            description="远端仓库设置将由 scripts/github-remote.sh --apply 统一执行。"
+            ;;
+        verify)
+            status="verify_only"
+            description="本次只验证远端仓库设置，不执行写入。"
+            ;;
+        skip)
+            status="skipped"
+            description="用户选择跳过 GitHub remote 编排，未写入远端仓库设置。"
+            ;;
+        auto|check|"")
+            status="pending"
+            description="远端仓库设置等待用户显式选择 --github-remote apply 后再写入。"
+            ;;
+        *)
+            status="pending"
+            description="远端仓库设置等待 GitHub remote 编排。"
+            ;;
+    esac
 
-    if ! repo_full_name="$(resolve_github_repository_full_name)"; then
-        APPLY_ERROR=$((APPLY_ERROR + 1))
-        description="无法识别目标 GitHub 仓库 owner/name；请配置 origin 为 GitHub 远端，或设置 DAYU_HARNESS_GITHUB_REPOSITORY=owner/repo 后重试。"
-    else
-        set +e
-        api_output="$(gh api -X PATCH "repos/$repo_full_name" -F allow_auto_merge=true -F delete_branch_on_merge=true 2>&1)"
-        api_rc=$?
-        set -e
-
-        if [ "$api_rc" -eq 0 ]; then
-            status="applied"
-            description="已通过 GitHub API 同步仓库设置：allow_auto_merge=true, delete_branch_on_merge=true。"
-        else
-            APPLY_ERROR=$((APPLY_ERROR + 1))
-            description="GitHub API 同步仓库设置失败：$api_output"
-        fi
-    fi
-
-    APPLY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/$(json_escape "$repo_full_name")\",\"status\":\"$(json_escape "$status")\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"$(json_escape "$description")\"}" )
+    APPLY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"$(json_escape "$status")\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
 collect_installer_entry_apply() {
@@ -881,6 +995,10 @@ do_dry_run() {
     environment_json="$(run_environment_gate "check" "${capability_ids[@]}" 2>&1)"
     environment_status="$(echo "$environment_json" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
     environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment check failed."' 2>/dev/null || echo "Environment check failed.")"
+    refresh_project_context "$environment_json"
+    if selected_has_remote_actions "${capability_ids[@]}"; then
+        GITHUB_REMOTE_JSON="$(run_github_remote check "${capability_ids[@]}")"
+    fi
 
     DRY_FILES=0
     DRY_NEW=0
@@ -893,13 +1011,14 @@ do_dry_run() {
         local manifest_path
         manifest_path="$(manifest_path_for_id "$cap_id")"
 
-        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json
+        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json remote_actions_json
         cap_desc="$(json_escape "$(jq -r '.description // empty' "$manifest_path")")"
         cap_desc_nl="$(json_escape "$(jq -r '.description_nl // empty' "$manifest_path")")"
         cap_default="$(jq -r '.default // false' "$manifest_path")"
         dependencies_json="$(jq -c '.dependencies // []' "$manifest_path")"
         acceptance_json="$(jq -c '.acceptance // []' "$manifest_path")"
         installer_json="$(jq -c '.installer // null' "$manifest_path")"
+        remote_actions_json="$(manifest_remote_actions_json "$manifest_path")"
 
         local pre_new=$DRY_NEW
         local pre_existing=$DRY_EXISTING
@@ -926,7 +1045,7 @@ do_dry_run() {
 
         local items_json
         items_json="$(join_json "${DRY_ITEMS[@]}")"
-        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"files_missing\":$cap_missing,\"items\":[$items_json]}" )
+        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"remote_actions\":$remote_actions_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"files_missing\":$cap_missing,\"items\":[$items_json]}" )
     done
 
     local top_status="clean"
@@ -954,6 +1073,10 @@ do_dry_run() {
   "mode":"dry-run",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$top_status",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":$(project_baseline_json),
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "summary":"Selected capabilities: $(json_escape "$summary")",
@@ -992,12 +1115,22 @@ do_apply() {
     environment_json="$(run_environment_gate "apply" "${capability_ids[@]}" 2>&1)"
     environment_status="$(echo "$environment_json" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
     environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment preflight failed."' 2>/dev/null || echo "Environment preflight failed.")"
+    refresh_project_context "$environment_json"
+    local has_remote_actions="false"
+    if selected_has_remote_actions "${capability_ids[@]}"; then
+        has_remote_actions="true"
+        GITHUB_REMOTE_JSON="$(run_github_remote check "${capability_ids[@]}")"
+    fi
     if [ "$environment_status" != "ok" ]; then
         cat <<JSONEOF
 {
   "mode":"apply",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$environment_status",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":$(project_baseline_json),
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -1028,13 +1161,14 @@ JSONEOF
     for cap_id in "${capability_ids[@]}"; do
         local manifest_path
         manifest_path="$(manifest_path_for_id "$cap_id")"
-        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json
+        local cap_desc cap_desc_nl cap_default dependencies_json acceptance_json installer_json remote_actions_json
         cap_desc="$(json_escape "$(jq -r '.description // empty' "$manifest_path")")"
         cap_desc_nl="$(json_escape "$(jq -r '.description_nl // empty' "$manifest_path")")"
         cap_default="$(jq -r '.default // false' "$manifest_path")"
         dependencies_json="$(jq -c '.dependencies // []' "$manifest_path")"
         acceptance_json="$(jq -c '.acceptance // []' "$manifest_path")"
         installer_json="$(jq -c '.installer // null' "$manifest_path")"
+        remote_actions_json="$(manifest_remote_actions_json "$manifest_path")"
 
         local pre_new=$APPLY_NEW
         local pre_existing=$APPLY_EXISTING
@@ -1140,8 +1274,42 @@ JSONEOF
 
         local items_json
         items_json="$(join_json "${APPLY_ITEMS[@]}")"
-        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"items\":[$items_json]}" )
+        capability_jsons+=( "{\"id\":\"$cap_id\",\"description\":\"$cap_desc\",\"description_nl\":\"$cap_desc_nl\",\"default\":$cap_default,\"dependencies\":$dependencies_json,\"acceptance\":$acceptance_json,\"installer\":$installer_json,\"remote_actions\":$remote_actions_json,\"status\":\"$status\",\"files_total\":$((cap_new + cap_existing)),\"files_new\":$cap_new,\"files_existing\":$cap_existing,\"items\":[$items_json]}" )
     done
+
+    if [ "$has_remote_actions" = "true" ]; then
+        case "$GITHUB_REMOTE_MODE" in
+            apply)
+                GITHUB_REMOTE_JSON="$(run_github_remote apply "${capability_ids[@]}")"
+                REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                ;;
+            verify)
+                REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
+                ;;
+            skip)
+                GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was skipped by user choice."}'
+                REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was skipped by user choice."}'
+                ;;
+            auto|check|"")
+                REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation requires --github-remote apply or --github-remote verify."}'
+                ;;
+        esac
+
+        remote_status="$(echo "$GITHUB_REMOTE_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "error")"
+        remote_validation_status="$(echo "$REMOTE_VALIDATION_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "error")"
+        if [ "$GITHUB_REMOTE_MODE" = "apply" ] && [ "$remote_status" = "error" ]; then
+            APPLY_ERROR=$((APPLY_ERROR + 1))
+        elif [ "$GITHUB_REMOTE_MODE" = "apply" ] && [ "$remote_status" != "ok" ] && [ "$remote_status" != "skipped" ]; then
+            APPLY_PARTIAL=$((APPLY_PARTIAL + 1))
+        fi
+        if [ "$GITHUB_REMOTE_MODE" = "verify" ] || [ "$GITHUB_REMOTE_MODE" = "apply" ]; then
+            if [ "$remote_validation_status" = "error" ]; then
+                APPLY_ERROR=$((APPLY_ERROR + 1))
+            elif [ "$remote_validation_status" != "ok" ] && [ "$remote_validation_status" != "skipped" ]; then
+                APPLY_PARTIAL=$((APPLY_PARTIAL + 1))
+            fi
+        fi
+    fi
 
     local overall_status="ok"
     if [ "$APPLY_ERROR" -gt 0 ] || [ "$APPLY_MISSING" -gt 0 ]; then
@@ -1164,6 +1332,9 @@ JSONEOF
         else
             validation_status="failed"
             validation_desc="$(echo "$validate_output" | jq -r '.description_nl // .summary // "validate failed"' 2>/dev/null || echo "validate failed")"
+            if [ "$overall_status" = "ok" ]; then
+                overall_status="error"
+            fi
         fi
     fi
 
@@ -1178,6 +1349,9 @@ JSONEOF
         fi
     elif [ "$overall_status" = "error" ]; then
         top_desc="Apply encountered errors. Resolve conflicts and retry."
+        if [ "$validation_status" = "failed" ]; then
+            top_desc="Apply copied files, but final validation failed. Resolve validation errors and retry."
+        fi
     fi
 
     local capabilities_json
@@ -1192,6 +1366,10 @@ JSONEOF
   "mode":"apply",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$overall_status",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":$(project_baseline_json),
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "summary":"Applied capability set: $(json_escape "$summary")",

@@ -82,6 +82,10 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
     exit 2
 }
 TARGET_DISPLAY="$(relative_output_path "$TARGET")"
+DEFAULT_BRANCH="main"
+PROJECT_VERSION="0.1.0"
+PACKAGE_CREATED=false
+PACKAGE_VERSION_WAS_MISSING=false
 
 DEFAULT_CAPABILITIES=(
     "core"
@@ -185,6 +189,161 @@ join_json() {
     printf '%s' "$out"
 }
 
+read_current_branch() {
+    local branch=""
+    branch="$(git -C "$TARGET" symbolic-ref --quiet --short HEAD 2>/dev/null \
+        || git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null \
+        || true)"
+    [ "$branch" = "HEAD" ] && branch=""
+    [ "$branch" = "null" ] && branch=""
+    printf '%s' "$branch"
+}
+
+read_package_version() {
+    if [ -f "$TARGET/package.json" ] && command -v jq >/dev/null 2>&1; then
+        jq -r '.version // empty' "$TARGET/package.json" 2>/dev/null || true
+    fi
+}
+
+read_version_file() {
+    if [ -f "$TARGET/VERSION" ]; then
+        sed -n '1p' "$TARGET/VERSION" | tr -d '[:space:]'
+    fi
+}
+
+extract_semver_token() {
+    local raw="$1"
+    local parsed=""
+    local label=""
+    label="$(printf '%s\n' "$raw" | sed -nE 's/^\[([^]]+)\]\(.*\).*/\1/p; s/^\[([^]]+)\].*/\1/p; s/^([^[:space:]]+).*/\1/p' | sed -n '1p')"
+    case "$label" in
+        [Uu]nreleased) return 0 ;;
+    esac
+    case "$raw" in
+        [Uu]nreleased|[Uu]nreleased[[:space:]]*) return 0 ;;
+    esac
+
+    parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*\[v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)\].*/\1/p' | sed -n '1p')"
+    if [ -z "$parsed" ]; then
+        parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*(^|[^0-9A-Za-z.])v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\2/p' | sed -n '1p')"
+    fi
+    printf '%s' "$parsed"
+}
+
+read_changelog_version() {
+    if [ -f "$TARGET/CHANGELOG.md" ]; then
+        local heading version
+        while IFS= read -r heading; do
+            version="$(extract_semver_token "$heading")"
+            if [ -n "$version" ]; then
+                printf '%s' "$version"
+                return 0
+            fi
+        done < <(sed -n 's/^##[[:space:]]*//p' "$TARGET/CHANGELOG.md")
+    fi
+}
+
+read_release_manifest_version() {
+    if [ -f "$TARGET/.release-please-manifest.json" ] && command -v jq >/dev/null 2>&1; then
+        jq -r '."." // empty' "$TARGET/.release-please-manifest.json" 2>/dev/null || true
+    fi
+}
+
+refresh_project_version() {
+    local package_version version_file changelog_version manifest_version
+    package_version="$(read_package_version)"
+    version_file="$(read_version_file)"
+    changelog_version="$(read_changelog_version)"
+    manifest_version="$(read_release_manifest_version)"
+
+    if [ -n "$package_version" ]; then
+        PROJECT_VERSION="$package_version"
+    elif [ -n "$version_file" ]; then
+        PROJECT_VERSION="$version_file"
+    elif [ -n "$changelog_version" ]; then
+        PROJECT_VERSION="$changelog_version"
+    elif [ -n "$manifest_version" ]; then
+        PROJECT_VERSION="$manifest_version"
+    fi
+}
+
+detect_version_conflict() {
+    local package_version version_file changelog_version manifest_version
+    local first_version=""
+    local conflict="false"
+    local source_summary=""
+
+    package_version="$(read_package_version)"
+    version_file="$(read_version_file)"
+    changelog_version="$(read_changelog_version)"
+    manifest_version="$(read_release_manifest_version)"
+
+    add_version_source() {
+        local source_name="$1"
+        local source_value="$2"
+        [ -n "$source_value" ] || return 0
+        if [ -z "$source_summary" ]; then
+            source_summary="${source_name}=${source_value}"
+        else
+            source_summary="${source_summary}, ${source_name}=${source_value}"
+        fi
+        if [ -z "$first_version" ]; then
+            first_version="$source_value"
+        elif [ "$source_value" != "$first_version" ]; then
+            conflict="true"
+        fi
+    }
+
+    add_version_source "package.json" "$package_version"
+    add_version_source "VERSION" "$version_file"
+    add_version_source "CHANGELOG.md" "$changelog_version"
+    add_version_source ".release-please-manifest.json" "$manifest_version"
+    [ -n "$first_version" ] && PROJECT_VERSION="$first_version"
+
+    if [ "$conflict" = "true" ]; then
+        USER_ACTIONS=$((USER_ACTIONS + 1))
+        add_item "project_version" "version_sources" "needs_user_action" "true" "manual_resolve_version_conflict" "检测到项目版本源不一致：${source_summary}。请先选择唯一版本并同步 package.json、VERSION、CHANGELOG.md 与 release manifest。"
+        return 0
+    fi
+    return 1
+}
+
+set_package_version() {
+    local version="$1"
+    [ -f "$TARGET/package.json" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp_file
+    tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-package.XXXXXX")" || return 1
+    if jq --arg version "$version" '.version = $version' "$TARGET/package.json" > "$tmp_file"; then
+        mv "$tmp_file" "$TARGET/package.json"
+        return 0
+    fi
+    rm -f "$tmp_file"
+    return 1
+}
+
+ensure_file() {
+    local path="$1"
+    local content="$2"
+    local description="$3"
+    local action="$4"
+
+    if [ -f "$path" ]; then
+        add_item "project_file" "$(basename "$path")" "ok" "false" "none" "${description}已存在。"
+        return 0
+    fi
+
+    if [ "$MODE" = "apply" ]; then
+        printf '%s\n' "$content" > "$path"
+        INITIALIZATIONS=$((INITIALIZATIONS + 1))
+        add_item "project_file" "$(basename "$path")" "created" "false" "$action" "已创建${description}。"
+    else
+        INITIALIZATIONS=$((INITIALIZATIONS + 1))
+        add_item "project_file" "$(basename "$path")" "needs_initialization" "false" "$action" "项目缺少${description}，apply 阶段会创建。"
+    fi
+}
+
 install_hint_for_tool() {
     case "$1" in
         git)
@@ -266,6 +425,8 @@ if [ "$MISSING_TOOLS" -gt 0 ]; then
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"needs_install",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
   "summary":"Missing required environment tools.",
   "items":[${items_json}],
   "missing_tools":$MISSING_TOOLS,
@@ -279,21 +440,49 @@ JSONEOF
     exit 0
 fi
 
+if detect_version_conflict; then
+    items_json="$(join_json "${ITEMS[@]}")"
+    cat <<JSONEOF
+{
+  "mode":"$MODE",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
+  "status":"needs_user_action",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
+  "summary":"Project version sources conflict.",
+  "items":[${items_json}],
+  "missing_tools":0,
+  "initializations":0,
+  "installs":0,
+  "user_actions":$USER_ACTIONS,
+  "errors":0,
+  "description_nl":"检测到项目版本源不一致。请先同步 package.json、VERSION、CHANGELOG.md 与 release manifest 后再部署。"
+}
+JSONEOF
+    exit 0
+fi
+
+refresh_project_version
+
 if [ ! -d "$TARGET/.git" ]; then
     if [ "$MODE" = "apply" ]; then
-        if git -C "$TARGET" init >/dev/null 2>&1; then
+        if git -C "$TARGET" init -b main >/dev/null 2>&1 || (git -C "$TARGET" init >/dev/null 2>&1 && git -C "$TARGET" branch -M main >/dev/null 2>&1); then
             INITIALIZATIONS=$((INITIALIZATIONS + 1))
-            add_item "project" "git" "initialized" "true" "git init" "目标目录不是 Git 项目，已执行 git init。"
+            DEFAULT_BRANCH="$(read_current_branch)"
+            [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
+            add_item "project" "git" "initialized" "true" "git init -b main" "目标目录不是 Git 项目，已初始化 Git，并使用 ${DEFAULT_BRANCH} 作为默认分支。"
         else
             ERRORS=$((ERRORS + 1))
-            add_item "project" "git" "error" "true" "git init" "目标目录不是 Git 项目，且 git init 执行失败。"
+            add_item "project" "git" "error" "true" "git init -b main" "目标目录不是 Git 项目，且 Git 初始化执行失败。"
         fi
     else
         INITIALIZATIONS=$((INITIALIZATIONS + 1))
-        add_item "project" "git" "needs_initialization" "true" "git init" "目标目录不是 Git 项目，部署前必须执行 git init。"
+        add_item "project" "git" "needs_initialization" "true" "git init -b main" "目标目录不是 Git 项目，apply 阶段会使用 main 初始化默认分支。"
     fi
 else
-    add_item "project" "git" "ok" "true" "none" "目标目录已是 Git 项目。"
+    DEFAULT_BRANCH="$(read_current_branch)"
+    [ -z "$DEFAULT_BRANCH" ] && DEFAULT_BRANCH="main"
+    add_item "project" "git" "ok" "true" "none" "目标目录已是 Git 项目，将保留当前默认分支 ${DEFAULT_BRANCH}。"
 fi
 
 if [ "$requires_hook_path" = true ] && [ -d "$TARGET/.git" ]; then
@@ -332,6 +521,7 @@ if [ "$requires_node" = true ]; then
         if [ "$MODE" = "apply" ]; then
             if (cd "$TARGET" && npm init -y >/dev/null 2>&1); then
                 INITIALIZATIONS=$((INITIALIZATIONS + 1))
+                PACKAGE_CREATED=true
                 add_item "project" "node" "initialized" "true" "npm init -y" "目标目录不是 Node 项目，已执行 npm init -y。"
             else
                 ERRORS=$((ERRORS + 1))
@@ -343,6 +533,24 @@ if [ "$requires_node" = true ]; then
         fi
     else
         add_item "project" "node" "ok" "true" "none" "package.json 已存在。"
+    fi
+
+    package_version="$(read_package_version)"
+    if [ -n "$package_version" ] && [ "$PACKAGE_CREATED" != true ]; then
+        PROJECT_VERSION="$package_version"
+    elif [ -z "$package_version" ]; then
+        PACKAGE_VERSION_WAS_MISSING=true
+    fi
+
+    if [ "$MODE" = "apply" ] && { [ "$PACKAGE_CREATED" = true ] || [ "$PACKAGE_VERSION_WAS_MISSING" = true ]; }; then
+        if set_package_version "$PROJECT_VERSION"; then
+            add_item "project" "package.version" "configured" "false" "set package.json version" "已将 package.json version 设置为 ${PROJECT_VERSION}。"
+        else
+            ERRORS=$((ERRORS + 1))
+            add_item "project" "package.version" "error" "false" "set package.json version" "设置 package.json version 失败。"
+        fi
+    elif [ -f "$TARGET/package.json" ]; then
+        add_item "project" "package.version" "ok" "false" "none" "package.json version 使用 ${PROJECT_VERSION}。"
     fi
 
     if [ -f "$TARGET/package.json" ] && [ "${#NPM_DEPS[@]}" -gt 0 ]; then
@@ -360,6 +568,10 @@ if [ "$requires_node" = true ]; then
                 if (cd "$TARGET" && npm install --save-dev "${MISSING_NPM_DEPS[@]}" >/dev/null 2>&1); then
                     INSTALLS=$((INSTALLS + 1))
                     add_item "npm_dependencies" "devDependencies" "installed" "true" "npm install --save-dev ${dep_list}" "已安装必需 package.json devDependencies：${dep_list}。"
+                    if { [ "$PACKAGE_CREATED" = true ] || [ "$PACKAGE_VERSION_WAS_MISSING" = true ]; } && ! set_package_version "$PROJECT_VERSION"; then
+                        ERRORS=$((ERRORS + 1))
+                        add_item "project" "package.version" "error" "false" "set package.json version" "安装依赖后重新同步 package.json version 失败。"
+                    fi
                 else
                     ERRORS=$((ERRORS + 1))
                     add_item "npm_dependencies" "devDependencies" "error" "true" "npm install --save-dev ${dep_list}" "安装必需 package.json 依赖失败：${dep_list}。"
@@ -373,6 +585,21 @@ if [ "$requires_node" = true ]; then
         fi
     fi
 fi
+
+if [ "$PACKAGE_CREATED" != true ] && [ "$PACKAGE_VERSION_WAS_MISSING" != true ]; then
+    refresh_project_version
+fi
+
+project_name="$(basename "$TARGET")"
+ensure_file "$TARGET/README.md" "# ${project_name}
+
+Project initialized with Dayu Harness governance." "README.md" "create README.md"
+ensure_file "$TARGET/VERSION" "$PROJECT_VERSION" "VERSION 文件" "create VERSION"
+ensure_file "$TARGET/CHANGELOG.md" "# Changelog
+
+## ${PROJECT_VERSION}
+
+- Initial project baseline." "CHANGELOG.md" "create CHANGELOG.md"
 
 if [ "$requires_gh" = true ]; then
     if gh auth status >/dev/null 2>&1; then
@@ -406,6 +633,8 @@ cat <<JSONEOF
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
   "status":"$TOP_STATUS",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
   "summary":"$(json_escape "$DESC")",
   "items":[${items_json}],
   "missing_tools":$MISSING_TOOLS,

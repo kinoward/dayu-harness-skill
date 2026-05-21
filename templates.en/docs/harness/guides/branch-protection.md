@@ -4,12 +4,12 @@
 
 ## Branching Strategy
 
-- Do not push directly to `main` / `master`.
-- Create feature branches from the main branch with prefixes such as `feat/`, `fix/`, `docs/`, `chore/`.
-- All changes must be merged into the main branch through PR.
+- Do not push directly to the default branch (`__DAYU_DEFAULT_BRANCH__`).
+- Create feature branches from the default branch (`__DAYU_DEFAULT_BRANCH__`) with prefixes such as `feat/`, `fix/`, `docs/`, `chore/`.
+- All changes must be merged into the default branch (`__DAYU_DEFAULT_BRANCH__`) through PR.
 - Branch names should follow Git conventions (printable characters, no spaces, no special characters); prefer tool-friendly slugs (for example, `feat/xxx`, `fix/xxx`).
 
-Default GitHub Flow is recommended: main branch → short-lived feature branch → PR → merge → delete branch.
+Default GitHub Flow is recommended: `__DAYU_DEFAULT_BRANCH__` → short-lived feature branch → PR → merge → delete branch.
 
 ## Merge Strategy
 
@@ -24,19 +24,19 @@ Default is merge commit. If release-please is enabled, follow Conventional Commi
 ## Post-merge Cleanup
 
 ```bash
-git checkout main
-git pull origin main
+git checkout __DAYU_DEFAULT_BRANCH__
+git pull origin __DAYU_DEFAULT_BRANCH__
 ```
 
 ## Protection Rules
 
-Main branch protection:
+Default-branch protection:
 - No deletion
 - No direct local pushes, including fast-forward and non-fast-forward
 - Merge only through PR
 
 Implementation:
-- Local: `branch protection` snippet in `.husky/pre-push` blocks direct `main` / `master` pushes
+- Local: `branch protection` snippet in `.husky/pre-push` blocks direct pushes to `__DAYU_DEFAULT_BRANCH__`
 - Remote: GitHub ruleset `.github/rulesets/protect-main.json`
 
 ### Ruleset Application

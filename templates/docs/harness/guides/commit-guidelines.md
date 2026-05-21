@@ -23,8 +23,8 @@ type(scope): description
 ## 提交原则
 
 - 按逻辑变更拆分 commit，每个 commit 仅含单一职责
-- 禁止直接向 main 分支提交
-- 所有变更通过功能分支 + PR 合并到 main
+- 禁止直接向默认分支（`__DAYU_DEFAULT_BRANCH__`）提交
+- 所有变更通过功能分支 + PR 合并到默认分支（`__DAYU_DEFAULT_BRANCH__`）
 
 ## 自动化校验
 

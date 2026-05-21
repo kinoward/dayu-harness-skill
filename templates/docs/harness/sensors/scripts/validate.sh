@@ -134,6 +134,26 @@ check_json_file() {
     fi
 }
 
+check_plain_file() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+
+    if [ -f "$file_path" ]; then
+        record_check "$item" "pass" "${rel_path} 已部署"
+        log_text "  ✓ ${rel_path} 已部署"
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} 缺失（功能可能未正确部署）"
+            log_text "  ✗ ${rel_path} 缺失（功能可能未正确部署）"
+        else
+            record_check "$item" "skip" "${rel_path} 未部署（按可选能力处理）"
+            log_text "  - ${rel_path} 未部署（按可选能力处理）"
+        fi
+    fi
+}
+
 check_pull_request_settings_json() {
     local item="$1"
     local rel_path="$2"
@@ -193,6 +213,87 @@ check_pull_request_settings_json() {
     fi
 }
 
+read_json_value() {
+    local file_path="$1"
+    local expr="$2"
+    if [ -f "$file_path" ] && command -v jq >/dev/null 2>&1; then
+        jq -r "$expr // empty" "$file_path" 2>/dev/null || true
+    fi
+}
+
+extract_semver_token() {
+    local raw="$1"
+    local parsed=""
+    local label=""
+    label="$(printf '%s\n' "$raw" | sed -nE 's/^\[([^]]+)\]\(.*\).*/\1/p; s/^\[([^]]+)\].*/\1/p; s/^([^[:space:]]+).*/\1/p' | sed -n '1p')"
+    case "$label" in
+        [Uu]nreleased) return 0 ;;
+    esac
+    case "$raw" in
+        [Uu]nreleased|[Uu]nreleased[[:space:]]*) return 0 ;;
+    esac
+
+    parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*\[v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)\].*/\1/p' | sed -n '1p')"
+    if [ -z "$parsed" ]; then
+        parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*(^|[^0-9A-Za-z.])v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\2/p' | sed -n '1p')"
+    fi
+    printf '%s' "$parsed"
+}
+
+read_changelog_version() {
+    if [ -f "$PROJECT_ROOT/CHANGELOG.md" ]; then
+        local heading version
+        while IFS= read -r heading; do
+            version="$(extract_semver_token "$heading")"
+            if [ -n "$version" ]; then
+                printf '%s' "$version"
+                return 0
+            fi
+        done < <(sed -n 's/^##[[:space:]]*//p' "$PROJECT_ROOT/CHANGELOG.md")
+    fi
+}
+
+check_release_version_sync() {
+    local package_version version_file manifest_version changelog_heading expected mismatches missing
+    package_version="$(read_json_value "$PROJECT_ROOT/package.json" '.version')"
+    version_file=""
+    manifest_version="$(read_json_value "$PROJECT_ROOT/.release-please-manifest.json" '."."')"
+    changelog_heading=""
+    expected=""
+    mismatches=""
+    missing=""
+
+    if [ -f "$PROJECT_ROOT/VERSION" ]; then
+        version_file="$(sed -n '1p' "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
+    fi
+    changelog_heading="$(read_changelog_version)"
+
+    [ -n "$package_version" ] || missing="${missing:+$missing, }package.json.version"
+    [ -n "$version_file" ] || missing="${missing:+$missing, }VERSION"
+    [ -n "$manifest_version" ] || missing="${missing:+$missing, }.release-please-manifest.json[.]"
+    [ -n "$changelog_heading" ] || missing="${missing:+$missing, }CHANGELOG.md"
+
+    expected="$package_version"
+    [ -n "$expected" ] || expected="$version_file"
+    [ -n "$expected" ] || expected="$manifest_version"
+    [ -n "$expected" ] || expected="$changelog_heading"
+
+    if [ -n "$expected" ]; then
+        [ -z "$package_version" ] || [ "$package_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package.json=${package_version}"
+        [ -z "$version_file" ] || [ "$version_file" = "$expected" ] || mismatches="${mismatches:+$mismatches, }VERSION=${version_file}"
+        [ -z "$manifest_version" ] || [ "$manifest_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }manifest=${manifest_version}"
+        [ -z "$changelog_heading" ] || [ "$changelog_heading" = "$expected" ] || mismatches="${mismatches:+$mismatches, }CHANGELOG=${changelog_heading}"
+    fi
+
+    if [ -n "$missing" ] || [ -n "$mismatches" ]; then
+        record_check "release/version-sync" "fail" "发布版本源未对齐。缺失：${missing:-无}；不一致：${mismatches:-无}。"
+        log_text "  ✗ 发布版本源未对齐。缺失：${missing:-无}；不一致：${mismatches:-无}。"
+    else
+        record_check "release/version-sync" "pass" "package.json、VERSION、release manifest 与 CHANGELOG 起始版本一致：${expected}"
+        log_text "  ✓ 发布版本源一致：${expected}"
+    fi
+}
+
 check_python_script() {
     local item="$1"
     local rel_path="$2"
@@ -201,12 +302,12 @@ check_python_script() {
 
     if [ -f "$file_path" ]; then
         if command -v python3 >/dev/null 2>&1; then
-            if python3 -m py_compile "$file_path" >/dev/null 2>&1; then
+            if python3 -c 'import sys; compile(open(sys.argv[1], "r", encoding="utf-8").read(), sys.argv[1], "exec")' "$file_path" >/dev/null 2>&1; then
                 record_check "$item" "pass" "${rel_path} Python 语法有效"
                 log_text "  ✓ ${rel_path} Python 语法有效"
             else
                 local err
-                err="$(python3 -m py_compile "$file_path" 2>&1 | sed -n '1,1p' || true)"
+                err="$(python3 -c 'import sys; compile(open(sys.argv[1], "r", encoding="utf-8").read(), sys.argv[1], "exec")' "$file_path" 2>&1 | sed -n '1,1p' || true)"
                 record_check "$item" "fail" "${rel_path} Python 语法错误: ${err:-未知}"
                 log_text "  ✗ ${rel_path} Python 语法错误: ${err:-未知}"
             fi
@@ -368,20 +469,24 @@ fi
 
 # 4. 校验 GitHub 资产（JSON + 脚本）
 log_text "--- GitHub assets ---"
-if [ -f "$PROJECT_ROOT/.github/workflows/issue-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/issue_depends_on.py" ]; then
+if [ -f "$PROJECT_ROOT/.github/workflows/issue-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/issue_depends_on.py" ] || [ -f "$PROJECT_ROOT/.github/ISSUE_TEMPLATE/dayu-harness-issue.md" ]; then
     check_workflow_file "repo-workflow/issue-lint" ".github/workflows/issue-lint.yml" required
+    check_plain_file "repo-template/issue" ".github/ISSUE_TEMPLATE/dayu-harness-issue.md" required
     check_python_script "repo-script/issue_depends_on.py" ".github/scripts/issue_depends_on.py" required
 else
     record_check "repo-workflow/issue-lint" "skip" "issue-lint 工作流未部署（按可选能力处理）"
+    record_check "repo-template/issue" "skip" "Issue 模板未部署（按可选能力处理）"
     record_check "repo-script/issue_depends_on.py" "skip" "issue 依赖检查脚本未部署（按可选能力处理）"
     log_text "  - issue-lint 工作流与脚本未部署（按可选能力处理）"
 fi
 
-if [ -f "$PROJECT_ROOT/.github/workflows/pr-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_body_structure.py" ]; then
+if [ -f "$PROJECT_ROOT/.github/workflows/pr-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_body_structure.py" ] || [ -f "$PROJECT_ROOT/.github/pull_request_template.md" ]; then
     check_workflow_file "repo-workflow/pr-lint" ".github/workflows/pr-lint.yml" required
+    check_plain_file "repo-template/pull-request" ".github/pull_request_template.md" required
     check_python_script "repo-script/pr-body-structure.py" ".github/scripts/pr_body_structure.py" required
 else
     record_check "repo-workflow/pr-lint" "skip" "pr-lint 工作流未部署（按可选能力处理）"
+    record_check "repo-template/pull-request" "skip" "PR 模板未部署（按可选能力处理）"
     record_check "repo-script/pr-body-structure.py" "skip" "PR body 结构检查脚本未部署（按可选能力处理）"
     log_text "  - pr-lint 工作流与 PR body 结构检查脚本未部署（按可选能力处理）"
 fi
@@ -393,15 +498,16 @@ if [ -f "$PROJECT_ROOT/.github/workflows/release-please.yml" ] || [ -f "$PROJECT
     check_json_file "release/repository-settings-policy" ".github/release-please-policy.json" required
     check_json_file "release/release-please-config" "release-please-config.json" required
     check_json_file "release/release-please-manifest" ".release-please-manifest.json" required
+    check_release_version_sync
     check_workflow_file "release/workflow" ".github/workflows/release-please.yml" required
     check_python_script "release/release-please-policy-script" ".github/scripts/release_please_policy.py" required
     if [ -f "$PROJECT_ROOT/.github/scripts/release_please_policy.py" ] && [ -f "$PROJECT_ROOT/.github/release-please-policy.json" ]; then
         if command -v python3 >/dev/null 2>&1; then
-            if (cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" ".") >/dev/null 2>&1; then
+            if (cd "$PROJECT_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" ".") >/dev/null 2>&1; then
                 record_check "release/release-please-policy" "pass" "release-please 策略校验通过"
                 log_text "  ✓ release-please 策略校验通过"
             else
-                policy_err="$(cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" "." 2>&1 | sed -n '1,3p' | tr '\n' ' ' || true)"
+                policy_err="$(cd "$PROJECT_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" "." 2>&1 | sed -n '1,3p' | tr '\n' ' ' || true)"
                 record_check "release/release-please-policy" "fail" "release-please 策略校验失败: ${policy_err:-未知}"
                 log_text "  ✗ release-please 策略校验失败: ${policy_err:-未知}"
             fi
