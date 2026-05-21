@@ -19,17 +19,16 @@ release-please 根据 Conventional Commits 自动生成 release PR、版本号�
 - 普通 PR 由 `github.pr` 检查；release-please PR 在可放行名单内会跳过 PR Lint，由 release workflow 与 `release-please-policy` 负责发布安全边界
 - 启用 `release.versioning`，让版本号和标签保护有明确规则
 - 启用 `github.repository-settings`，用于补齐仓库端策略前置要求
-- 仓库配置 `secrets.RELEASE_TOKEN`
-- `.github/release-please-policy.json` 中设置 `workflow.allowed_actors_variable`（默认：`RELEASE_PLEASE_ALLOWED_ACTORS`）
+- GitHub Actions workflow permissions 必须为 `default_workflow_permissions=write`，并设置 `can_approve_pull_request_reviews=true`
+- release workflow 使用 `secrets.GITHUB_TOKEN`，不需要额外配置 PAT secret
 
-建议使用 PAT (`secrets.RELEASE_TOKEN`) 而不是默认 `GITHUB_TOKEN`，因为 release-please 创建的 PR 通常需要触发后续 CI checks。
+使用 `GITHUB_TOKEN` 的目的，是让 release PR 不触发 Dayu 自带 PR/Issue/TDD CI，也不触发依赖 token 派生事件的后续 workflow。发布闭环由同一个 release workflow 在 release PR 合并后触发 `workflow_dispatch mode=publish` 完成。
 
 默认允许以下 actor 触发 release-please 自动合并与 PR lint 跳过：
 - `github-actions[bot]`
 - `release-please[bot]`
-- 仅可通过 `RELEASE_PLEASE_ALLOWED_ACTORS` 增补其他允许的 PAT/人类账号（用逗号分隔）或明确的 bot 账号名。
 
-如果 release PR 的作者是普通 PAT owner（不是 bot），必须在仓库变量 `RELEASE_PLEASE_ALLOWED_ACTORS` 配置对应用户名（`,` 分隔），否则不会触发 release-please 自动合并和 PR lint 跳过。
+不允许通过普通 PAT owner 或额外 actor 变量扩展 release PR 放行范围。release PR 必须来自同仓库、目标默认分支、匹配 `release-please--` 分支前缀，并且只修改 `.github/release-please-policy.json` 允许的 release 文件。
 
 `release-please` 工作流不再依赖 `autorelease` 标签作为放行条件，label gate（如 `pull_request_target` + `labeled`）不可恢复。
 
@@ -56,5 +55,5 @@ release-please 根据 Conventional Commits 自动生成 release PR、版本号�
 
 ## Issue 关闭位置
 
-Issue closing keyword 只放 PR body，不放单个 commit message。若启用 `github.pr`，PR body validator 会检查 `Closes #N` / `Fixes #N` / `Resolves #N` trailer。
+Issue closing keyword 只放 PR body，不放单个 commit message。项目已启用 `github.pr`：PR body validator 会检查 `Closes #N` / `Fixes #N` / `Resolves #N` trailer。
 对可跳过 PR lint 的 release-please PR，发布安全边界由 release workflow 与 `release-please-policy` 约束。

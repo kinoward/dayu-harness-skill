@@ -71,24 +71,24 @@ The target project needs environment preparation first.
 [3] 取消本次部署 / Cancel this deployment
 ```
 
-### GitHub remote / push
+### GitHub remote / sync
 
-本地初始化确认后，再询问是否开启 GitHub 远端托管。用户选择不开启时，GitHub 能力保持未启用，仅继续本地治理能力。
-After local initialization is confirmed, ask whether to enable GitHub remote hosting. If the user declines, keep GitHub capabilities disabled and continue with local governance only.
+本地初始化确认后，只确认是否需要 GitHub 远端治理能力；实际创建/绑定、提交和同步必须等部署与能力验证全部通过后执行。
+After local initialization is confirmed, only confirm whether GitHub remote governance is needed; actual create/bind, commit, and sync must wait until deployment and capability validation have fully passed.
 
 ```markdown
-是否现在开启 GitHub 远端托管并推送当前仓库？
-Do you want to enable GitHub remote hosting and push the current repository now?
+是否在部署验证通过后开启 GitHub 远端托管并同步初始化提交？
+Do you want to enable GitHub remote hosting and sync the initialization commit after deployment validation passes?
 
 [1] 开启 / Enable
 [2] 跳过 / Skip
-[3] 稍后手动 / Configure later manually
+[3] 稍后配置 / Configure later
 ```
 
 用户选择开启后，流程固定为：
 After the user chooses Enable, the flow is fixed:
 
-1. 执行 `gh auth status`；若未登录，提示用户执行 `gh auth login`，并允许用户中断，此时结束 GitHub 能力开启流程。
+1. 执行 `gh auth status`；若未登录，提供“重试登录 / 暂不创建远端 / 跳过 GitHub 能力”选项，此时不要求用户输入额外命令。
 2. 询问仓库可见性：
 
 ```markdown
@@ -99,9 +99,10 @@ Please choose the GitHub repository visibility.
 [2] 公开仓库 / Public repository
 ```
 
-3. 运行 `scripts/github-remote.sh <project-root> --check` 解析可连接账户、origin 与 `owner/repo`。
-4. 用户确认仓库名与可见性后，运行 `scripts/github-remote.sh <project-root> --apply` 创建或绑定远端，并执行 `git push -u origin <default-branch>`。
-5. 推送成功后，再询问 GitHub/Git 相关能力。启用后，`scaffold.sh --apply --github-remote apply` 会应用 repo settings、rulesets，并用 `scripts/github-remote.sh <project-root> --verify` 回读远端状态。
+3. 运行 `scripts/github-remote.sh <project-root> --check` 解析可连接账户、origin、`owner/repo` 与本地/远端分支关系，但不写入远端。
+4. 先完成能力问答与 dry-run/merge plan；用户确认后运行 `scaffold.sh --apply --finalize-git auto`，如需远端同步则同一次追加 `--github-remote apply`。
+5. `scaffold.sh --apply` 内部必须先执行 `validate/audit/check-consistency`，全部通过后才创建初始化提交；需要远端同步时，远端相同或本地领先则推送默认分支，远端领先或分叉则推送 `dayu-harness/init-*` 初始化分支并创建 PR；全程禁止 force push。
+6. 远端写入完成后，`scripts/github-remote.sh <project-root> --verify` 回读 repo settings、workflow permissions、rulesets 与默认分支状态。
 
 默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
 
@@ -116,9 +117,9 @@ Please choose the GitHub repository visibility.
 - `project.context`
 - `knowledge.archive`
 
-Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。GitHub remote/push 完成后，再询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力。
+Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。GitHub remote/sync 只做前置检查和意图确认；GitHub Rulesets、release、quality/TDD 等可选能力必须先完成问答与 dry-run 确认，部署验证通过后再进入提交和远端同步。
 
-可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 稍后手动 / Configure later manually。某些能力仍可附带 `自定义需求 / Custom request` 分支，但不作为默认选项。
+可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 稍后配置 / Configure later。某些能力仍可附带 `自定义需求 / Custom request` 分支，但不作为默认选项。
 
 ```markdown
 Q: 是否使用 GitHub 远程托管？
@@ -128,6 +129,79 @@ Q: Do you use GitHub as the remote hosting platform?
 Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
 Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
    选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 自定义工具链 / Custom toolchain
+```
+
+## 全流程阻塞提问（结构化）
+
+### 版本冲突处理（package.json / package-lock.json / VERSION / CHANGELOG / release manifest）
+
+检测到版本基线冲突：`package.json`、`package-lock.json`、`VERSION`、`CHANGELOG.md`、`.release-please-manifest.json` 存在不一致，不能直接继续部署。
+A version baseline conflict was detected and deployment cannot continue with inconsistent `package.json` / `package-lock.json` / `VERSION` / `CHANGELOG.md` / `.release-please-manifest.json` records.
+
+```markdown
+[1] 回到初始基线 `0.1.0` 并同步所有版本文件 / Reset to initial baseline `0.1.0` and sync all version files
+[2] 采用已存在的某个版本源并同步其他文件 / Choose one existing version source and sync other files
+[3] 暂停本次流程，稍后重新运行 / Pause this run and rerun later
+```
+
+### GitHub 远端创建与同步
+
+如果本次流程需要远端治理能力，先确认权限与同步策略；实际创建、提交与推送必须等部署和能力验证通过后执行。
+If remote governance is required, confirm permissions and sync strategy first; actual creation, commit, and push must wait until deployment and capability validation pass.
+
+```markdown
+是否在部署验证通过后完成 GitHub 远端创建并同步初始化提交？
+Do you want to create/bind remote and sync the initialization commit after deployment validation passes?
+
+[1] 验证通过后创建远端并同步 / Create/bind remote and sync after validation
+[2] 暂不创建远端，仅保留本地部署结果 / Defer remote creation and keep local deployment only
+[3] 仅执行本地治理，不创建远端 / Continue with local governance only
+[4] 取消本次流程 / Cancel this run
+```
+
+### hooks 与 workflow 合并策略
+
+检测到现有 `.husky` / `.github/workflows` / ruleset 文件与本次能力输出存在冲突，需先确认策略后继续。
+Detected conflicts between existing `.husky`, `.github/workflows`, or ruleset files and generated outputs; confirm strategy before continuing.
+
+```markdown
+当前项应采用何种 merge 策略？
+Which merge strategy should be used for this item?
+
+[1] 安全合并（优先保留既有改动）/ Safe merge (prefer keeping existing local changes)
+[2] 保留现有文件并跳过本项 / Keep existing file and skip this item
+[3] 仅生成 merge plan 并暂停 / Generate merge plan and pause
+[4] 用本次能力标准内容替换 / Replace with generated capability content
+```
+
+### `.claude` 已跟踪文件处理
+
+检测到目标项目已有被跟踪的 `.claude/` / `CLAUDE.md`，涉及路由文件需要确认是否重叠。
+The target project has tracked `.claude/` / `CLAUDE.md`; routing files may overlap and require explicit confirmation.
+
+```markdown
+如何处理 `.claude` 路由文件？
+How should tracked `.claude` route files be handled?
+
+[1] 保留现有 `.claude`，仅同步治理文档与脚本 / Keep existing `.claude`, sync governance docs/scripts only
+[2] 与现有 `.claude` 一起合并并继续 / Merge together with existing `.claude` and continue
+[3] 同步除 `.claude` 外的其他文件 / Sync all files except `.claude`
+[4] 取消本次流程 / Cancel this run
+```
+
+### 受保护分支确认
+
+启用 `github.branch-protection` 时，若仓库已有分支规则需先确认继承关系与生效优先级。
+When `github.branch-protection` is enabled and branch rules already exist, confirm policy inheritance and precedence.
+
+```markdown
+受保护分支策略应如何与既有规则合并？
+How should protected-branch policy be reconciled with existing rules?
+
+[1] 保留现有规则，并补充可合并项 / Keep existing rules and append merge-compatible constraints
+[2] 按本项目新规则更新并允许替换 / Update to this project's new rules and allow replacement
+[3] 仅生成调整方案并暂停 / Generate adjustment plan and pause
+[4] 跳过分支保护能力 / Skip branch-protection
 ```
 
 ## 专项能力提问示例（覆盖 /dayu-harness 关键能力）
@@ -147,7 +221,7 @@ Before applying, `gh auth status` must pass and the current account must have ad
 选项 / Options:
 [1] 启用 / Enable
 [2] 跳过 / Skip
-[3] 稍后手动 / Configure later manually
+[3] 稍后配置 / Configure later
 ```
 
 - `github.pr`：PR 质量治理只关注结构、签名、Troubleshooting 索引与 issue closing 位置；不做语言约束。
@@ -162,7 +236,7 @@ Note: This capability does not enforce language. It checks structure, signatures
 选项 / Options:
 [1] 启用 / Enable
 [2] 跳过 / Skip
-[3] 稍后手动 / Configure later manually
+[3] 稍后配置 / Configure later
 ```
 
 - `github.issue`：Issues 工作流按 `Depends on: #N` 维护前后置序；不打标签、不评论、不过滤语言。
@@ -180,7 +254,7 @@ This capability does not add labels, does not post comments, and does not enforc
 选项 / Options:
 [1] 启用 / Enable
 [2] 跳过 / Skip
-[3] 稍后手动 / Configure later manually
+[3] 稍后配置 / Configure later
 ```
 
 - `quality.tdd`：TDD gate 使用策略文件定义路径；未配置路径不应阻断。
@@ -195,7 +269,7 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 选项 / Options:
 [1] 启用 / Enable
 [2] 跳过 / Skip
-[3] 稍后手动 / Configure later manually
+[3] 稍后配置 / Configure later
 ```
 
 ## 必选治理能力清单
@@ -207,7 +281,7 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 | capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
 | `git.commit-format` | 每次提交必须可追溯、可自动审查，减少后续 review 与回溯成本。 | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
-| `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 按 universal / Node.js / Python 模板检测并 merge。 | Git 项目；已有 `.gitignore` 走 merge plan |
+| `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 从 `github/gitignore` 快照按项目内容动态选择 Node/Python/Go/Rust/Java/Dotnet 等模板并 merge，始终追加 Dayu 本地排除段。 | Git 项目；已有 `.gitignore` 走 merge plan |
 | `ai.execution` | AI 执行方式、自动重试和汇报规则必须沉淀到项目文档中。 | 部署 AI 执行实践文档。 | 默认启用 |
 | `ai.memory` | 项目长期知识/经验的边界和沉淀规则必须写入仓库。 | 部署 AI 记忆边界文档，并将 `AGENTS.md` 与 `docs/` 作为长期知识/经验锚点。 | 默认启用 |
 | `knowledge.adr` | 必须有稳定的项目技术决策记录位点，避免关键架构讨论只留在会话里。 | 部署 ADR 目录与模板，作为项目知识/经验的一部分。 | 默认启用 |
@@ -273,17 +347,17 @@ Merge plan:
 请选择 / Please choose:
 [1] 保留现有配置 / Keep the existing configuration
 [2] 替换为大禹治库 Skill 提供的治理模板 / Replace with the governance template provided by Dayu Harness Skill
-[3] 手动合并后继续 / Continue after manual merge
+[3] 仅生成 merge plan 并暂停 / Generate merge plan and pause
 [4] 跳过此项 / Skip this item
 ```
 
 ## 执行规则
 
 1. `scripts/ensure-environment.sh <project-root> --check --capabilities "<local/default capability ids>"`：先处理本地工具、Git 初始化、Node 初始化和 README/VERSION/CHANGELOG 基线；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行动作并等待用户确认；用户若拒绝则终止流程。
-2. 用户选择 GitHub remote/push 后，先运行 `gh auth status`；未登录则辅助用户执行 `gh auth login`，用户可中断并跳过 GitHub 能力。
-3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，再运行 `scripts/github-remote.sh <project-root> --check` 和 `--apply` 创建/绑定远端并 `git push -u origin <default-branch>`。
-4. 远端推送完成后，再询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力；`scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan，脚本会自动包含 `default=true` 的必选能力，并展示 `default_branch`、`project_baseline`、`github_remote`、`remote_validation` 与 `remote_actions`。
-5. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --enable <optional ids> --github-remote apply`；clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准。
+2. 用户选择 GitHub remote/sync 后，先运行 `gh auth status`；未登录则给出重试登录、暂不创建远端、跳过 GitHub 能力三类选项。
+3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，再运行 `scripts/github-remote.sh <project-root> --check` 解析远端、权限和分支关系，不写入远端。
+4. 继续询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力；`scaffold.sh --dry-run --enable <optional ids>` 先输出 JSON plan，脚本会自动包含 `default=true` 的必选能力，并展示 `default_branch`、`project_baseline`、`github_remote`、`remote_validation` 与 `remote_actions`。
+5. 用户确认可选治理能力和已有配置策略后，才执行 `scaffold.sh --apply --finalize-git auto --enable <optional ids>`；需要远端同步时追加 `--github-remote apply`。clean installer 会自动使用 `merge`，已有配置或冲突场景需补充 `--strategy <merge|replace|skip>`，具体可用策略以 capability manifest 为准。
 6. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 `scaffold.sh --dry-run` 与 diff-helper/manual review 产出对比描述。
 7. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`。
 8. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`；GitHub 能力启用时再执行 `scripts/github-remote.sh <project-root> --verify`。

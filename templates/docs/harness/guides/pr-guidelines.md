@@ -70,8 +70,8 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## 创建后
 
-- Test plan 执行：若启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
-- 合并策略：若启用 `github.branch-protection`，按分支保护规约中的合并策略执行
+- Test plan 执行：项目已启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
+- 合并策略：项目已启用 `github.branch-protection`，按分支保护规约中的合并策略执行
 
 ## PR 合并
 

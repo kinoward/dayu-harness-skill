@@ -19,17 +19,16 @@ Deployment files:
 - Use `github.pr` for regular PR checks; allowed release-please PRs skip PR lint, while the release workflow and `release-please-policy` enforce release safety boundaries.
 - Enable `release.versioning` so version and tag protection rules are explicit
 - Enable `github.repository-settings` to complete repository-side policy prerequisites
-- Add `workflow.allowed_actors_variable` under `.github/release-please-policy.json` (default: `RELEASE_PLEASE_ALLOWED_ACTORS`)
-- Configure `secrets.RELEASE_TOKEN` in the repository
+- GitHub Actions workflow permissions must be `default_workflow_permissions=write` with `can_approve_pull_request_reviews=true`
+- The release workflow uses `secrets.GITHUB_TOKEN`; no extra PAT secret is required
 
-Use a PAT (`secrets.RELEASE_TOKEN`) instead of default `GITHUB_TOKEN` because release-please-created PRs often need to trigger downstream CI checks.
+The workflow intentionally uses `GITHUB_TOKEN` so release PRs do not trigger Dayu-managed PR/Issue/TDD CI or token-derived follow-up workflow runs. The release workflow closes the loop by dispatching `workflow_dispatch mode=publish` after the release PR merges.
 
 By default, release-please auto-merge and PR lint skip are allowed for:
 - `github-actions[bot]`
 - `release-please[bot]`
-- Only these default bot accounts, unless additional accounts are explicitly listed in `RELEASE_PLEASE_ALLOWED_ACTORS` (comma-separated usernames).
 
-If a release PR author is a regular PAT owner (non-bot), you must configure `RELEASE_PLEASE_ALLOWED_ACTORS` in repository variables with comma-separated usernames. Without this configuration, release-please auto-merge and PR lint skip are not allowed for that actor.
+Regular PAT owners and extra actor variables are not valid release PR bypasses. The release PR must come from the same repository, target the default branch, match the `release-please--` branch prefix, and only modify release files allowed by `.github/release-please-policy.json`.
 
 `release-please` no longer uses `autorelease` label-based bypassing, and `pull_request_target` + `labeled` label gates are intentionally not supported.
 

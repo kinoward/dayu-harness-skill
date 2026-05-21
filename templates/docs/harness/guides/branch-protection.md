@@ -19,7 +19,7 @@
 | squash | `gh pr merge --squash` | 小功能，压缩为单 commit |
 | rebase | `gh pr merge --rebase` | 个人项目，线性历史 |
 
-默认使用 merge commit。若启用 release-please，子 commit 遵循 Conventional Commits，PR 标题使用自然语言，避免重复 changelog 条目。
+默认使用 merge commit。项目已启用 release-please：子 commit 遵循 Conventional Commits，PR 标题使用自然语言，避免重复 changelog 条目。
 
 ## 合并后清理
 

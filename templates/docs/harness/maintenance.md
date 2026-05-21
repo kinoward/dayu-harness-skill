@@ -193,8 +193,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `github.issue` | issue-lint.yml + issue_depends_on.py | Issue depends-on 校验 |
 | `quality.tdd` | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | PR TDD 检查 |
 | `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | 复杂配置默认人工确认 |
-| `project.gitignore` | .gitignore installer | 按项目类型合并 universal/node/python 模板 |
-| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；需要 PAT |
+| `project.gitignore` | .gitignore installer | 从 `github/gitignore` 快照按项目内容选择 Node/Python/Go/Rust/Java/Dotnet 等模板，并追加 Dayu 本地排除段 |
+| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；使用 `GITHUB_TOKEN` 与 workflow permissions |
 | 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
 
 > 默认纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）由 `default=true` manifest 强制部署，不通过用户问答决定；可选能力仍由 manifest 控制。

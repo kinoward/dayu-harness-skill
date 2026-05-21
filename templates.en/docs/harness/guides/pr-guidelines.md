@@ -9,7 +9,7 @@ PR titles are readable summaries for humans and tools. Use Chinese, English, or 
 Requirements:
 - At least 5 characters
 - Use a natural-language descriptive title
-- If release-please is enabled with merge commit strategy, avoid Conventional Commits format in PR titles to prevent duplicate changelog entries.
+- This project has enabled release-please with merge commit strategy; avoid Conventional Commits format in PR titles to prevent duplicate changelog entries.
 
 ## PR Body Template
 
@@ -70,8 +70,8 @@ When `gh pr create` fails:
 
 ## After Creation
 
-- Execute Test plan: if `ai.execution` is enabled, validate each Test plan item per AI execution rules.
-- Merge strategy: if `github.branch-protection` is enabled, follow merge strategy in branch protection protocol.
+- Execute Test plan: this project has enabled `ai.execution`; validate each Test plan item per AI execution rules.
+- Merge strategy: this project has enabled `github.branch-protection`; follow merge strategy in branch protection protocol.
 
 ## PR Merge
 

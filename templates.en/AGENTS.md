@@ -50,25 +50,25 @@ The directory index for this level must be kept in sync when directories, files,
 ## Before PR Create/Update
 
 > Trigger: creating a PR, editing PR content, or when CI feedback fails.
-- If `github.pr` is enabled, read `docs/harness/guides/pr-guidelines.md`
-- If `github.pr` is enabled, write PR body as `Summary / Implementation notes / Test plan`
+- This project has enabled `github.pr`; read `docs/harness/guides/pr-guidelines.md`
+- This project has enabled `github.pr`; write PR body as `Summary / Implementation notes / Test plan`
 - Close linked issues with GitHub closing keyword trailers, e.g. `Closes #123`
 
 ## During Release, PR Review, and Troubleshooting
 
 > Trigger: branch release, reviewing changes, process/environment issues.
-- If `github.branch-protection` is enabled, read `docs/harness/guides/branch-protection.md`
-- If `release.versioning` is enabled, read `docs/harness/guides/release-versioning.md`
-- If `github.release-please` is enabled, read `docs/harness/guides/release-please.md`
-- If `github.pr` is enabled, read `docs/harness/sensors/reviews/code-review-checklist.md`
-- If `quality.practices` is enabled, read `docs/harness/guides/dev-hygiene.md`
+- This project has enabled `github.branch-protection`; read `docs/harness/guides/branch-protection.md`
+- This project has enabled `release.versioning`; read `docs/harness/guides/release-versioning.md`
+- This project has enabled `github.release-please`; read `docs/harness/guides/release-please.md`
+- This project has enabled `github.pr`; read `docs/harness/sensors/reviews/code-review-checklist.md`
+- This project has enabled `quality.practices`; read `docs/harness/guides/dev-hygiene.md`
 
 ## During AI-led Execution
 
 > Trigger: AI takes over implementation or execution.
 - Read `docs/harness/guides/ai-execution.md`
 - Read `docs/harness/guides/ai-memory.md`
-- If `quality.practices` is enabled, read `docs/harness/guides/testing-strategy.md`
+- This project has enabled `quality.practices`; read `docs/harness/guides/testing-strategy.md`
 
 ## Reviewing Knowledge and Project Context
 

@@ -19,7 +19,7 @@ Default GitHub Flow is recommended: `__DAYU_DEFAULT_BRANCH__` → short-lived fe
 | squash | `gh pr merge --squash` | Small feature changes, squashed into one commit |
 | rebase | `gh pr merge --rebase` | Personal projects, linear history |
 
-Default is merge commit. If release-please is enabled, follow Conventional Commits for commit messages and use natural-language PR titles to avoid duplicate changelog entries.
+Default is merge commit. This project has enabled release-please, so child commits follow Conventional Commits, and PR titles should use natural language to avoid duplicate changelog entries.
 
 ## Post-merge Cleanup
 
