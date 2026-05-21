@@ -216,6 +216,22 @@ json_from_output() {
     grep -Fq "skills-lock.json" "$project_dir/.gitignore"
 }
 
+@test "conversation replay: empty project gitignore defaults to Node template" {
+    local project_dir="$TEST_DIR/empty-gitignore-default"
+    mkdir -p "$project_dir"
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --check
+    echo "$output" | jq -e '.status == "clean"'
+    echo "$output" | jq -e '.detected_templates == ["Node"]'
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --apply merge
+    echo "$output" | jq -e '.status == "ok" and .action == "merge"'
+    echo "$output" | jq -e '.detected_templates == ["Node"]'
+    grep -Fq "node_modules/" "$project_dir/.gitignore"
+    grep -Fq ".claude/" "$project_dir/.gitignore"
+    grep -Fq "skills-lock.json" "$project_dir/.gitignore"
+}
+
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {
 	    local project_dir="$TEST_DIR/default-no-github-optional"
 	    cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"

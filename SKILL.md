@@ -34,6 +34,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 项目已有完整体系，用户要求检查完整性 → 进入诊断模式
 - 所有操作前先分析项目现状，基于 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 适配提问；默认治理与 Git 能力不作为是否启用的问题，只在已有配置需要合并策略时确认
 - 所有面向用户的提问和选项必须中英双语展示，格式为中文在前、英文在后；选项使用 `[1] 中文 / English`，默认项写明 `（默认，推荐）/ (default, recommended)`
+- 初始化第一个阻塞问题必须是部署内容语言（中文 / English）。不得先询问项目编程语言、技术栈或项目类型；这些信息由 Skill 根据文件自动判断，空项目默认按 Node.js 治理工具链基线处理。
 - 问答交互规则只约束 Skill 运行时，不写入目标项目部署产物。若宿主客户端暴露了可调用的原生交互机制（如选择器、确认对话或计划审批控件），必须优先使用；若当前客户端没有暴露可调用的结构化交互能力，则采用兼容降级：一次只提出一个阻塞问题，立即结束当前回复并等待用户输入，不得在同一轮继续运行命令、不得合并多个阻塞问题、不得假装已经进入交互控件
 - 可选的 `github.repository-settings` 在用户选择启用、部署验证通过且本次流程明确追加 `--github-remote apply` 后，才调用 GitHub API 同步 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；dry-run 只预览，不修改远端。Issue/PR/TDD/发布能力仍以配置、策略文件、工作流和说明为主。
 - 部署/融合前统一执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`；尚未确定可选能力时不传 `--capabilities`，脚本按默认必选能力检查。若返回 `needs_install`、`needs_initialization` 或 `needs_user_action`，先向用户展示安装/初始化建议并确认；若用户拒绝，当前流程终止
@@ -57,7 +58,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 
 触发：项目无 AGENTS.md
 
-1. 若用户未提供部署语言，先通过交互门禁确认部署语言并等待回答；随后执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`，处理并确认 Git/Node 初始化需求（见 Q&A 前置问题；尚未确定可选能力时使用默认必选能力检查）
+1. 若用户未提供部署语言，先通过交互门禁确认部署语言并等待回答；这必须是第一个问题。随后执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`，由脚本自动判断技术栈、Git/Node 治理工具链初始化需求和 `.gitignore` 模板（见 Q&A 前置问题；尚未确定可选能力时使用默认必选能力检查）
 2. 分析项目现状（读取文件结构、已有配置）
 3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 的交互门禁询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
 4. 展示确认汇总

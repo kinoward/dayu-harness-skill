@@ -227,6 +227,7 @@ Before asking questions, assess the current project state:
 
 If pre-check indicates missing dependencies or missing Git:
 - Ask user to run `git init` first.
+- The AI determines stack and project type from files automatically; do not ask the user what programming language the project uses. Empty projects use the Node.js governance-tooling baseline.
 - For Node-based governance tooling (husky/commitlint/lint-staged), ask for `npm init -y` first.
 - If required dependencies are missing, ask user to run the `npm install --save-dev ...` command from script guidance.
 - Clarify these dependencies are for governance tooling, not proof that the project must be a Node.js app; do not replace project initialization with a template `package.json`.

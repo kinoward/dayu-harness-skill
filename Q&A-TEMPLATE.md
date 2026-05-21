@@ -20,13 +20,15 @@
 - 问答必须优先使用当前宿主已经暴露且可调用的原生交互能力（选择器、确认对话、计划审批控件或等价交互机制），不能默认把连续问题写成普通说明文本。
 - 如果宿主客户端没有暴露可调用的结构化交互能力，采用兼容降级：一次只提出一个阻塞问题，随后立即结束当前回复并等待用户输入；不得在同一轮继续执行命令、不得把语言选择、环境初始化、能力选择或 merge 策略合并成一个长问题，也不得声称已经打开原生交互控件。
 - 若用户已经在当前请求中明确给出完整预设（例如部署语言、初始化许可、可选能力启用/跳过策略），可跳过对应问题，但必须在确认汇总中列明这些预设来源。
+- 第一个阻塞问题必须是部署内容语言（中文 / English）；不得先询问项目使用哪种编程语言、技术栈或项目类型。
+- 技术栈、项目类型和 `.gitignore` 模板由 Skill 根据文件自动判断；不得要求使用者判断当前项目使用哪种编程语言。空项目按 Node.js 治理工具链基线处理。
 - This section governs only Skill runtime Q&A, not deployed target-project governance content. Use native host interaction only when it is explicitly exposed and callable; otherwise ask exactly one blocking question per turn, stop immediately, and wait for the user's answer before running more commands.
 
 ## 前置问题
 
 ### 部署语言
 
-进入能力问答前，先询问部署到目标项目的文档语言。除非用户已经明确给出部署语言，否则本问题是第一个阻塞交互点；提出后必须等待回答，不得同时执行环境检查。
+进入能力问答前，先询问部署到目标项目的文档语言。除非用户已经明确给出部署语言，否则本问题是第一个阻塞交互点；提出后必须等待回答，不得同时执行环境检查，也不得先询问项目编程语言。
 
 ```markdown
 请选择部署到目标项目的文档语言。推荐使用中文，因为中文是本 Skill 的源语言，更贴近作者意图。
@@ -37,6 +39,16 @@ Please choose the documentation language to deploy to the target project. Chines
 ```
 
 用户选择中文或未明确选择时，后续 `scaffold.sh` 使用默认 `--locale zh-CN`；用户明确选择英文时，执行 `scaffold.sh --locale en`。无论选择哪种语言，写入目标项目的路径保持不变，只改变部署内容语言。
+
+### 技术栈自动判断
+
+部署语言只决定写入目标项目的文档内容语言，不等同于项目编程语言。项目编程语言、包管理器、`.gitignore` 模板和可选工具链由 Skill 自动检测：
+
+- 空目录或无法识别技术栈时，按 Node.js 治理工具链基线处理，用 Node `.gitignore` 模板作为默认模板。
+- 检测到 `package.json`、lockfile 或 JS/TS 相关文件时，按 Node.js 项目处理。
+- 检测到 `requirements.txt`、`pyproject.toml`、`*.py` 时叠加 Python 模板。
+- 检测到 `go.mod`、`Cargo.toml`、`pom.xml`、Gradle、`.sln`、`*.csproj` 等文件时，叠加对应 Go/Rust/Java/Dotnet 模板。
+- 可选能力提问只能基于“Skill 已检测到 X，因此是否启用对应治理能力”来问，不得让用户选择“当前项目是什么语言”。
 
 ### 本地初始化与项目基线
 
@@ -56,7 +68,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - New Git repositories must use `git init -b main`; older Git falls back to `git init && git branch -M main`. Existing repositories keep their current default branch, and that branch becomes the default for later GitHub workflows, rulesets, and documented commands.
 - 初始化时若缺少 `README.md`、`VERSION` 或 `CHANGELOG.md`，apply 阶段会补齐。空项目初始版本为 `0.1.0`；已有 `package.json.version` 时以现有版本为准创建 `VERSION` 和起始 CHANGELOG。
 - During initialization, missing `README.md`, `VERSION`, or `CHANGELOG.md` will be created during apply. Empty projects start at `0.1.0`; if `package.json.version` already exists, that version is used for `VERSION` and the initial CHANGELOG entry.
-- 需要 Node 生态时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化；若 Skill 新建 package 或 package 缺 version，则写入 `0.1.0`。
+- 需要 Node 生态治理工具链时，提示执行 `npm init -y`，并说明 `package.json` 不能通过手写模板文件替代初始化；若 Skill 新建 package 或 package 缺 version，则写入 `0.1.0`。这一步由 Skill 根据治理工具链需要和项目内容判断，不询问用户“项目是否为 Node.js”。
 - 说明：Node/npm/npx、`package.json`、`devDependencies` 仅用于安装/运行治理工具链（如 husky、commitlint、lint-staged），不是目标项目必须是 Node.js 应用的前提。
 - 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或能力关联 installer 脚本。
 
@@ -126,9 +138,9 @@ Q: 是否使用 GitHub 远程托管？
 Q: Do you use GitHub as the remote hosting platform?
    选项 / Options: [1] 是 / Yes [2] 否 / No [3] 其他托管平台（请描述）/ Other hosting platform (please describe)
 
-Q: 是否需要 Node.js 的 ESLint / Prettier / lint-staged 自动拦截？
-Q: Do you need automatic Node.js ESLint / Prettier / lint-staged checks?
-   选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 自定义工具链 / Custom toolchain
+Q: Skill 已检测到 Node.js/npm 工具链上下文，是否启用 ESLint / Prettier / lint-staged 自动拦截？
+Q: The Skill detected a Node.js/npm tooling context. Do you want to enable ESLint / Prettier / lint-staged checks?
+   选项 / Options: [1] 启用 / Enable [2] 跳过 / Skip [3] 稍后配置 / Configure later
 ```
 
 ## 全流程阻塞提问（结构化）

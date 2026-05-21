@@ -601,14 +601,14 @@ if [ "$requires_node" = true ]; then
             if (cd "$TARGET" && npm init -y >/dev/null 2>&1); then
                 INITIALIZATIONS=$((INITIALIZATIONS + 1))
                 PACKAGE_CREATED=true
-                add_item "project" "node" "initialized" "true" "npm init -y" "目标目录不是 Node 项目，已执行 npm init -y。"
+                add_item "project" "node" "initialized" "true" "npm init -y" "治理工具链需要 package.json，已执行 npm init -y；这不表示目标项目必须是 Node.js 应用。"
             else
                 ERRORS=$((ERRORS + 1))
-                add_item "project" "node" "error" "true" "npm init -y" "目标目录不是 Node 项目，且 npm init -y 执行失败。"
+                add_item "project" "node" "error" "true" "npm init -y" "治理工具链需要 package.json，但 npm init -y 执行失败。"
             fi
         else
             INITIALIZATIONS=$((INITIALIZATIONS + 1))
-            add_item "project" "node" "needs_initialization" "true" "npm init -y" "目标目录不是 Node 项目，部署前必须执行 npm init -y。"
+            add_item "project" "node" "needs_initialization" "true" "npm init -y" "治理工具链需要 package.json，部署前需执行 npm init -y；这不要求目标项目本身是 Node.js 应用。"
         fi
     else
         add_item "project" "node" "ok" "true" "none" "package.json 已存在。"

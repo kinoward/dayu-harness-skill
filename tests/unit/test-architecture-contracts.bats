@@ -812,6 +812,28 @@ expected_agents_h1() {
     grep -q "npm init -y" "$REPO_ROOT/templates/docs/harness/maintenance.md"
 }
 
+@test "Q&A starts with deployment locale and never asks user to classify project language" {
+    local locale_line stack_line local_init_line
+
+    locale_line="$(rg -n '^### 部署语言$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+    stack_line="$(rg -n '^### 技术栈自动判断$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+    local_init_line="$(rg -n '^### 本地初始化与项目基线$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+
+    [ -n "$locale_line" ]
+    [ -n "$stack_line" ]
+    [ -n "$local_init_line" ]
+    [ "$locale_line" -lt "$stack_line" ]
+    [ "$stack_line" -lt "$local_init_line" ]
+
+    grep -Fq '第一个阻塞问题必须是部署内容语言' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '不得先询问项目使用哪种编程语言、技术栈或项目类型' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '空项目按 Node.js 治理工具链基线处理' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '初始化第一个阻塞问题必须是部署内容语言' "$REPO_ROOT/SKILL.md"
+    grep -Fq '不得先询问项目编程语言、技术栈或项目类型' "$REPO_ROOT/SKILL.md"
+    ! rg -n '^Q: .*编程语言|^Q: .*项目类型|^Q: .*programming language|^Q: .*project type' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    ! rg -n '目标目录不是 Node 项目' "$REPO_ROOT/scripts/ensure-environment.sh"
+}
+
 @test "scaffold --enable github.release-please resolves dependencies" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.release-please
 
