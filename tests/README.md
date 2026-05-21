@@ -58,6 +58,22 @@ RUN_CLAUDE_I18N_SMOKE=1 tests/smoke/claude-i18n-deploy-smoke.sh
 RUN_CLAUDE_I18N_SMOKE=1 bats tests/unit/test-skill-interaction-e2e.bats
 ```
 
+### Profiled Skill Smoke
+
+位置：`tests/smoke/dayu-harness-profile.sh`
+
+该入口把空项目测试拆成三个 profile，减少每次都跑完整远端链路的成本：
+
+- `local-fast`：只跑本地生成、模板渲染、validate 只读性和 fake-gh 单元检查。
+- `remote-smoke`：显式开启后使用 disposable GitHub repo 验证 Issue -> PR：创建 Issue，PR body 使用 `Closes #N`，验证 issue lint、PR lint 和自动关闭链路。
+- `remote-release`：显式开启后验证 release-please 真实 push 触发；不得把 `workflow_dispatch` 作为成功标准。
+
+```bash
+tests/smoke/dayu-harness-profile.sh --profile local-fast
+RUN_DAYU_REMOTE_SMOKE=1 tests/smoke/dayu-harness-profile.sh --profile remote-smoke
+RUN_DAYU_REMOTE_RELEASE=1 tests/smoke/dayu-harness-profile.sh --profile remote-release
+```
+
 ## 运行方式
 
 单独运行执行层 E2E：

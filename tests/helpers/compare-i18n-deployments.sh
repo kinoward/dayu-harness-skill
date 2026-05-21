@@ -69,7 +69,9 @@ EN_DIR="$(cd "$EN_DIR" 2>/dev/null && pwd)" || {
     exit 2
 }
 
-TMP_DIR="$(mktemp -d)"
+TMP_ROOT="${TMPDIR:-/tmp}"
+mkdir -p "$TMP_ROOT"
+TMP_DIR="$(mktemp -d "$TMP_ROOT/dayu-i18n-compare.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 CHECKS_FILE="$TMP_DIR/checks.jsonl"
 : > "$CHECKS_FILE"

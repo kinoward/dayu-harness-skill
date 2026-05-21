@@ -133,7 +133,7 @@ json_from_output() {
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable "$enabled"
     echo "$output" | jq -e '.status == "needs_initialization"'
-    echo "$output" | jq -e '.environment.items | any(.action == "git init")'
+    echo "$output" | jq -e '.environment.items | any(.action | startswith("git init"))'
     echo "$output" | jq -e '.environment.items | any(.action == "npm init -y")'
     echo "$output" | jq -e '.capability_count == 13'
     echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices"]'
@@ -147,6 +147,12 @@ json_from_output() {
     assert_path "$project_dir/.husky/pre-commit"
     assert_no_path "$project_dir/.husky/pre-push"
     assert_path "$project_dir/package.json"
+    assert_path "$project_dir/README.md"
+    assert_path "$project_dir/VERSION"
+    assert_path "$project_dir/CHANGELOG.md"
+    [ "$(cat "$project_dir/VERSION")" = "0.1.0" ]
+    grep -Fq "## 0.1.0" "$project_dir/CHANGELOG.md"
+    jq -e '.version == "0.1.0"' "$project_dir/package.json"
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.cjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
@@ -199,12 +205,14 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.delivery --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
-	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
-	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
 	    assert_path "$project_dir/.github/workflows/pr-lint.yml"
 	    assert_path "$project_dir/.github/workflows/issue-lint.yml"
+	    assert_path "$project_dir/.github/ISSUE_TEMPLATE/dayu-harness-issue.md"
+	    assert_path "$project_dir/.github/pull_request_template.md"
 	    assert_path "$project_dir/.github/rulesets/protect-main.json"
 	    assert_no_path "$project_dir/.github/rulesets/protect-tags.json"
 	    assert_path "$project_dir/docs/harness/guides/issue-guidelines.md"
@@ -224,8 +232,8 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable release.automated --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
-	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
-	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/workflows/release-please.yml"
 	    assert_path "$project_dir/.github/release-please-policy.json"
@@ -233,6 +241,9 @@ json_from_output() {
 	    assert_path "$project_dir/release-please-config.json"
 	    assert_path "$project_dir/.release-please-manifest.json"
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
+	    [ "$(cat "$project_dir/VERSION")" = "0.1.0" ]
+	    jq -e '."." == "0.1.0"' "$project_dir/.release-please-manifest.json"
+	    jq -e '.version == "0.1.0"' "$project_dir/package.json"
 
 	    assert_no_path "$project_dir/.github/workflows/issue-lint.yml"
 
@@ -240,6 +251,10 @@ json_from_output() {
 	    json_from_output | jq -e '.summary.failed == 0'
 	    run_json "$project_dir/docs/harness/sensors/scripts/audit.sh" --json "$project_dir"
 	    json_from_output | jq -e '.summary.failed == 0'
+	    run bash -c 'find "$1" -type d -name "__pycache__"' _ "$project_dir"
+	    [ -z "$output" ]
+	    run bash -c 'find "$1" -type f -name "*.pyc"' _ "$project_dir"
+	    [ -z "$output" ]
 	}
 
 	@test "legacy language capability aliases remain rejected in e2e path" {
@@ -296,6 +311,27 @@ json_from_output() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "pass"'
     echo "$output" | jq -e '.deployments.zh and .deployments.en'
+}
+
+@test "profiled Dayu Harness smoke test entrypoint exposes local and gated remote profiles" {
+    local profile_script="$REPO_ROOT/tests/smoke/dayu-harness-profile.sh"
+    [ -x "$profile_script" ]
+
+    run bash "$profile_script" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"local-fast"* ]]
+    [[ "$output" == *"remote-smoke"* ]]
+    [[ "$output" == *"remote-release"* ]]
+    grep -Fq "Depends on: #" "$profile_script"
+    grep -Fq "createdAt" "$profile_script"
+
+    run env RUN_DAYU_REMOTE_SMOKE=0 bash "$profile_script" --profile remote-smoke --json
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "skipped" and .profile == "remote-smoke"'
+
+    run env RUN_DAYU_REMOTE_RELEASE=0 bash "$profile_script" --profile remote-release --json
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "skipped" and .profile == "remote-release"'
 }
 
 @test "conversation replay: messy project merges selected capabilities and fixes progressive docs indexes" {

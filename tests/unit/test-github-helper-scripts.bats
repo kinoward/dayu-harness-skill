@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
+    export PYTHONDONTWRITEBYTECODE=1
     TEST_ROOT="${BATS_TEST_DIRNAME}/.tmp"
     mkdir -p "$TEST_ROOT"
     TEST_DIR="$(mktemp -d "$TEST_ROOT/github-helper-scripts.XXXXXX")"
