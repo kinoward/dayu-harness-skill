@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # github-remote.sh — GitHub 远端协同检查、创建与校验
-# 用法：scripts/github-remote.sh <target-root> --check|--apply|--verify
+# 用法：scripts/github-remote.sh <target-root> --check|--apply|--verify [--repository owner/repo] [--visibility private|public]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -10,7 +10,13 @@ MODE="check"
 DAYU_GITHUB_REPO="${DAYU_HARNESS_GITHUB_REPOSITORY:-}"
 DAYU_GITHUB_VISIBILITY="${DAYU_HARNESS_GITHUB_VISIBILITY:-private}"
 REQUESTED_DEFAULT_BRANCH="${DAYU_HARNESS_DEFAULT_BRANCH:-}"
-REMOTE_ACTIONS_JSON="${DAYU_HARNESS_REMOTE_ACTIONS_JSON:-[]}"
+REMOTE_ACTIONS_EXPLICIT="false"
+if [ "${DAYU_HARNESS_REMOTE_ACTIONS_JSON+x}" = "x" ]; then
+    REMOTE_ACTIONS_EXPLICIT="true"
+    REMOTE_ACTIONS_JSON="${DAYU_HARNESS_REMOTE_ACTIONS_JSON}"
+else
+    REMOTE_ACTIONS_JSON="[]"
+fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -18,8 +24,16 @@ while [ $# -gt 0 ]; do
             MODE="${1#--}"
             shift
             ;;
+        --repository|--repo)
+            DAYU_GITHUB_REPO="${2:-}"
+            shift 2
+            ;;
+        --visibility)
+            DAYU_GITHUB_VISIBILITY="${2:-}"
+            shift 2
+            ;;
         --help|-h)
-            echo '{"status":"error","error":"usage: github-remote.sh <target-root> --check|--apply|--verify","description_nl":"请传入目标目录和 --check / --apply / --verify。"}'
+            echo '{"status":"error","error":"usage: github-remote.sh <target-root> --check|--apply|--verify [--repository owner/repo] [--visibility private|public]","description_nl":"请传入目标目录、--check / --apply / --verify，可选传入 --repository owner/repo 与 --visibility private|public。"}'
             exit 2
             ;;
         *)
@@ -58,6 +72,7 @@ normalize_branch_name() {
     local branch="$1"
     case "$branch" in
         ""|HEAD|null) branch="" ;;
+        dayu-harness/init|dayu-harness/init-*) branch="main" ;;
     esac
     printf '%s' "$branch"
 }
@@ -294,7 +309,7 @@ configure_required_remote_actions() {
         return 0
     fi
 
-    if [ "$MODE" = "apply" ]; then
+    if [ "$REMOTE_ACTIONS_EXPLICIT" = "true" ]; then
         return 0
     fi
 
@@ -594,7 +609,7 @@ push_initialization_pr() {
 
     short_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
     init_branch="dayu-harness/init-${short_sha}"
-    pr_body="Dayu Harness 初始化分支。远端 ${DEFAULT_BRANCH} 已领先或分叉，因此本次初始化通过 PR 同步，且全程不使用 force push。"
+    pr_body="Dayu Harness 初始化分支。远端 ${DEFAULT_BRANCH} 需要通过 PR 同步（可能因远端已领先/分叉，或本地默认分支保护已启用），且全程不使用 force push。"
 
     set +e
     push_output="$(git -C "$TARGET" push -u origin "HEAD:${init_branch}" 2>&1)"
@@ -620,6 +635,20 @@ push_initialization_pr() {
 
     add_item "{\"kind\":\"pull_request\",\"action\":\"create\",\"branch\":\"$(json_escape "$init_branch")\",\"base\":\"$(json_escape "$DEFAULT_BRANCH")\",\"status\":\"error\",\"description_nl\":\"初始化 PR 创建失败：$(json_escape "$pr_output")\"}" "error"
     return 1
+}
+
+push_default_branch() {
+    if [ "$REMOTE_SYNC_STATE" = "remote_missing" ]; then
+        DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=1 git -C "$TARGET" push -u origin "HEAD:$DEFAULT_BRANCH" >/dev/null 2>&1
+    else
+        git -C "$TARGET" push -u origin "HEAD:$DEFAULT_BRANCH" >/dev/null 2>&1
+    fi
+}
+
+default_branch_direct_push_blocked() {
+    local hook="$TARGET/.husky/pre-push"
+    [ -f "$hook" ] || return 1
+    grep -Fq 'direct push to $ref_name is not allowed' "$hook" 2>/dev/null || grep -Fq 'direct push to' "$hook" 2>/dev/null
 }
 
 check_mode() {
@@ -718,11 +747,11 @@ apply_mode() {
         fi
         ensure_default_branch_fallback
         assess_remote_sync_state
-        if [ "$REMOTE_SYNC_STATE" = "behind" ] || [ "$REMOTE_SYNC_STATE" = "diverged" ]; then
+        if [ "$REMOTE_SYNC_STATE" = "behind" ] || [ "$REMOTE_SYNC_STATE" = "diverged" ] || { [ "$REMOTE_SYNC_STATE" = "ahead" ] && default_branch_direct_push_blocked; }; then
             if push_initialization_pr; then
                 push_ok="branch_pr"
             fi
-        elif git -C "$TARGET" push -u origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        elif push_default_branch; then
             push_ok="true"
             add_item '{"kind":"remote","action":"push","status":"ok","description_nl":"已执行 git push -u origin <default_branch>。"}' "ok"
         else

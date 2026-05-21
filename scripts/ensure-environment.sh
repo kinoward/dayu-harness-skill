@@ -86,6 +86,7 @@ DEFAULT_BRANCH="main"
 PROJECT_VERSION="0.1.0"
 PACKAGE_CREATED=false
 PACKAGE_VERSION_WAS_MISSING=false
+PACKAGE_VERSION_IS_NPM_DEFAULT=false
 PACKAGE_LOCK_CREATED=false
 
 DEFAULT_CAPABILITIES=(
@@ -197,7 +198,63 @@ read_current_branch() {
         || true)"
     [ "$branch" = "HEAD" ] && branch=""
     [ "$branch" = "null" ] && branch=""
+    case "$branch" in
+        dayu-harness/init|dayu-harness/init-*)
+            branch="main"
+            ;;
+    esac
     printf '%s' "$branch"
+}
+
+read_raw_current_branch() {
+    local branch=""
+    branch="$(git -C "$TARGET" symbolic-ref --quiet --short HEAD 2>/dev/null \
+        || git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null \
+        || true)"
+    [ "$branch" = "HEAD" ] && branch=""
+    [ "$branch" = "null" ] && branch=""
+    printf '%s' "$branch"
+}
+
+ensure_default_branch_checkout() {
+    local raw_branch
+    raw_branch="$(read_raw_current_branch)"
+    case "$raw_branch" in
+        dayu-harness/init|dayu-harness/init-*)
+            DEFAULT_BRANCH="main"
+            if [ "$MODE" != "apply" ]; then
+                add_item "project" "git.branch" "needs_initialization" "false" "git switch main" "当前位于初始化临时分支 ${raw_branch}；apply 阶段会切换或创建 main 作为真实默认分支。"
+                return 0
+            fi
+            if ! git -C "$TARGET" diff --quiet --ignore-submodules -- 2>/dev/null || ! git -C "$TARGET" diff --cached --quiet --ignore-submodules -- 2>/dev/null; then
+                ERRORS=$((ERRORS + 1))
+                add_item "project" "git.branch" "error" "true" "git switch main" "当前位于初始化临时分支 ${raw_branch}，且工作区已有未提交变更；为避免把初始化提交留在临时分支，请先清理或提交后再继续。"
+                return 1
+            fi
+            if git -C "$TARGET" rev-parse --verify refs/heads/main >/dev/null 2>&1; then
+                if git -C "$TARGET" switch main >/dev/null 2>&1; then
+                    add_item "project" "git.branch" "configured" "true" "git switch main" "已从初始化临时分支 ${raw_branch} 切换到 main，后续初始化提交会落在真实默认分支。"
+                else
+                    ERRORS=$((ERRORS + 1))
+                    add_item "project" "git.branch" "error" "true" "git switch main" "无法从初始化临时分支 ${raw_branch} 切换到 main。"
+                fi
+            elif git -C "$TARGET" rev-parse --verify HEAD >/dev/null 2>&1; then
+                if git -C "$TARGET" branch main HEAD >/dev/null 2>&1 && git -C "$TARGET" switch main >/dev/null 2>&1; then
+                    add_item "project" "git.branch" "configured" "true" "git branch main && git switch main" "已基于当前提交创建并切换到 main，避免初始化临时分支成为默认分支。"
+                else
+                    ERRORS=$((ERRORS + 1))
+                    add_item "project" "git.branch" "error" "true" "git branch main && git switch main" "无法基于初始化临时分支 ${raw_branch} 创建 main。"
+                fi
+            else
+                if git -C "$TARGET" symbolic-ref HEAD refs/heads/main >/dev/null 2>&1; then
+                    add_item "project" "git.branch" "configured" "true" "git symbolic-ref HEAD refs/heads/main" "当前仓库尚无提交，已将初始分支指向 main。"
+                else
+                    ERRORS=$((ERRORS + 1))
+                    add_item "project" "git.branch" "error" "true" "git symbolic-ref HEAD refs/heads/main" "无法将无提交仓库的初始分支指向 main。"
+                fi
+            fi
+            ;;
+    esac
 }
 
 read_package_version() {
@@ -261,6 +318,37 @@ read_release_manifest_version() {
     fi
 }
 
+project_has_meaningful_initial_content() {
+    local entry base
+    while IFS= read -r entry; do
+        base="$(basename "$entry")"
+        case "$base" in
+            .git|.claude|node_modules|package.json|package-lock.json|npm-shrinkwrap.json|.DS_Store)
+                continue
+                ;;
+        esac
+        return 0
+    done < <(find "$TARGET" -mindepth 1 -maxdepth 1 -print 2>/dev/null)
+    return 1
+}
+
+is_npm_default_initial_version() {
+    local package_version package_lock_version
+    package_version="$(read_package_version)"
+    package_lock_version="$(read_package_lock_version)"
+
+    [ "$package_version" = "1.0.0" ] || return 1
+    [ -z "$package_lock_version" ] || [ "$package_lock_version" = "1.0.0" ] || return 1
+    [ ! -f "$TARGET/VERSION" ] || return 1
+    [ ! -f "$TARGET/CHANGELOG.md" ] || return 1
+    [ ! -f "$TARGET/.release-please-manifest.json" ] || return 1
+    [ ! -f "$TARGET/AGENTS.md" ] || return 1
+    if project_has_meaningful_initial_content; then
+        return 1
+    fi
+    return 0
+}
+
 refresh_project_version() {
     local package_version package_lock_version version_file changelog_version manifest_version
     package_version="$(read_package_version)"
@@ -269,7 +357,9 @@ refresh_project_version() {
     changelog_version="$(read_changelog_version)"
     manifest_version="$(read_release_manifest_version)"
 
-    if [ -n "$package_version" ]; then
+    if is_npm_default_initial_version; then
+        PROJECT_VERSION="0.1.0"
+    elif [ -n "$package_version" ]; then
         PROJECT_VERSION="$package_version"
     elif [ -n "$package_lock_version" ]; then
         PROJECT_VERSION="$package_lock_version"
@@ -293,6 +383,12 @@ detect_version_conflict() {
     version_file="$(read_version_file)"
     changelog_version="$(read_changelog_version)"
     manifest_version="$(read_release_manifest_version)"
+
+    if is_npm_default_initial_version; then
+        package_version=""
+        package_lock_version=""
+        PROJECT_VERSION="0.1.0"
+    fi
 
     add_version_source() {
         local source_name="$1"
@@ -564,6 +660,10 @@ else
     add_item "project" "git" "ok" "true" "none" "目标目录已是 Git 项目，将保留当前默认分支 ${DEFAULT_BRANCH}。"
 fi
 
+if [ -d "$TARGET/.git" ]; then
+    ensure_default_branch_checkout
+fi
+
 if [ "$requires_hook_path" = true ] && [ -d "$TARGET/.git" ]; then
     hooks_path="$(git -C "$TARGET" config --local --get core.hooksPath 2>/dev/null || true)"
     if [ -z "$hooks_path" ]; then
@@ -615,19 +715,24 @@ if [ "$requires_node" = true ]; then
     fi
 
     package_version="$(read_package_version)"
-    if [ -n "$package_version" ] && [ "$PACKAGE_CREATED" != true ]; then
+    if is_npm_default_initial_version; then
+        PACKAGE_VERSION_IS_NPM_DEFAULT=true
+        PROJECT_VERSION="0.1.0"
+    elif [ -n "$package_version" ] && [ "$PACKAGE_CREATED" != true ]; then
         PROJECT_VERSION="$package_version"
     elif [ -z "$package_version" ]; then
         PACKAGE_VERSION_WAS_MISSING=true
     fi
 
-    if [ "$MODE" = "apply" ] && { [ "$PACKAGE_CREATED" = true ] || [ "$PACKAGE_VERSION_WAS_MISSING" = true ]; }; then
+    if [ "$MODE" = "apply" ] && { [ "$PACKAGE_CREATED" = true ] || [ "$PACKAGE_VERSION_WAS_MISSING" = true ] || [ "$PACKAGE_VERSION_IS_NPM_DEFAULT" = true ]; }; then
         if set_package_version "$PROJECT_VERSION"; then
             add_item "project" "package.version" "configured" "false" "set package.json version" "已将 package.json version 设置为 ${PROJECT_VERSION}。"
         else
             ERRORS=$((ERRORS + 1))
             add_item "project" "package.version" "error" "false" "set package.json version" "设置 package.json version 失败。"
         fi
+    elif [ "$PACKAGE_VERSION_IS_NPM_DEFAULT" = true ]; then
+        add_item "project" "package.version" "ok" "false" "none" "空项目忽略 npm init 默认 version=1.0.0，初始化版本使用 ${PROJECT_VERSION}。"
     elif [ -f "$TARGET/package.json" ]; then
         add_item "project" "package.version" "ok" "false" "none" "package.json version 使用 ${PROJECT_VERSION}。"
     fi
@@ -682,7 +787,11 @@ if [ "$requires_node" = true ] && [ -f "$TARGET/package.json" ]; then
             add_item "project" "package-lock.version" "error" "false" "sync package-lock.json version" "同步 package-lock.json version 失败。"
         fi
     elif [ -f "$TARGET/package-lock.json" ]; then
-        add_item "project" "package-lock.version" "ok" "false" "none" "package-lock.json version 使用 $(read_package_lock_version)。"
+        if [ "$PACKAGE_VERSION_IS_NPM_DEFAULT" = true ]; then
+            add_item "project" "package-lock.version" "ok" "false" "none" "空项目 package-lock.json 的 npm 默认 1.0.0 会在 apply 阶段同步为 ${PROJECT_VERSION}。"
+        else
+            add_item "project" "package-lock.version" "ok" "false" "none" "package-lock.json version 使用 $(read_package_lock_version)。"
+        fi
     elif [ "$INSTALLS" -gt 0 ]; then
         add_item "project" "package-lock.json" "needs_install" "false" "npm install" "package-lock.json 缺失；apply 阶段安装依赖时会生成或补齐并同步版本 ${PROJECT_VERSION}。"
     else
@@ -691,7 +800,7 @@ if [ "$requires_node" = true ] && [ -f "$TARGET/package.json" ]; then
     fi
 fi
 
-if [ "$PACKAGE_CREATED" != true ] && [ "$PACKAGE_VERSION_WAS_MISSING" != true ]; then
+if [ "$PACKAGE_CREATED" != true ] && [ "$PACKAGE_VERSION_WAS_MISSING" != true ] && [ "$PACKAGE_VERSION_IS_NPM_DEFAULT" != true ]; then
     refresh_project_version
 fi
 

@@ -26,6 +26,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
             exit 1
         fi
 
+        if [ "${DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION:-}" = "1" ] && [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+            continue
+        fi
+
         echo "ERROR: direct push to $ref_name is not allowed."
         echo "Use a feature branch and pull request workflow."
         exit 1

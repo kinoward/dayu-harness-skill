@@ -20,6 +20,9 @@ ONLY_EXPLICIT="false"
 STRATEGY=""
 LOCALE="zh-CN"
 GITHUB_REMOTE_MODE="${DAYU_HARNESS_GITHUB_REMOTE:-auto}"
+GITHUB_E2E_MODE="${DAYU_HARNESS_GITHUB_E2E:-auto}"
+GITHUB_REPOSITORY="${DAYU_HARNESS_GITHUB_REPOSITORY:-}"
+GITHUB_VISIBILITY="${DAYU_HARNESS_GITHUB_VISIBILITY:-}"
 FINALIZE_GIT="${DAYU_HARNESS_FINALIZE_GIT:-skip}"
 
 while [ $# -gt 0 ]; do
@@ -67,6 +70,21 @@ while [ $# -gt 0 ]; do
             esac
             shift 2
             ;;
+        --github-repository|--github-repo)
+            GITHUB_REPOSITORY="${2:-}"
+            shift 2
+            ;;
+        --github-visibility|--visibility)
+            GITHUB_VISIBILITY="${2:-}"
+            case "$GITHUB_VISIBILITY" in
+                private|public|"") ;;
+                *)
+                    echo "error: unsupported --github-visibility '$GITHUB_VISIBILITY'. Supported: private|public" >&2
+                    exit 2
+                    ;;
+            esac
+            shift 2
+            ;;
         --finalize-git)
             if [ $# -gt 1 ] && [[ "${2:-}" != --* ]]; then
                 FINALIZE_GIT="${2:-auto}"
@@ -83,6 +101,17 @@ while [ $# -gt 0 ]; do
                     ;;
             esac
             ;;
+        --github-e2e)
+            GITHUB_E2E_MODE="${2:-}"
+            case "$GITHUB_E2E_MODE" in
+                auto|target|skip) ;;
+                *)
+                    echo "error: unsupported --github-e2e '$GITHUB_E2E_MODE'. Supported: auto|target|skip" >&2
+                    exit 2
+                    ;;
+            esac
+            shift 2
+            ;;
         --help|-h)
             MODE="help"
             shift
@@ -95,7 +124,7 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en] [--github-remote auto|check|apply|verify|skip] [--finalize-git auto|skip]"
+    echo "用法: scaffold.sh <target-root> [--dry-run|--apply] [--enable ids] [--only category] [--strategy merge|replace|skip] [--locale zh-CN|en] [--github-remote auto|check|apply|verify|skip] [--github-repository owner/repo] [--github-visibility private|public] [--github-e2e auto|target|skip] [--finalize-git auto|skip]"
     echo "说明:"
     echo "  - default=true 的必选能力始终部署；--enable 在必选集上追加能力"
     echo "  - --enable 与 --only 支持逗号分隔；--only 保留历史兼容，不会排除必选能力"
@@ -105,6 +134,8 @@ usage() {
     echo "  - --apply 默认不替换已存在文件；安装器 clean 时自动 merge，已有配置需通过 --strategy 声明安全策略"
     echo "  - --locale 选择模板语言。默认 zh-CN；en 将优先使用 manifest.template_files_i18n.en（如存在）"
     echo "  - --github-remote 控制 GitHub remote 编排。默认 auto：dry-run/check 只检查，apply 不推送；apply 需用户显式选择"
+    echo "  - --github-repository / --github-visibility 显式指定远端仓库和可见性，等价于对应 DAYU_HARNESS_GITHUB_* 环境变量"
+    echo "  - --github-e2e 控制 GitHub Issue/PR 端到端验证。默认 auto：--github-remote apply 且启用 issue+pr 时创建测试 Issue/PR 并等待 PR checks"
     echo "  - --finalize-git auto 会在部署和本地验证通过后精确 stage managed_paths 并创建初始化提交；默认 skip"
 }
 
@@ -158,6 +189,7 @@ DEFAULT_BRANCH="main"
 PROJECT_VERSION="0.1.0"
 GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was not requested."}'
 REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was not requested."}'
+GITHUB_E2E_JSON='{"status":"skipped","description_nl":"GitHub Issue/PR E2E validation was not requested."}'
 MANAGED_PATHS=()
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -177,6 +209,7 @@ if ! command -v jq >/dev/null 2>&1; then
   "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -384,12 +417,62 @@ detect_default_branch() {
             || true)"
     fi
     [ -n "$branch" ] && [ "$branch" != "HEAD" ] || branch="main"
+    case "$branch" in
+        dayu-harness/init|dayu-harness/init-*)
+            branch="main"
+            ;;
+    esac
     printf '%s\n' "$branch"
+}
+
+project_has_meaningful_initial_content() {
+    local entry base
+    while IFS= read -r entry; do
+        base="$(basename "$entry")"
+        case "$base" in
+            .git|.claude|node_modules|package.json|package-lock.json|npm-shrinkwrap.json|.DS_Store)
+                continue
+                ;;
+        esac
+        return 0
+    done < <(find "$TARGET" -mindepth 1 -maxdepth 1 -print 2>/dev/null)
+    return 1
+}
+
+read_package_lock_version() {
+    if [ -f "$TARGET/package-lock.json" ]; then
+        local lock_version=""
+        lock_version="$(jq -r '.packages[""].version // empty' "$TARGET/package-lock.json" 2>/dev/null || true)"
+        if [ -z "$lock_version" ] || [ "$lock_version" = "null" ]; then
+            lock_version="$(jq -r '.version // empty' "$TARGET/package-lock.json" 2>/dev/null || true)"
+        fi
+        printf '%s' "$lock_version"
+    fi
+}
+
+is_npm_default_initial_version() {
+    local package_version package_lock_version
+    [ -f "$TARGET/package.json" ] || return 1
+    package_version="$(jq -r '.version // empty' "$TARGET/package.json" 2>/dev/null || true)"
+    package_lock_version="$(read_package_lock_version)"
+
+    [ "$package_version" = "1.0.0" ] || return 1
+    [ -z "$package_lock_version" ] || [ "$package_lock_version" = "1.0.0" ] || return 1
+    [ ! -f "$TARGET/VERSION" ] || return 1
+    [ ! -f "$TARGET/CHANGELOG.md" ] || return 1
+    [ ! -f "$TARGET/.release-please-manifest.json" ] || return 1
+    [ ! -f "$TARGET/AGENTS.md" ] || return 1
+    if project_has_meaningful_initial_content; then
+        return 1
+    fi
+    return 0
 }
 
 detect_project_version() {
     local version=""
-    if [ -f "$TARGET/package.json" ]; then
+    if is_npm_default_initial_version; then
+        version="0.1.0"
+    elif [ -f "$TARGET/package.json" ]; then
         version="$(jq -r '.version // empty' "$TARGET/package.json" 2>/dev/null || true)"
     fi
     if [ -z "$version" ] && [ -f "$TARGET/VERSION" ]; then
@@ -493,6 +576,29 @@ selected_has_remote_actions() {
     return 1
 }
 
+selected_has_github_capabilities() {
+    local cap_id
+    for cap_id in "$@"; do
+        case "$cap_id" in
+            github.*|release.*)
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
+
+selected_has_github_e2e_capabilities() {
+    local has_issue="false"
+    local has_pr="false"
+    local cap_id
+    for cap_id in "$@"; do
+        [ "$cap_id" = "github.issue" ] && has_issue="true"
+        [ "$cap_id" = "github.pr" ] && has_pr="true"
+    done
+    [ "$has_issue" = "true" ] && [ "$has_pr" = "true" ]
+}
+
 run_github_remote() {
     local mode="$1"
     shift || true
@@ -506,7 +612,7 @@ run_github_remote() {
     fi
 
     set +e
-    remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>&1)"
+    remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_GITHUB_REPOSITORY="$GITHUB_REPOSITORY" DAYU_HARNESS_GITHUB_VISIBILITY="$GITHUB_VISIBILITY" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>&1)"
     remote_rc=$?
     set -e
 
@@ -1219,6 +1325,243 @@ run_post_apply_checks() {
         "$(json_escape "$description")"
 }
 
+github_e2e_result_json() {
+    local status="$1"
+    local desc="$2"
+    local issue="${3:-}"
+    local pr="${4:-}"
+    local branch="${5:-}"
+    local extra=""
+    [ -n "$issue" ] && extra+=",\"issue\":\"$(json_escape "$issue")\""
+    [ -n "$pr" ] && extra+=",\"pull_request\":\"$(json_escape "$pr")\""
+    [ -n "$branch" ] && extra+=",\"branch\":\"$(json_escape "$branch")\""
+    printf '{"status":"%s","description_nl":"%s"%s}' \
+        "$(json_escape "$status")" \
+        "$(json_escape "$desc")" \
+        "$extra"
+}
+
+wait_github_workflow_success() {
+    local repo="$1"
+    local workflow="$2"
+    local head_sha="$3"
+    local event_filter="$4"
+    local created_after="${5:-}"
+    local timeout="${DAYU_HARNESS_GITHUB_E2E_TIMEOUT_SECONDS:-900}"
+    local deadline=$((SECONDS + timeout))
+    local run_json status conclusion event run_id
+    GITHUB_E2E_WAIT_DESC=""
+
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        run_json="$(gh run list --repo "$repo" --workflow "$workflow" --json databaseId,headSha,status,conclusion,event,createdAt --limit 30 2>/dev/null \
+            | jq -c --arg sha "$head_sha" --arg event "$event_filter" --arg after "$created_after" '[.[] | select(.headSha == $sha and .event == $event and ($after == "" or .createdAt >= $after))] | .[0] // empty' 2>/dev/null || true)"
+        if [ -n "$run_json" ]; then
+            status="$(printf '%s' "$run_json" | jq -r '.status // empty' 2>/dev/null || true)"
+            conclusion="$(printf '%s' "$run_json" | jq -r '.conclusion // empty' 2>/dev/null || true)"
+            event="$(printf '%s' "$run_json" | jq -r '.event // empty' 2>/dev/null || true)"
+            run_id="$(printf '%s' "$run_json" | jq -r '.databaseId // empty' 2>/dev/null || true)"
+            if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ] && [ "$event" = "$event_filter" ]; then
+                    return 0
+                fi
+                GITHUB_E2E_WAIT_DESC="${workflow} run ${run_id:-unknown} completed with conclusion ${conclusion:-unknown}."
+                return 1
+            fi
+        fi
+        sleep 15
+    done
+
+    GITHUB_E2E_WAIT_DESC="${workflow} did not complete for ${event_filter} within ${timeout}s."
+    return 1
+}
+
+repo_from_remote_json() {
+    local remote_json="$1"
+    local repo=""
+    repo="$(printf '%s' "$remote_json" | jq -r '.repository // empty' 2>/dev/null || true)"
+    if [ -n "$repo" ]; then
+        printf '%s' "$repo"
+        return 0
+    fi
+    if git -C "$TARGET" remote get-url origin >/dev/null 2>&1; then
+        git -C "$TARGET" remote get-url origin 2>/dev/null \
+            | sed -nE 's#^https://github.com/([^/]+/[^/.]+)(\.git)?$#\1#p; s#^git@github.com:([^/]+/[^/.]+)(\.git)?$#\1#p' \
+            | sed -n '1p'
+    fi
+}
+
+remote_workflow_exists() {
+    local repo="$1"
+    local workflow="$2"
+    [ -n "$repo" ] || return 1
+    [ -n "$workflow" ] || return 1
+    [ -n "$DEFAULT_BRANCH" ] || return 1
+    gh api "repos/$repo/contents/.github/workflows/$workflow?ref=$DEFAULT_BRANCH" >/dev/null 2>&1
+}
+
+run_github_target_e2e() {
+    local apply_json="$1"
+    local verify_json="$2"
+    shift 2 || true
+    local repo original_branch issue_after issue_url issue_number issue_body main_sha branch marker_file marker_rel head_sha body_file pr_url pr_number current_branch e2e_commit_created
+
+    if [ "$GITHUB_E2E_MODE" = "skip" ]; then
+        github_e2e_result_json "skipped" "GitHub Issue/PR E2E validation was skipped by user choice."
+        return 0
+    fi
+
+    if ! selected_has_github_e2e_capabilities "$@"; then
+        github_e2e_result_json "skipped" "GitHub Issue/PR E2E validation requires both github.issue and github.pr."
+        return 0
+    fi
+
+    if [ "$GITHUB_REMOTE_MODE" != "apply" ] && [ "$GITHUB_REMOTE_MODE" != "verify" ]; then
+        github_e2e_result_json "skipped" "GitHub Issue/PR E2E validation requires --github-remote apply or --github-remote verify so workflows exist on the remote default branch."
+        return 0
+    fi
+
+    if printf '%s' "$apply_json" | jq -e '.items[]? | select((.kind == "remote" and .action == "push_init_branch" and .status == "ok") or (.kind == "pull_request" and .action == "create" and .status == "ok"))' >/dev/null 2>&1; then
+        github_e2e_result_json "skipped" "GitHub Issue/PR E2E validation waits until the initialization PR is merged into the default branch."
+        return 0
+    fi
+
+    repo="$(repo_from_remote_json "$verify_json")"
+    if [ -z "$repo" ]; then
+        repo="$(repo_from_remote_json "$apply_json")"
+    fi
+    if [ -z "$repo" ]; then
+        github_e2e_result_json "failed" "GitHub Issue/PR E2E validation could not resolve owner/repo."
+        return 0
+    fi
+
+    if ! command -v gh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+        github_e2e_result_json "failed" "GitHub Issue/PR E2E validation requires gh, git and jq."
+        return 0
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        github_e2e_result_json "failed" "GitHub Issue/PR E2E validation requires an authenticated GitHub CLI session."
+        return 0
+    fi
+    if ! remote_workflow_exists "$repo" "issue-lint.yml" || ! remote_workflow_exists "$repo" "pr-lint.yml"; then
+        github_e2e_result_json "failed" "GitHub Issue/PR E2E validation requires issue-lint.yml and pr-lint.yml to exist on the remote default branch before creating test issues or PRs."
+        return 0
+    fi
+
+    original_branch="$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    marker_file=""
+    marker_rel=""
+    body_file=""
+    e2e_commit_created="false"
+    restore_github_e2e_branch() {
+        rm -f "${body_file:-}"
+        if [ -n "${marker_rel:-}" ] && [ "$e2e_commit_created" != "true" ]; then
+            git -C "$TARGET" restore --staged "$marker_rel" >/dev/null 2>&1 || true
+            rm -f "$TARGET/$marker_rel"
+            rmdir "$TARGET/.dayu-harness-smoke" >/dev/null 2>&1 || true
+        fi
+        current_branch="$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+        if [ -n "$original_branch" ] && [ "$current_branch" != "$original_branch" ]; then
+            git -C "$TARGET" switch "$original_branch" >/dev/null 2>&1 || true
+        fi
+    }
+    fail_github_e2e() {
+        local desc="$1"
+        local issue="${2:-}"
+        local pr="${3:-}"
+        local smoke_branch="${4:-}"
+        restore_github_e2e_branch
+        github_e2e_result_json "failed" "$desc" "$issue" "$pr" "$smoke_branch"
+    }
+
+    issue_after="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    main_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
+    if [ -z "$main_sha" ]; then
+        fail_github_e2e "GitHub Issue/PR E2E validation requires a local commit to test from."
+        return 0
+    fi
+
+    issue_body="## Summary
+
+- Verify Dayu Harness Issue -> PR governance after initialization.
+
+## Background
+
+- Created by scaffold.sh post-deployment E2E validation.
+"
+    if ! issue_url="$(gh issue create --repo "$repo" --title "test: Dayu Harness Issue PR E2E" --body "$issue_body" 2>/dev/null)"; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to create a test issue."
+        return 0
+    fi
+    issue_number="${issue_url##*/}"
+
+    if ! wait_github_workflow_success "$repo" "issue-lint.yml" "$main_sha" "issues" "$issue_after"; then
+        fail_github_e2e "GitHub Issue workflow E2E failed: ${GITHUB_E2E_WAIT_DESC:-unknown issue-lint result}" "$issue_url"
+        return 0
+    fi
+
+    branch="dayu-harness/e2e-${issue_number}-$(date +%Y%m%d%H%M%S)"
+    if ! git -C "$TARGET" switch -c "$branch" >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to create a local test branch." "$issue_url" "" "$branch"
+        return 0
+    fi
+
+    marker_rel=".dayu-harness-smoke/issue-${issue_number}.md"
+    marker_file="$TARGET/$marker_rel"
+    mkdir -p "$(dirname "$marker_file")"
+    printf 'Dayu Harness GitHub E2E smoke for issue #%s\n' "$issue_number" > "$marker_file"
+    if ! git -C "$TARGET" add "$marker_rel" >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to stage the smoke marker." "$issue_url" "" "$branch"
+        return 0
+    fi
+    if ! git -C "$TARGET" commit -m "test: verify dayu harness github e2e" >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to create the smoke commit." "$issue_url" "" "$branch"
+        return 0
+    fi
+    e2e_commit_created="true"
+    if ! git -C "$TARGET" push -u origin "$branch" >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to push the smoke branch." "$issue_url" "" "$branch"
+        return 0
+    fi
+    head_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
+
+    body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-e2e-pr-body.XXXXXX")"
+    cat > "$body_file" <<EOF
+## Summary
+<!-- dayu-harness:summary -->
+
+- Verify Dayu Harness GitHub Issue -> PR governance after initialization.
+
+## Implementation notes
+<!-- dayu-harness:implementation-notes -->
+
+- Adds a smoke marker on an isolated validation branch.
+
+## Test plan
+<!-- dayu-harness:test-plan -->
+
+- [x] \`gh issue view $issue_number --repo $repo\`
+- [x] \`gh pr checks --repo $repo\`
+
+Closes #$issue_number
+EOF
+    if ! pr_url="$(gh pr create --repo "$repo" --base "$DEFAULT_BRANCH" --head "$branch" --title "test: verify Dayu Harness GitHub E2E" --body-file "$body_file" 2>/dev/null)"; then
+        fail_github_e2e "GitHub Issue/PR E2E validation failed to create a test PR." "$issue_url" "" "$branch"
+        return 0
+    fi
+    rm -f "$body_file"
+    body_file=""
+    pr_number="${pr_url##*/}"
+
+    if ! wait_github_workflow_success "$repo" "pr-lint.yml" "$head_sha" "pull_request"; then
+        fail_github_e2e "GitHub PR workflow E2E failed: ${GITHUB_E2E_WAIT_DESC:-unknown pr-lint result}" "$issue_url" "$pr_url" "$branch"
+        return 0
+    fi
+
+    restore_github_e2e_branch
+
+    github_e2e_result_json "passed" "GitHub Issue/PR E2E validation passed; test PR is left open for review and is not merged by scaffold." "$issue_url" "$pr_url" "$branch"
+}
+
 do_dry_run() {
     local requested_ids=()
     local capability_ids=()
@@ -1245,7 +1588,7 @@ do_dry_run() {
     environment_status="$(echo "$environment_json" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
     environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment check failed."' 2>/dev/null || echo "Environment check failed.")"
     refresh_project_context "$environment_json"
-    if selected_has_remote_actions "${capability_ids[@]}"; then
+    if selected_has_remote_actions "${capability_ids[@]}" || selected_has_github_e2e_capabilities "${capability_ids[@]}"; then
         GITHUB_REMOTE_JSON="$(run_github_remote check "${capability_ids[@]}")"
     fi
 
@@ -1327,6 +1670,7 @@ do_dry_run() {
   "project_baseline":$(project_baseline_json),
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),
@@ -1369,8 +1713,15 @@ do_apply() {
     environment_desc="$(echo "$environment_json" | jq -r '.description_nl // "Environment preflight failed."' 2>/dev/null || echo "Environment preflight failed.")"
     refresh_project_context "$environment_json"
     local has_remote_actions="false"
+    local has_remote_sync="false"
     if selected_has_remote_actions "${capability_ids[@]}"; then
         has_remote_actions="true"
+        has_remote_sync="true"
+    fi
+    if selected_has_github_e2e_capabilities "${capability_ids[@]}"; then
+        has_remote_sync="true"
+    fi
+    if [ "$has_remote_sync" = "true" ]; then
         GITHUB_REMOTE_JSON="$(run_github_remote check "${capability_ids[@]}")"
     fi
     if [ "$environment_status" != "ok" ]; then
@@ -1383,6 +1734,7 @@ do_apply() {
   "project_baseline":$(project_baseline_json),
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -1565,7 +1917,7 @@ JSONEOF
         fi
     fi
 
-    if [ "$has_remote_actions" = "true" ]; then
+    if [ "$has_remote_sync" = "true" ]; then
         case "$GITHUB_REMOTE_MODE" in
             apply)
                 if [ "$overall_status" = "ok" ]; then
@@ -1612,6 +1964,18 @@ JSONEOF
         fi
     fi
 
+    if selected_has_github_capabilities "${capability_ids[@]}"; then
+        if [ "$overall_status" = "ok" ] || [ "$GITHUB_E2E_MODE" = "skip" ]; then
+            GITHUB_E2E_JSON="$(run_github_target_e2e "$GITHUB_REMOTE_JSON" "$REMOTE_VALIDATION_JSON" "${capability_ids[@]}")"
+            github_e2e_status="$(echo "$GITHUB_E2E_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "failed")"
+            if [ "$github_e2e_status" = "failed" ]; then
+                overall_status="error"
+            fi
+        else
+            GITHUB_E2E_JSON='{"status":"skipped","description_nl":"GitHub Issue/PR E2E validation waits until deployment, local validation, git finalization and remote verification are successful."}'
+        fi
+    fi
+
     local top_desc="Apply completed with status $overall_status."
     if [ "$overall_status" = "needs_strategy" ]; then
         top_desc="Apply required a strategy for installer-backed capabilities. Re-run with an allowed --strategy value."
@@ -1646,6 +2010,7 @@ JSONEOF
   "project_baseline":$(project_baseline_json),
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),
