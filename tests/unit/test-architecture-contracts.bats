@@ -549,6 +549,28 @@ expected_agents_h1() {
     jq -e '.version == "0.1.0"' "$target/package.json"
 }
 
+@test "environment normalizes npm init default 1.0.0 to empty project baseline" {
+    local target="$WORK_DIR/baseline-npm-default-version"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/package.json" '{"name":"baseline-npm-default-version","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/package-lock.json" '{"name":"baseline-npm-default-version","version":"1.0.0","lockfileVersion":3,"packages":{"":{"name":"baseline-npm-default-version","version":"1.0.0"}}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --check --capabilities "core,git.hooks,git.commit-format"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+    echo "$output" | jq -e '.items | any(.name=="package.version" and (.description_nl | contains("npm init 默认")))'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+    jq -e '.version == "0.1.0"' "$target/package.json"
+    jq -e '.version == "0.1.0" and .packages[""].version == "0.1.0"' "$target/package-lock.json"
+    [ "$(cat "$target/VERSION")" = "0.1.0" ]
+    grep -Fq "## 0.1.0" "$target/CHANGELOG.md"
+}
+
 @test "scaffold finalize-git commits only managed paths and leaves tracked local agent files out" {
     local target="$WORK_DIR/finalize-managed-paths"
     local committed_files
@@ -726,6 +748,41 @@ expected_agents_h1() {
     ! grep -R "refs/heads/HEAD" "$target/.github"
 }
 
+@test "scaffold treats initialization branches as main for default branch assets" {
+    local target="$WORK_DIR/render-init-branch-default"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config core.hooksPath .husky
+    write_file "$target/package.json" '{"name":"render-init-branch-default","version":"0.1.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    git -C "$target" switch -c dayu-harness/init-20260522 >/dev/null
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run --enable github.branch-protection --strategy merge
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.default_branch == "main"'
+}
+
+@test "environment apply moves initialization branch work back to main before writing" {
+    local target="$WORK_DIR/apply-init-branch-checkout"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config user.name "ci"
+    git -C "$target" config user.email "ci@example.com"
+    write_file "$target/README.md" "# seed"
+    git -C "$target" add README.md
+    git -C "$target" commit -q -m "chore: seed main"
+    git -C "$target" switch -c dayu-harness/init-20260522 >/dev/null
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "main"'
+    echo "$output" | jq -e '.items | any(.kind=="project" and .name=="git.branch" and .status=="configured")'
+    [ "$(git -C "$target" branch --show-current)" = "main" ]
+    [ "$(cat "$target/VERSION")" = "0.1.0" ]
+}
+
 @test "branch protection hook renders and protects non-main default branch" {
     local target="$WORK_DIR/non-main-hook"
     mkdir -p "$target"
@@ -738,6 +795,13 @@ expected_agents_h1() {
     run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 0000000000000000000000000000000000000000 refs/heads/trunk 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "deleting trunk is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 2222222222222222222222222222222222222222 refs/heads/trunk 0000000000000000000000000000000000000000" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "direct push to trunk is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 2222222222222222222222222222222222222222 refs/heads/trunk 0000000000000000000000000000000000000000" | env DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=1 .husky/pre-push' _ "$target"
+    [ "$status" -eq 0 ]
 }
 
 @test "machine-readable reports use relative target paths" {
@@ -1044,6 +1108,15 @@ expected_agents_h1() {
     grep -Fq '.claude/' "$REPO_ROOT/scripts/scaffold.sh"
     grep -Fq 'skills-lock.json' "$REPO_ROOT/scripts/scaffold.sh"
     ! grep -Fq 'GitHub remote/push 完成后，再询问' "$REPO_ROOT/Q&A-TEMPLATE.md"
+}
+
+@test "GitHub E2E waits for deployed workflows on default branch" {
+    grep -Fq 'selected_has_github_e2e_capabilities "${capability_ids[@]}"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'push_init_branch' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'initialization PR is merged into the default branch' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'HEAD:$DEFAULT_BRANCH' "$REPO_ROOT/scripts/github-remote.sh"
+    grep -Fq 'remote_workflow_exists "$repo" "issue-lint.yml"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'remote_workflow_exists "$repo" "pr-lint.yml"' "$REPO_ROOT/scripts/scaffold.sh"
 }
 
 @test "dynamic gitignore assets cover supported language snapshots" {

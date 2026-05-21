@@ -216,7 +216,7 @@ json_from_output() {
     grep -Fq "skills-lock.json" "$project_dir/.gitignore"
 }
 
-@test "conversation replay: empty project gitignore defaults to Node template" {
+	@test "conversation replay: empty project gitignore defaults to Node template" {
     local project_dir="$TEST_DIR/empty-gitignore-default"
     mkdir -p "$project_dir"
 
@@ -230,7 +230,46 @@ json_from_output() {
     grep -Fq "node_modules/" "$project_dir/.gitignore"
     grep -Fq ".claude/" "$project_dir/.gitignore"
     grep -Fq "skills-lock.json" "$project_dir/.gitignore"
-}
+	}
+
+	@test "conversation replay: manual npm init default version stays at 0.1.0 in dry-run" {
+	    local project_dir="$TEST_DIR/manual-npm-init-default"
+	    mkdir -p "$project_dir"
+	    git -C "$project_dir" init -b main >/dev/null
+	    write_file "$project_dir/package.json" '{"name":"manual-npm-init-default","version":"1.0.0","devDependencies":{}}'
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable release.automated
+	    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+	    echo "$output" | jq -e '.environment.items | any(.name=="package.version" and (.description_nl | contains("npm init 默认")))'
+	}
+
+	@test "conversation replay: github remote options are parsed as options not target paths" {
+	    local project_dir="$TEST_DIR/github-remote-options"
+	    mkdir -p "$project_dir"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable github.delivery --github-repository kinoward/dayu-harness-skill-test --visibility public
+	    echo "$output" | jq -e '.github_remote.repository == "kinoward/dayu-harness-skill-test"'
+	}
+
+	@test "conversation replay: issue and PR workflows require remote sync for E2E" {
+	    local project_dir="$TEST_DIR/github-issue-pr-remote-sync"
+	    mkdir -p "$project_dir"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable github.issue,github.pr --github-repository kinoward/dayu-harness-skill-test
+	    echo "$output" | jq -e '.github_remote.repository == "kinoward/dayu-harness-skill-test"'
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote skip
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply")'
+
+	    local forced_dir="$TEST_DIR/github-issue-pr-forced-target"
+	    mkdir -p "$forced_dir"
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$forced_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote skip --github-e2e target
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply or --github-remote verify")'
+	}
 
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {
 	    local project_dir="$TEST_DIR/default-no-github-optional"
@@ -259,6 +298,8 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.delivery --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply")'
 	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
 	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 

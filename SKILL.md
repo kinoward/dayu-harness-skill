@@ -62,8 +62,8 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 2. 分析项目现状（读取文件结构、已有配置）
 3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 的交互门禁询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
 4. 展示确认汇总
-5. 用户确认后：调用 `scaffold.sh --dry-run --enable <optional capability ids>` 预览变更 → 对已有配置确认策略 → `scaffold.sh --apply --finalize-git auto --enable <optional capability ids>`（如有冲突再加 `--strategy`，如用户已确认远端同步再加 `--github-remote apply`）复制默认与可选模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
-6. `scaffold.sh --apply` 必须先完成 `validate/audit/check-consistency`，通过后再精确 stage managed paths、创建初始化提交，并按远端状态推送默认分支或创建初始化 PR；随后使用完成报告模板向用户汇报
+5. 用户确认后：调用 `scaffold.sh --dry-run --enable <optional capability ids>` 预览变更 → 对已有配置确认策略 → `scaffold.sh --apply --finalize-git auto --enable <optional capability ids>`（如有冲突再加 `--strategy`，如用户已确认远端同步再加 `--github-remote apply`；启用 GitHub Issue/PR 且需跳过目标仓库 E2E 时必须显式追加 `--github-e2e skip`）复制默认与可选模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
+6. `scaffold.sh --apply` 必须先完成 `validate/audit/check-consistency`，通过后再精确 stage managed paths、创建初始化提交，并按远端状态推送默认分支或创建初始化 PR；启用 GitHub Issue/PR 且远端同步成功后，必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，测试 PR 保持打开不自动合并；随后使用完成报告模板向用户汇报
 
 ### 2. 诊断
 
@@ -114,6 +114,8 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 1. `docs/harness/sensors/scripts/validate.sh --json <project-root>`：检查已启用的 hooks、配置和 workflow 是否可用。
 2. `docs/harness/sensors/scripts/audit.sh --json <project-root>`：检查 `AGENTS.md`、`CLAUDE.md`、docs 索引和维护脚本是否完整。
 3. `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`：检查文档链接、索引和孤儿文档。
+
+以上三项属于本地结构/配置验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；该测试 PR 默认保持打开，不自动合并。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
 
 如果脚本不存在或暂时不可执行，按目标项目中的 `docs/harness/maintenance.md` 手动检查关键路径。
 

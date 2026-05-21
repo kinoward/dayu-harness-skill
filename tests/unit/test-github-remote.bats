@@ -221,7 +221,7 @@ setup_repo() {
     echo "$output" | jq -e '.repository == "acme/private-repo"'
     echo "$output" | jq -e '.items | any(.action=="create" and .status=="ok")'
     grep -Fq "repo create acme/private-repo --private --source=. --remote=origin" "$call_log"
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
     origin_url="$(git -C "$repo_dir" remote get-url origin)"
     [ "$origin_url" = "https://github.com/acme/private-repo.git" ]
 }
@@ -245,7 +245,7 @@ setup_repo() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
     grep -Fq "repo create acme/default-private --private --source=. --remote=origin" "$call_log"
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
 }
 
 @test "github-remote --apply binds existing repository when no origin is set" {
@@ -271,7 +271,7 @@ setup_repo() {
       exit 1
     fi
     [ "$(git -C "$repo_dir" remote get-url origin)" = "https://github.com/acme/existing-remote.git" ]
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
 }
 
 @test "github-remote --apply blocks when origin and requested repository differ" {
@@ -327,7 +327,7 @@ setup_repo() {
       echo "repo create should not be called when origin exists"
       exit 1
     fi
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
 }
 
 @test "github-remote --apply creates initialization PR when remote is ahead" {
@@ -366,7 +366,7 @@ setup_repo() {
       echo "remote-ahead initialization flow must not force push"
       exit 1
     fi
-    if grep -Fxq "push -u origin main" "$push_log"; then
+    if grep -Fxq "push -u origin main" "$push_log" || grep -Fxq "push -u origin HEAD:main" "$push_log"; then
       echo "remote-ahead initialization flow should use a PR branch"
       exit 1
     fi
@@ -413,7 +413,7 @@ setup_repo() {
       echo "diverged initialization flow must not force push"
       exit 1
     fi
-    if grep -Fxq "push -u origin main" "$push_log"; then
+    if grep -Fxq "push -u origin main" "$push_log" || grep -Fxq "push -u origin HEAD:main" "$push_log"; then
       echo "diverged initialization flow should use a PR branch"
       exit 1
     fi
@@ -459,7 +459,47 @@ JSON
     grep -Fq "api -X POST repos/acme/actions-target/rulesets --input" "$call_log"
 }
 
-@test "github-remote --apply does not fallback to local remote assets without remote_actions" {
+@test "github-remote --apply uses initialization PR when local branch protection blocks default branch direct push" {
+    local repo_dir="$TEST_DIR/apply-ahead-protected"
+    local push_log="$TEST_DIR/push-ahead-protected.log"
+    local call_log="$TEST_DIR/gh-ahead-protected.log"
+    local base_sha
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/ahead-protected.git"
+    base_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    git -C "$repo_dir" update-ref refs/remotes/origin/main "$base_sha"
+    mkdir -p "$repo_dir/.husky"
+    cat > "$repo_dir/.husky/pre-push" <<'HOOK'
+#!/usr/bin/env bash
+echo "ERROR: direct push to $ref_name is not allowed."
+exit 1
+HOOK
+    chmod +x "$repo_dir/.husky/pre-push"
+    printf '%s\n' "local init" > "$repo_dir/local.txt"
+    git -C "$repo_dir" add local.txt
+    git -C "$repo_dir" commit -q -m "chore: local initialization"
+
+    export DAYU_HARNESS_GH_SCENARIO="default"
+    export DAYU_HARNESS_GH_REPO="acme/ahead-protected"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/ahead-protected"
+    write_fake_gh default
+
+    run bash "$SCRIPT" "$repo_dir" --apply
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.items | any(.kind=="remote_sync" and .state=="ahead" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="remote" and .action=="push_init_branch" and .status=="ok")'
+    grep -Fq "push -u origin HEAD:dayu-harness/init-" "$push_log"
+    if grep -Fxq "push -u origin HEAD:main" "$push_log"; then
+      echo "protected default branch sync should use an initialization PR"
+      exit 1
+    fi
+}
+
+@test "github-remote --apply falls back to local remote assets when remote_actions is unset" {
     local repo_dir="$TEST_DIR/apply-no-actions"
     local push_log="$TEST_DIR/push-no-actions.log"
     local call_log="$TEST_DIR/gh-no-actions.log"
@@ -488,11 +528,10 @@ JSON
     run bash "$SCRIPT" "$repo_dir" --apply
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
-    grep -Fq "push -u origin main" "$push_log"
-    if grep -Eq "api -X (PATCH|POST|PUT) repos/acme/no-actions" "$call_log"; then
-      echo "remote assets should not be applied without explicit remote_actions"
-      exit 1
-    fi
+    grep -Fq "push -u origin HEAD:main" "$push_log"
+    grep -Fq "api -X PATCH repos/acme/no-actions -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
+    grep -Fq "api -X PUT repos/acme/no-actions/rulesets/42 --input" "$call_log"
+    grep -Fq "api -X POST repos/acme/no-actions/rulesets --input" "$call_log"
 }
 
 @test "github-remote --apply ignores invalid remote_actions instead of scanning local assets" {
@@ -521,7 +560,7 @@ JSON
     run bash "$SCRIPT" "$repo_dir" --apply
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
     if grep -Eq "api -X (PATCH|POST|PUT) repos/acme/invalid-actions" "$call_log"; then
       echo "invalid remote_actions should not fall back to local remote asset writes"
       exit 1
@@ -554,7 +593,7 @@ JSON
     run bash "$SCRIPT" "$repo_dir" --apply
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
     if grep -Eq "api -X (PATCH|POST|PUT) repos/acme/empty-actions" "$call_log"; then
       echo "empty remote_actions should not apply local remote asset writes"
       exit 1
@@ -599,7 +638,7 @@ JSON
     echo "$output" | jq -e '.status == "ok"'
     echo "$output" | jq -e '.default_branch == "main"'
     grep -Fq "repo create acme/detached-apply --private --source=. --remote=origin" "$call_log"
-    grep -Fq "push -u origin main" "$push_log"
+    grep -Fq "push -u origin HEAD:main" "$push_log"
 }
 
 @test "github-remote --apply uses requested default branch and syncs remote default branch" {
@@ -623,8 +662,36 @@ JSON
     run bash "$SCRIPT" "$repo_dir" --apply
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
-    grep -Fq "push -u origin trunk" "$push_log"
+    grep -Fq "push -u origin HEAD:trunk" "$push_log"
     grep -Fq "api -X PATCH repos/acme/default-branch-target -F default_branch=trunk" "$call_log"
+}
+
+@test "github-remote --apply normalizes initialization branch to main for first remote push" {
+    local repo_dir="$TEST_DIR/apply-init-branch-main"
+    local push_log="$TEST_DIR/push-init-branch-main.log"
+    local call_log="$TEST_DIR/gh-init-branch-main.log"
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" checkout -b dayu-harness/init-20260522 >/dev/null
+
+    export DAYU_HARNESS_GH_SCENARIO="repo_missing"
+    export DAYU_HARNESS_GH_REPO="acme/init-branch-main"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/init-branch-main"
+    unset DAYU_HARNESS_DEFAULT_BRANCH
+    unset DAYU_HARNESS_GITHUB_VISIBILITY
+    write_fake_gh repo_missing
+
+    run bash "$SCRIPT" "$repo_dir" --apply
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "main"'
+    grep -Fq "push -u origin HEAD:main" "$push_log"
+    if grep -Fq "dayu-harness/init-20260522" "$push_log"; then
+      echo "initialization branch must not become the remote default branch"
+      exit 1
+    fi
 }
 
 @test "github-remote --verify scopes checks to deployed repository settings" {
