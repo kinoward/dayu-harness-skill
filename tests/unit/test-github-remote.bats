@@ -149,6 +149,18 @@ JSON
         fi
         exit 0
         ;;
+      "repos/$REPO/actions/permissions/workflow")
+        if [ "$SCENARIO" = "verify_missing" ]; then
+          cat <<JSON
+{"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
+JSON
+        else
+          cat <<JSON
+{"default_workflow_permissions":"write","can_approve_pull_request_reviews":true}
+JSON
+        fi
+        exit 0
+        ;;
     esac
 fi
 
@@ -318,6 +330,95 @@ setup_repo() {
     grep -Fq "push -u origin main" "$push_log"
 }
 
+@test "github-remote --apply creates initialization PR when remote is ahead" {
+    local repo_dir="$TEST_DIR/apply-remote-ahead"
+    local push_log="$TEST_DIR/push-remote-ahead.log"
+    local call_log="$TEST_DIR/gh-remote-ahead.log"
+    local base_sha remote_sha
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/remote-ahead.git"
+
+    base_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    printf '%s\n' "remote ahead" > "$repo_dir/remote.txt"
+    git -C "$repo_dir" add remote.txt
+    git -C "$repo_dir" commit -q -m "docs: remote ahead fixture"
+    remote_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    git -C "$repo_dir" update-ref refs/remotes/origin/main "$remote_sha"
+    git -C "$repo_dir" reset --hard "$base_sha" >/dev/null
+
+    export DAYU_HARNESS_GH_SCENARIO="default"
+    export DAYU_HARNESS_GH_REPO="acme/remote-ahead"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/remote-ahead"
+    write_fake_gh default
+
+    run bash "$SCRIPT" "$repo_dir" --apply
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.items | any(.kind=="remote_sync" and .state=="behind" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="remote" and .action=="push_init_branch" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="pull_request" and .action=="create" and .base=="main" and .status=="ok")'
+    grep -Fq "push -u origin HEAD:dayu-harness/init-" "$push_log"
+    grep -Fq "pr create --repo acme/remote-ahead --base main --head dayu-harness/init-" "$call_log"
+    if grep -Fq -- "--force" "$push_log" "$call_log"; then
+      echo "remote-ahead initialization flow must not force push"
+      exit 1
+    fi
+    if grep -Fxq "push -u origin main" "$push_log"; then
+      echo "remote-ahead initialization flow should use a PR branch"
+      exit 1
+    fi
+}
+
+@test "github-remote --apply creates initialization PR when remote diverged" {
+    local repo_dir="$TEST_DIR/apply-remote-diverged"
+    local push_log="$TEST_DIR/push-remote-diverged.log"
+    local call_log="$TEST_DIR/gh-remote-diverged.log"
+    local base_sha local_sha remote_sha
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/remote-diverged.git"
+
+    base_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    printf '%s\n' "local init" > "$repo_dir/local.txt"
+    git -C "$repo_dir" add local.txt
+    git -C "$repo_dir" commit -q -m "chore: local initialization fixture"
+    local_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    git -C "$repo_dir" reset --hard "$base_sha" >/dev/null
+    printf '%s\n' "remote ahead" > "$repo_dir/remote.txt"
+    git -C "$repo_dir" add remote.txt
+    git -C "$repo_dir" commit -q -m "docs: remote diverged fixture"
+    remote_sha="$(git -C "$repo_dir" rev-parse HEAD)"
+    git -C "$repo_dir" update-ref refs/remotes/origin/main "$remote_sha"
+    git -C "$repo_dir" reset --hard "$local_sha" >/dev/null
+
+    export DAYU_HARNESS_GH_SCENARIO="default"
+    export DAYU_HARNESS_GH_REPO="acme/remote-diverged"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/remote-diverged"
+    write_fake_gh default
+
+    run bash "$SCRIPT" "$repo_dir" --apply
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.items | any(.kind=="remote_sync" and .state=="diverged" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="remote" and .action=="push_init_branch" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="pull_request" and .action=="create" and .base=="main" and .status=="ok")'
+    grep -Fq "push -u origin HEAD:dayu-harness/init-" "$push_log"
+    grep -Fq "pr create --repo acme/remote-diverged --base main --head dayu-harness/init-" "$call_log"
+    if grep -Fq -- "--force" "$push_log" "$call_log"; then
+      echo "diverged initialization flow must not force push"
+      exit 1
+    fi
+    if grep -Fxq "push -u origin main" "$push_log"; then
+      echo "diverged initialization flow should use a PR branch"
+      exit 1
+    fi
+}
+
 @test "github-remote --apply patches repository settings and upserts rulesets" {
     local repo_dir="$TEST_DIR/apply-actions"
     local push_log="$TEST_DIR/push-actions.log"
@@ -341,7 +442,7 @@ JSON
     export DAYU_HARNESS_GH_CALL_LOG="$call_log"
     export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
     unset DAYU_HARNESS_GITHUB_REPOSITORY
-    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"repository_settings"},{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
+    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"repository_settings"},{"kind":"workflow_permissions"},{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
     write_fake_gh apply_actions
 
     run bash "$SCRIPT" "$repo_dir" --apply
@@ -349,9 +450,11 @@ JSON
     echo "$output" | jq -e '.status == "ok"'
     echo "$output" | jq -e '.repository == "acme/actions-target"'
     echo "$output" | jq -e '.items | any(.kind=="repository_settings" and .action=="patch" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .action=="put" and .status=="ok")'
     echo "$output" | jq -e '.items | any(.kind=="ruleset" and .name=="protect-main" and .action=="update" and .status=="ok")'
     echo "$output" | jq -e '.items | any(.kind=="ruleset" and .name=="protect-tags" and .action=="create" and .status=="ok")'
     grep -Fq "api -X PATCH repos/acme/actions-target -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
+    grep -Fq "api -X PUT repos/acme/actions-target/actions/permissions/workflow -f default_workflow_permissions=write -F can_approve_pull_request_reviews=true" "$call_log"
     grep -Fq "api -X PUT repos/acme/actions-target/rulesets/42 --input" "$call_log"
     grep -Fq "api -X POST repos/acme/actions-target/rulesets --input" "$call_log"
 }
@@ -605,7 +708,7 @@ JSON
     echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-main:refs/heads/trunk") != null))'
 }
 
-@test "github-remote --verify reports missing ruleset and secret" {
+@test "github-remote --verify reports missing ruleset and workflow permissions" {
     local repo_dir="$TEST_DIR/verify-missing"
     local call_log="$TEST_DIR/verify.log"
     setup_repo "$repo_dir"
@@ -631,6 +734,7 @@ JSON
     echo "$output" | jq -e '.status == "needs_user_action"'
     echo "$output" | jq -e '.repository == "acme/verify-target"'
     echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-tags") != null))'
-    echo "$output" | jq -e '.items | any(.kind=="secrets" and .status=="missing" and (.missing | index("RELEASE_TOKEN") != null))'
-    echo "$output" | jq -e '.items | any(.kind=="variables" and .status=="ok")'
+    echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .status=="missing" and (.missing | index("default_workflow_permissions=write") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="secrets" and .required == [])'
+    echo "$output" | jq -e '.items | any(.kind=="variables" and .required == [])'
 }

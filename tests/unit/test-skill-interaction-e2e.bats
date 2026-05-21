@@ -142,6 +142,13 @@ json_from_output() {
     echo "$output" | jq -e '.status == "ok"'
     echo "$output" | jq -e '.applied_count == 35'
     echo "$output" | jq -e '.validation == "passed"'
+    echo "$output" | jq -e '.post_apply_checks.status == "passed"'
+    echo "$output" | jq -e '.post_apply_checks.checks | map(.name) == ["validate","audit","check-consistency"]'
+    echo "$output" | jq -e '.managed_paths | index("package-lock.json")'
+    echo "$output" | jq -e '.managed_paths | index(".claude/") | not'
+    echo "$output" | jq -e '.managed_paths | index("skills-lock.json") | not'
+    echo "$output" | jq -e '.staging_policy.forbidden | index("git add .")'
+    echo "$output" | jq -e '.staging_policy.excluded == [".claude/","skills-lock.json"]'
 
     assert_path "$project_dir/.husky/commit-msg"
     assert_path "$project_dir/.husky/pre-commit"
@@ -153,6 +160,8 @@ json_from_output() {
     [ "$(cat "$project_dir/VERSION")" = "0.1.0" ]
     grep -Fq "## 0.1.0" "$project_dir/CHANGELOG.md"
     jq -e '.version == "0.1.0"' "$project_dir/package.json"
+    assert_path "$project_dir/package-lock.json"
+    jq -e '.version == "0.1.0" and .packages[""].version == "0.1.0"' "$project_dir/package-lock.json"
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.cjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
@@ -177,6 +186,35 @@ json_from_output() {
 	    run bash -c 'cd "$1" && .husky/commit-msg .test-msg-cjk' _ "$project_dir"
 	    [ "$status" -eq 0 ]
 	}
+
+@test "conversation replay: dynamic gitignore merges language snapshots and keeps user rules" {
+    local project_dir="$TEST_DIR/dynamic-gitignore"
+    mkdir -p "$project_dir"
+    write_file "$project_dir/package.json" '{"name":"dynamic-gitignore","version":"0.1.0"}'
+    write_file "$project_dir/pyproject.toml" "[project]"
+    write_file "$project_dir/go.mod" "module example.com/dynamic"
+    write_file "$project_dir/Cargo.toml" "[package]"
+    write_file "$project_dir/pom.xml" "<project></project>"
+    write_file "$project_dir/app.csproj" "<Project></Project>"
+    write_file "$project_dir/.gitignore" "custom-local-rule/"
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --check
+    echo "$output" | jq -e '.status == "conflict"'
+    echo "$output" | jq -e '.detected_templates | sort == ["Go","Java","Node","Python","Rust","VisualStudio"]'
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --apply merge
+    echo "$output" | jq -e '.status == "ok" and .action == "merge" and .added_count > 0'
+
+    grep -Fq "custom-local-rule/" "$project_dir/.gitignore"
+    grep -Fq "node_modules/" "$project_dir/.gitignore"
+    grep -Fq "__pycache__/" "$project_dir/.gitignore"
+    grep -Fq "*.test" "$project_dir/.gitignore"
+    grep -Fq "target/" "$project_dir/.gitignore"
+    grep -Fq ".gradle/" "$project_dir/.gitignore"
+    grep -Fq ".vs/" "$project_dir/.gitignore"
+    grep -Fq ".claude/" "$project_dir/.gitignore"
+    grep -Fq "skills-lock.json" "$project_dir/.gitignore"
+}
 
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {
 	    local project_dir="$TEST_DIR/default-no-github-optional"

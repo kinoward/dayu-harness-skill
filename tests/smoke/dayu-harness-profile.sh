@@ -211,10 +211,6 @@ run_remote_release() {
     require_cmd git
     require_cmd jq
     gh auth status >/dev/null
-    if [ -z "${DAYU_RELEASE_TOKEN:-}" ]; then
-        echo "DAYU_RELEASE_TOKEN is required for remote-release." >&2
-        exit 2
-    fi
 
     local owner repo tmp project vis head_sha release_pr_count
     owner="$(github_owner)"
@@ -232,8 +228,7 @@ run_remote_release() {
 
     export DAYU_HARNESS_GITHUB_REPOSITORY="$repo"
     bash "$REPO_ROOT/scripts/scaffold.sh" "$project" --apply --enable release.automated --strategy merge --github-remote skip >/dev/null
-    printf '%s' "$DAYU_RELEASE_TOKEN" | gh secret set RELEASE_TOKEN --repo "$repo" --body-file -
-    gh variable set RELEASE_PLEASE_ALLOWED_ACTORS --repo "$repo" --body "${DAYU_RELEASE_ALLOWED_ACTORS:-github-actions[bot],release-please[bot],$owner}"
+    gh api -X PUT "repos/$repo/actions/permissions/workflow" -f default_workflow_permissions=write -F can_approve_pull_request_reviews=true >/dev/null
 
     mkdir -p "$project/src"
     printf 'remote release smoke %s\n' "$(date +%s)" > "$project/src/remote-release.txt"

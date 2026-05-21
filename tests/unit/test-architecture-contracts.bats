@@ -429,8 +429,9 @@ expected_agents_h1() {
     jq -e '.remote_actions[] | select(.kind == "repository_settings" and .settings.allow_auto_merge == true and .settings.delete_branch_on_merge == true)' "$REPO_ROOT/capabilities/github.repository-settings.json"
     jq -e '.remote_actions[] | select(.kind == "ruleset" and .name == "protect-main" and .target_path == ".github/rulesets/protect-main.json")' "$REPO_ROOT/capabilities/github.branch-protection.json"
     jq -e '.remote_actions[] | select(.kind == "ruleset" and .name == "protect-tags" and .target_path == ".github/rulesets/protect-tags.json")' "$REPO_ROOT/capabilities/release.versioning.json"
-    jq -e '.remote_actions[] | select(.kind == "secret_check" and .name == "RELEASE_TOKEN")' "$REPO_ROOT/capabilities/github.release-please.json"
-    jq -e '.remote_actions[] | select(.kind == "variable_check" and .name == "RELEASE_PLEASE_ALLOWED_ACTORS")' "$REPO_ROOT/capabilities/github.release-please.json"
+    jq -e '.remote_actions[] | select(.kind == "workflow_permissions" and .default_workflow_permissions == "write" and .can_approve_pull_request_reviews == true)' "$REPO_ROOT/capabilities/github.release-please.json"
+    ! jq -e '.remote_actions[] | select(.kind == "secret_check" and .name == "RELEASE_TOKEN")' "$REPO_ROOT/capabilities/github.release-please.json" >/dev/null
+    ! jq -e '.remote_actions[] | select(.kind == "variable_check" and .name == "RELEASE_PLEASE_ALLOWED_ACTORS")' "$REPO_ROOT/capabilities/github.release-please.json" >/dev/null
 }
 
 @test "scaffold --github-remote skip does not write repository settings remotely" {
@@ -546,6 +547,37 @@ expected_agents_h1() {
     [ "$(cat "$target/VERSION")" = "0.1.0" ]
     grep -Fq "## 0.1.0" "$target/CHANGELOG.md"
     jq -e '.version == "0.1.0"' "$target/package.json"
+}
+
+@test "scaffold finalize-git commits only managed paths and leaves tracked local agent files out" {
+    local target="$WORK_DIR/finalize-managed-paths"
+    local committed_files
+    mkdir -p "$target/.claude"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config user.name "ci"
+    git -C "$target" config user.email "ci@example.com"
+    write_file "$target/package.json" '{"name":"finalize-managed-paths","version":"0.1.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/.claude/settings.json" '{"before":true}'
+    write_file "$target/skills-lock.json" '{"before":true}'
+    git -C "$target" add package.json .claude/settings.json skills-lock.json
+    git -C "$target" commit -q -m "chore: seed local files"
+    write_file "$target/.claude/settings.json" '{"after":true}'
+    write_file "$target/skills-lock.json" '{"after":true}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --strategy merge --finalize-git auto
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.git_finalization.status == "committed"'
+    echo "$output" | jq -e '.git_finalization.staged_paths | index(".claude/settings.json") | not'
+    echo "$output" | jq -e '.git_finalization.staged_paths | index("skills-lock.json") | not'
+    committed_files="$(git -C "$target" show --name-only --format= HEAD)"
+    [[ "$committed_files" == *"AGENTS.md"* ]]
+    [[ "$committed_files" != *".claude/settings.json"* ]]
+    [[ "$committed_files" != *"skills-lock.json"* ]]
+    git -C "$target" diff --name-only | grep -Fx ".claude/settings.json"
+    git -C "$target" diff --name-only | grep -Fx "skills-lock.json"
+    git -C "$target" diff --cached --quiet
 }
 
 @test "environment apply preserves existing package version when creating VERSION" {
@@ -951,6 +983,62 @@ expected_agents_h1() {
     done
 }
 
+@test "templates avoid capability-enabled conditional routing phrases" {
+    local file
+    local phrase_file=(
+        "$REPO_ROOT/templates/AGENTS.md"
+        "$REPO_ROOT/templates.en/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/guides/branch-protection.md"
+        "$REPO_ROOT/templates/docs/harness/guides/ai-execution.md"
+        "$REPO_ROOT/templates/docs/harness/guides/pr-guidelines.md"
+        "$REPO_ROOT/templates/docs/harness/guides/release-please.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/branch-protection.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/ai-execution.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/pr-guidelines.md"
+    )
+
+    for file in "${phrase_file[@]}"; do
+        if [ ! -f "$file" ]; then
+            echo "待检查文件不存在: $file"
+            return 1
+        fi
+
+        if rg -n --pcre2 "若启用|如果.*启用|If .* is enabled|if .* is enabled" "$file"; then
+            echo "检测到未替换的条件式能力表达: $file"
+            return 1
+        fi
+    done
+}
+
+@test "version and staging contracts are explicit" {
+    grep -Fq 'PROJECT_VERSION="0.1.0"' "$REPO_ROOT/scripts/ensure-environment.sh"
+    grep -Fq 'PROJECT_VERSION="0.1.0"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'package-lock.json、VERSION、CHANGELOG.md 与 release manifest' "$REPO_ROOT/scripts/ensure-environment.sh"
+    grep -Fq 'package-lock.json' "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh"
+    grep -Fq 'package-lock.json' "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh"
+
+    grep -Fq 'managed_paths' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'git add -- <managed_paths>' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq '.claude/' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'skills-lock.json' "$REPO_ROOT/scripts/scaffold.sh"
+    ! grep -Fq 'GitHub remote/push 完成后，再询问' "$REPO_ROOT/Q&A-TEMPLATE.md"
+}
+
+@test "dynamic gitignore assets cover supported language snapshots" {
+    local snapshot
+    for snapshot in Node Python Go Rust Java VisualStudio; do
+        [ -f "$REPO_ROOT/assets/gitignore/github/${snapshot}.gitignore" ] || {
+            echo "缺少 gitignore 快照: $snapshot"
+            return 1
+        }
+    done
+
+    grep -Fq 'github/gitignore' "$REPO_ROOT/scripts/install-gitignore.sh"
+    grep -Fq 'skills-lock.json' "$REPO_ROOT/scripts/install-gitignore.sh"
+    jq -e '.description_nl | contains("github/gitignore") and contains("Go") and contains("Rust") and contains("Dotnet")' "$REPO_ROOT/capabilities/project.gitignore.json"
+    ! jq -e '.description_nl | test("universal, Node\\.js, and Python templates")' "$REPO_ROOT/capabilities/project.gitignore.json" >/dev/null
+}
+
 @test "optional capability ids align with manifest and script allowlist" {
     local expected="$WORK_DIR/expected_capabilities.txt"
     local check_list="$WORK_DIR/check_allowed.txt"
@@ -1305,8 +1393,9 @@ PY
 @test "release-please policy includes PR lint workflow for release safety scanning" {
     jq -e '.workflow.additional_workflows | type == "array"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.additional_workflows | index(".github/workflows/pr-lint.yml")' "$REPO_ROOT/assets/github/release-please-policy.json"
-    jq -e '.workflow.allowed_actors_variable == "RELEASE_PLEASE_ALLOWED_ACTORS"' "$REPO_ROOT/assets/github/release-please-policy.json"
-    jq -e '.workflow.require_allowed_actors_reference == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.github_token_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.publish_mode_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.forbid_legacy_release_auth == true' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.label_gate_required == false' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.branch_prefix == "release-please--"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.title_pattern == "Release ${version}"' "$REPO_ROOT/assets/github/release-please-policy.json"
@@ -1587,7 +1676,7 @@ EOF
     grep -q "steps.detect-release-please.outputs.skip != 'true'" "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'HAS_AUTORELEASE_LABEL' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
-    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
@@ -1959,7 +2048,13 @@ PY
     grep -q 'name: Checkout repository for policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'uses: actions/checkout@v4' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'persist-credentials: false' "$REPO_ROOT/assets/github/workflows/release-please.yml"
-    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'secrets.GITHUB_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'actions: write' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'skip-github-pull-request' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'gh workflow run release-please.yml' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '-f mode=publish' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'RELEASE_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'branch_prefix' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'title_pattern' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'allowed_paths' "$REPO_ROOT/assets/github/workflows/release-please.yml"
