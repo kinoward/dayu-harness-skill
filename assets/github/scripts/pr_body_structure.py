@@ -10,7 +10,8 @@ Checks performed:
   2. Required order: Summary → Implementation notes → Test plan.
   3. Test plan bullets use `- [ ]` or `- [x]` format and every bullet
      contains at least one backtick-enclosed executable command.
-  4. Closing trailer line uses Closes/Fixes/Resolves with an issue number.
+  4. Issue trailer follows the issue-first rule: final PRs close the issue;
+     non-final PRs reference it without closing it.
   5. No AI-tool watermark / auto-generation signature is present.
 
 Usage:
@@ -23,8 +24,12 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 from typing import List, Optional
 
@@ -61,11 +66,14 @@ SECTION_BOUNDARY_RE = re.compile(
     re.MULTILINE,
 )
 
-CLOSING_TRAILER_RE = re.compile(
-    r"^(?:\s*(?:Closes|Fixes|Resolves)\s+#\d+\s*)$",
+ISSUE_TRAILER_RE = re.compile(
+    r"^\s*(?P<keyword>Closes|Fixes|Resolves|Refs|Part of)\s+#(?P<issue>\d+)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
+CLOSING_KEYWORDS = {"closes", "fixes", "resolves"}
+NON_CLOSING_KEYWORDS = {"refs", "part of"}
+FINAL_PR_RE = re.compile(r"^\s*Final PR:\s*(?P<value>yes|no|true|false)\s*$", re.IGNORECASE | re.MULTILINE)
 FORBIDDEN_CLOSING_HEADING_RE = re.compile(r"^##\s*Closes\b", re.IGNORECASE | re.MULTILINE)
 
 AI_WATERMARK_PATTERNS = [
@@ -135,6 +143,125 @@ def gather_body() -> str:
         "No PR body provided. Pipe the body via stdin or pass it as the"
         " first positional argument."
     )
+
+
+def normalize_keyword(value: str) -> str:
+    return value.strip().lower()
+
+
+def extract_issue_trailer(body: str) -> tuple[str, int] | None:
+    matches = list(ISSUE_TRAILER_RE.finditer(body))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        die("PR body must include exactly one issue trailer line.")
+    match = matches[0]
+    return normalize_keyword(match.group("keyword")), int(match.group("issue"))
+
+
+def extract_final_pr(body: str) -> Optional[bool]:
+    matches = list(FINAL_PR_RE.finditer(body))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        die("PR body must include at most one 'Final PR: yes/no' line.")
+    value = matches[0].group("value").lower()
+    return value in {"yes", "true"}
+
+
+def load_open_prs_from_file(path: str) -> list[dict]:
+    data = load_config(path)
+    prs = data.get("pulls", data.get("prs", data.get("items", [])))
+    if not isinstance(prs, list):
+        die(f"Open PRs fixture '{path}' must contain a pulls/prs/items array.")
+    return [item for item in prs if isinstance(item, dict)]
+
+
+def fetch_open_prs_via_api(repo: str, token: str) -> list[dict]:
+    prs: list[dict] = []
+    page = 1
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "dayu-harness-pr-body",
+    }
+    while True:
+        url = f"https://api.github.com/repos/{repo}/pulls?state=open&per_page=100&page={page}"
+        request = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(request, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        if not isinstance(data, list):
+            die("GitHub API returned an unexpected open PRs payload.")
+        if not data:
+            break
+        prs.extend(item for item in data if isinstance(item, dict))
+        if len(data) < 100:
+            break
+        page += 1
+    return prs
+
+
+def fetch_open_prs_via_gh(repo: str) -> list[dict]:
+    if shutil.which("gh") is None:
+        return []
+    proc = subprocess.run(
+        ["gh", "api", f"repos/{repo}/pulls?state=open&per_page=100", "--paginate"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return []
+
+    prs: list[dict] = []
+    decoder = json.JSONDecoder()
+    index = 0
+    raw = proc.stdout
+    while index < len(raw):
+        while index < len(raw) and raw[index].isspace():
+            index += 1
+        if index >= len(raw):
+            break
+        page_data, index = decoder.raw_decode(raw, index)
+        if isinstance(page_data, dict):
+            prs.append(page_data)
+        elif isinstance(page_data, list):
+            prs.extend(item for item in page_data if isinstance(item, dict))
+    return prs
+
+
+def open_prs_for_issue(
+    issue_number: int,
+    current_pr_number: Optional[int],
+    repo: Optional[str],
+    token: Optional[str],
+    open_prs_json: Optional[str],
+) -> list[int]:
+    if open_prs_json:
+        prs = load_open_prs_from_file(open_prs_json)
+    elif repo and token:
+        prs = fetch_open_prs_via_api(repo, token)
+    elif repo:
+        prs = fetch_open_prs_via_gh(repo)
+    else:
+        return []
+
+    matching: list[int] = []
+    for item in prs:
+        number = item.get("number")
+        if not isinstance(number, int):
+            continue
+        if current_pr_number is not None and number == current_pr_number:
+            continue
+        body = str(item.get("body") or "")
+        referenced_issues = {
+            int(match.group("issue"))
+            for match in ISSUE_TRAILER_RE.finditer(body)
+        }
+        if issue_number in referenced_issues:
+            matching.append(number)
+    return sorted(set(matching))
 
 
 # ---------------------------------------------------------------------------
@@ -221,13 +348,48 @@ def section_span(body: str, section: str) -> tuple[int, int]:
     return start, _consume_adjacent_same_section_tokens(body, section, end)
 
 
-def check_closing_trailer(body: str) -> None:
+def check_closing_trailer(
+    body: str,
+    repo: Optional[str] = None,
+    pr_number: Optional[int] = None,
+    token: Optional[str] = None,
+    open_prs_json: Optional[str] = None,
+) -> None:
     """Verify that a closing trailer is present and no heading is used instead."""
     if FORBIDDEN_CLOSING_HEADING_RE.search(body):
         die("Do not use a '## Closes' heading in PR body. Use an inline trailer instead.")
 
-    if not CLOSING_TRAILER_RE.search(body):
-        die("PR body must include one trailer line: Closes #N / Fixes #N / Resolves #N.")
+    trailer = extract_issue_trailer(body)
+    if trailer is None:
+        die("PR body must include one trailer line: Closes #N / Fixes #N / Resolves #N / Refs #N / Part of #N.")
+
+    keyword, issue_number = trailer
+    final_pr = extract_final_pr(body)
+
+    if final_pr is False and keyword not in NON_CLOSING_KEYWORDS:
+        die("Non-final PRs must use a non-closing issue trailer: Refs #N or Part of #N.")
+
+    if final_pr is True and keyword not in CLOSING_KEYWORDS:
+        die("Final PRs must use a closing issue trailer: Closes #N / Fixes #N / Resolves #N.")
+
+    if final_pr is None and keyword not in CLOSING_KEYWORDS:
+        die("Non-closing issue trailers require an explicit 'Final PR: no' line.")
+
+    if keyword in CLOSING_KEYWORDS:
+        linked_open_prs = open_prs_for_issue(
+            issue_number,
+            pr_number,
+            repo,
+            token,
+            open_prs_json,
+        )
+        if linked_open_prs:
+            refs = ", ".join(f"#{number}" for number in linked_open_prs)
+            die(
+                "Closing issue trailer is not allowed while other open PRs reference "
+                f"the same issue #{issue_number}: {refs}. Use 'Final PR: no' with "
+                "'Refs #N' / 'Part of #N' until the last PR."
+            )
 
 
 def check_test_plan(body: str) -> None:
@@ -307,16 +469,27 @@ Options:
 
   --help             Show this help message and exit.
 
+  --repo OWNER/REPO  Repository used to query open PR bodies for issue-first
+                     closing-keyword safety. Defaults to GITHUB_REPOSITORY.
+
+  --pr-number N      Current PR number to exclude from open-PR checks.
+
+  --open-prs-json P  Optional JSON fixture for open PR bodies; primarily used
+                     by tests. Expected root object: {{ "pulls": [...] }}.
+
 Exit status:
   0   PR body is valid.
   1   PR body failed one or more checks (details are printed to stderr).
 """.format(DEFAULT=", ".join(DEFAULT_SECTIONS))
 
 
-def parse_args(argv: list[str]) -> tuple[Optional[str], Optional[str]]:
-    """Return (body_text_or_None, config_path_or_None)."""
+def parse_args(argv: list[str]) -> tuple[Optional[str], Optional[str], Optional[str], Optional[int], Optional[str]]:
+    """Return body, config path, repo, pr number, and open PR fixture path."""
     config: Optional[str] = None
     body: Optional[str] = None
+    repo: Optional[str] = None
+    pr_number: Optional[int] = None
+    open_prs_json: Optional[str] = None
     args = argv[1:]  # skip program name
     i = 0
     while i < len(args):
@@ -328,16 +501,33 @@ def parse_args(argv: list[str]) -> tuple[Optional[str], Optional[str]]:
             if i >= len(args):
                 die("--config requires a path argument.")
             config = args[i]
+        elif args[i] == "--repo":
+            i += 1
+            if i >= len(args):
+                die("--repo requires OWNER/REPO.")
+            repo = args[i]
+        elif args[i] == "--pr-number":
+            i += 1
+            if i >= len(args):
+                die("--pr-number requires an integer.")
+            if not args[i].isdigit():
+                die("--pr-number requires an integer.")
+            pr_number = int(args[i])
+        elif args[i] == "--open-prs-json":
+            i += 1
+            if i >= len(args):
+                die("--open-prs-json requires a path.")
+            open_prs_json = args[i]
         elif not args[i].startswith("-"):
             body = args[i]
         else:
             die(f"Unknown option: {args[i]}")
         i += 1
-    return body, config
+    return body, config, repo, pr_number, open_prs_json
 
 
 def main() -> None:
-    body_arg, config_path = parse_args(sys.argv)
+    body_arg, config_path, repo, pr_number, open_prs_json = parse_args(sys.argv)
 
     # Resolve body text.
     if body_arg is not None:
@@ -360,7 +550,15 @@ def main() -> None:
 
     # Run checks.
     check_sections(body, sections)
-    check_closing_trailer(body)
+    if repo is None:
+        repo = os.environ.get("GITHUB_REPOSITORY")
+    if pr_number is None:
+        raw_pr_number = os.environ.get("PR_NUMBER") or os.environ.get("GITHUB_PR_NUMBER")
+        if raw_pr_number and raw_pr_number.isdigit():
+            pr_number = int(raw_pr_number)
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+
+    check_closing_trailer(body, repo=repo, pr_number=pr_number, token=token, open_prs_json=open_prs_json)
     check_test_plan(body)
     check_watermarks(body)
 

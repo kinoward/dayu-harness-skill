@@ -19,9 +19,11 @@
 
 - [ ] `command or inline check`
 
+Final PR: yes
 Closes #N
 
 <!--
-Replace N with the real linked issue number.
-You may also use `Fixes #N` or `Resolves #N`.
+Replace N with the real linked issue number. Use Final PR: no with
+Refs #N / Part of #N when other PRs for the same issue are still open.
+Use Final PR: yes with Closes #N / Fixes #N / Resolves #N only on the last PR.
 -->

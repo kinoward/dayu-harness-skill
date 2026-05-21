@@ -26,34 +26,46 @@ on:
       - ".release-please-manifest.json"
       - "VERSION"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode: pr creates/updates the release PR; publish creates the tag and GitHub Release only."
+        required: true
+        default: "pr"
+        type: choice
+        options:
+          - pr
+          - publish
 
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
+    if: ${{ github.event_name == 'push' || inputs.mode == 'publish' }}
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-pull-request: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}
 
       - name: Checkout repository for policy/config checks
+        if: ${{ github.event_name == 'push' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Merge release-please PR
-        if: ${{ steps.release.outcome == 'success' }}
+        if: ${{ github.event_name == 'push' && steps.release.outcome == 'success' }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          RELEASE_PLEASE_ALLOWED_ACTORS: ${{ vars.RELEASE_PLEASE_ALLOWED_ACTORS }}
           RELEASE_PLEASE_POLICY_PATH: .github/release-please-policy.json
           RELEASE_PLEASE_CONFIG_PATH: release-please-config.json
           RELEASE_PLEASE_PR_OUTPUT: ${{ steps.release.outputs.prs }}
@@ -121,48 +133,11 @@ jobs:
               escaped = escaped.replace(r"\$\{version\}", r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
               return re.compile(f"^{escaped}$")
 
-          def load_release_policy(path):
-              if not os.path.exists(path):
-                  print(f"Missing release-please policy file: {path}", file=sys.stderr)
-                  raise SystemExit(1)
-              try:
-                  data = load_json(path)
-              except (json.JSONDecodeError, OSError) as exc:
-                  print(f"Invalid release-please policy file '{path}': {exc}", file=sys.stderr)
-                  raise SystemExit(1)
-              if not isinstance(data, dict):
-                  print(f"Release-please policy file '{path}' must be a JSON object.", file=sys.stderr)
-                  raise SystemExit(1)
-
-              section = data.get("release_pr")
-              if not isinstance(section, dict):
-                  print(f"Release-please policy file '{path}' must define release_pr as an object.", file=sys.stderr)
-                  raise SystemExit(1)
-
-              return section
-
-          def load_release_config(path):
-              if not os.path.exists(path):
-                  return {}
-              data = load_json(path)
-              return data if isinstance(data, dict) else {}
-
-          def normalize_actor(value):
-              return (value or "").strip().lower()
-
-          def actor_allowed(author):
-              author_norm = normalize_actor(author)
-              if not author_norm:
-                  return False
-              if author_norm in {"github-actions[bot]", "release-please[bot]"}:
-                  return True
-
-              allowed_actors = {
-                  normalize_actor(item)
-                  for item in normalize_actor(os.getenv("RELEASE_PLEASE_ALLOWED_ACTORS", "")).split(",")
-                  if normalize_actor(item)
+          def is_release_actor(author):
+              return (author or "").strip().lower() in {
+                  "github-actions[bot]",
+                  "release-please[bot]",
               }
-              return author_norm in allowed_actors
 
           def is_allowed_file(filename, patterns):
               return any(
@@ -228,6 +203,32 @@ jobs:
                   elif isinstance(page_data, list):
                       items.extend(page_data)
               return items
+
+          def load_release_policy(path):
+              if not os.path.exists(path):
+                  print(f"Missing release-please policy file: {path}", file=sys.stderr)
+                  raise SystemExit(1)
+              try:
+                  data = load_json(path)
+              except (json.JSONDecodeError, OSError) as exc:
+                  print(f"Invalid release-please policy file '{path}': {exc}", file=sys.stderr)
+                  raise SystemExit(1)
+              if not isinstance(data, dict):
+                  print(f"Release-please policy file '{path}' must be a JSON object.", file=sys.stderr)
+                  raise SystemExit(1)
+
+              section = data.get("release_pr")
+              if not isinstance(section, dict):
+                  print(f"Release-please policy file '{path}' must define release_pr as an object.", file=sys.stderr)
+                  raise SystemExit(1)
+
+              return section
+
+          def load_release_config(path):
+              if not os.path.exists(path):
+                  return {}
+              data = load_json(path)
+              return data if isinstance(data, dict) else {}
 
           def has_allowed_files(pr_number, repo_name, allowed_patterns):
               token = os.getenv("GH_TOKEN")
@@ -312,7 +313,7 @@ jobs:
                   continue
 
               author = (item.get("user") or {}).get("login", "")
-              if not actor_allowed(author):
+              if not is_release_actor(author):
                   continue
 
               base_ref = (item.get("base") or {}).get("ref", "")
@@ -353,15 +354,42 @@ jobs:
             [ -z "$pr_number" ] && continue
             echo "Merging release PR #${pr_number}..."
             gh pr merge "$pr_number" --auto --merge --delete-branch --repo "$REPO"
+
+            merged="false"
+            for _ in $(seq 1 60); do
+              if gh pr view "$pr_number" --repo "$REPO" --json mergedAt --jq '.mergedAt // empty' | grep -q .; then
+                merged="true"
+                break
+              fi
+              sleep 10
+            done
+
+            if [ "$merged" != "true" ]; then
+              echo "Release PR #${pr_number} did not merge before timeout; publish dispatch was not started."
+              exit 1
+            fi
+
+            gh workflow run release-please.yml --repo "$REPO" --ref "$DEFAULT_BRANCH" -f mode=publish
           done <<< "$RELEASE_PLEASE_PRS"
 
-      # Publish step: runs only when a release is created.
-      # Uncomment and customize for your project:
-      #
-      # - uses: actions/checkout@v4
-      #   if: ${{ steps.release.outputs.release_created }}
-      # - name: Publish
-      #   if: ${{ steps.release.outputs.release_created }}
-      #   run: |
-      #     echo "Release ${{ steps.release.outputs.tag_name }} created"
-      #     # Add your publish steps here
+      - name: Verify published tag and GitHub Release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: |
+          if [ "$RELEASE_CREATED" != "true" ]; then
+            echo "release-please did not report a created release."
+            exit 1
+          fi
+
+          if [ -z "$TAG_NAME" ]; then
+            echo "release-please did not output tag_name."
+            exit 1
+          fi
+
+          gh api "repos/$REPO/git/ref/tags/$TAG_NAME" >/dev/null
+          gh api "repos/$REPO/releases/tags/$TAG_NAME" >/dev/null
+          echo "Verified tag and GitHub Release: $TAG_NAME"

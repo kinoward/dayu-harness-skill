@@ -29,8 +29,9 @@
     ],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
     "label_gate_required": false,
-    "allowed_actors_variable": "RELEASE_PLEASE_ALLOWED_ACTORS",
-    "require_allowed_actors_reference": true
+    "github_token_required": true,
+    "publish_mode_required": true,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",

@@ -14,7 +14,6 @@ from collections import Counter
 REQUIRED_PRIMARY_WORKFLOW = ".github/workflows/release-please.yml"
 REQUIRED_ADDITIONAL_WORKFLOW = ".github/workflows/pr-lint.yml"
 REQUIRED_MERGE_COMMAND = "gh pr merge --auto --merge --delete-branch"
-REQUIRED_ALLOWED_ACTORS_VARIABLE = "RELEASE_PLEASE_ALLOWED_ACTORS"
 REQUIRED_REPOSITORY_SETTINGS_FILE = ".github/repository/pull-request-settings.json"
 REQUIRED_RELEASE_CONFIG_FILE = "release-please-config.json"
 
@@ -222,21 +221,39 @@ def has_label_bypass_signal(workflow_text: str) -> bool:
     return False
 
 
-def has_allowed_actors_reference(workflow_text: str, variable: str) -> bool:
-    if not variable:
-        return True
+def has_github_token_reference(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}", workflow_text)
+        or re.search(r"\$\{\{\s*github\.token\s*\}\}", workflow_text)
+    )
 
-    escaped = re.escape(variable)
-    if re.search(rf"(?im)^\s*{escaped}\s*:", workflow_text):
-        return True
 
-    if f"${{{{ vars.{variable}" in workflow_text:
-        return True
+def has_publish_only_mode(workflow_text: str) -> bool:
+    lowered = workflow_text.lower()
+    return (
+        "workflow_dispatch" in lowered
+        and re.search(r"(?im)^\s*mode\s*:", workflow_text) is not None
+        and "skip-github-pull-request" in lowered
+        and "publish" in lowered
+    )
 
-    if re.search(rf"\${escaped}\b", workflow_text):
-        return True
 
-    return False
+def has_publish_dispatch_after_merge(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bgh\s+workflow\s+run\s+release-please\.yml\b", workflow_text)
+        and re.search(r"-f\s+mode=publish\b", workflow_text)
+    )
+
+
+def has_actions_write_permission(workflow_text: str) -> bool:
+    return bool(re.search(r"(?m)^\s+actions\s*:\s*write\s*$", workflow_text))
+
+
+def has_legacy_release_auth_reference(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bRELEASE_TOKEN\b", workflow_text)
+        or re.search(r"\bRELEASE_PLEASE_ALLOWED_ACTORS\b", workflow_text)
+    )
 
 
 def has_required_merge_command(workflow_text: str) -> bool:
@@ -400,25 +417,29 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
             f"{workflow_path}: missing merge command '{REQUIRED_MERGE_COMMAND}'."
         )
 
-    allowed_actors_variable = workflow_policy.get(
-        "allowed_actors_variable",
-        REQUIRED_ALLOWED_ACTORS_VARIABLE,
-    )
-    if not isinstance(allowed_actors_variable, str) or not allowed_actors_variable.strip():
-        errors.append(
-            f"workflow.allowed_actors_variable must be '{REQUIRED_ALLOWED_ACTORS_VARIABLE}'."
-        )
-        allowed_actors_variable = REQUIRED_ALLOWED_ACTORS_VARIABLE
-    elif allowed_actors_variable != REQUIRED_ALLOWED_ACTORS_VARIABLE:
-        errors.append(
-            f"workflow.allowed_actors_variable must be '{REQUIRED_ALLOWED_ACTORS_VARIABLE}'."
-        )
-        allowed_actors_variable = REQUIRED_ALLOWED_ACTORS_VARIABLE
+    if workflow_policy.get("github_token_required") is not True:
+        errors.append("workflow.github_token_required must be true.")
+    if not has_github_token_reference(workflow_text):
+        errors.append(f"{workflow_path}: release workflow must use secrets.GITHUB_TOKEN.")
 
-    require_allowed_actors_reference = workflow_policy.get("require_allowed_actors_reference")
-    if require_allowed_actors_reference is not True:
-        errors.append("workflow.require_allowed_actors_reference must be true.")
-        require_allowed_actors_reference = True
+    if workflow_policy.get("publish_mode_required") is not True:
+        errors.append("workflow.publish_mode_required must be true.")
+    if not has_publish_only_mode(workflow_text):
+        errors.append(
+            f"{workflow_path}: workflow_dispatch mode=publish with skip-github-pull-request is required."
+        )
+    if not has_publish_dispatch_after_merge(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must dispatch workflow_dispatch mode=publish."
+        )
+    if not has_actions_write_permission(workflow_text):
+        errors.append(
+            f"{workflow_path}: release workflow must grant actions: write for publish dispatch."
+        )
+
+    forbid_legacy_release_auth = workflow_policy.get("forbid_legacy_release_auth")
+    if forbid_legacy_release_auth is not True:
+        errors.append("workflow.forbid_legacy_release_auth must be true.")
 
     def validate_workflow_text(path: Path, text: str) -> None:
         if has_label_gate(text):
@@ -429,12 +450,9 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
             errors.append(
                 f"{path}: label-based signal detected, but policy forbids autorelease-label bypass."
             )
-        if not has_allowed_actors_reference(
-            text, allowed_actors_variable
-        ):
+        if forbid_legacy_release_auth is True and has_legacy_release_auth_reference(text):
             errors.append(
-                f"{path}: missing reference to allowed actor variable "
-                f"'{allowed_actors_variable}'."
+                f"{path}: legacy RELEASE_TOKEN or RELEASE_PLEASE_ALLOWED_ACTORS reference is forbidden."
             )
 
     if workflow_policy.get("label_gate_required") is not False:
@@ -522,6 +540,13 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
 
     if config_policy.get("require_full_changelog_types") is not True:
         errors.append("release_please_config.require_full_changelog_types must be true.")
+
+    if package_cfg.get("release-type") != "node":
+        errors.append(f"{config_path}: packages['.'].release-type must be 'node'.")
+
+    extra_files = package_cfg.get("extra-files")
+    if not isinstance(extra_files, list) or "VERSION" not in extra_files:
+        errors.append(f"{config_path}: packages['.'].extra-files must include VERSION.")
 
     seen_types: list[str] = []
     for idx, section in enumerate(sections):

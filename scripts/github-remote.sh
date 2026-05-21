@@ -265,6 +265,9 @@ configure_required_remote_actions() {
                 repository_settings)
                     NEED_REPOSITORY_SETTINGS="true"
                     ;;
+                workflow_permissions)
+                    NEED_WORKFLOW_PERMISSIONS="true"
+                    ;;
             esac
         done < <(printf '%s' "$REMOTE_ACTIONS_JSON" | jq -r '.[]?.kind // empty' 2>/dev/null)
 
@@ -299,8 +302,7 @@ configure_required_remote_actions() {
     [ -f "$TARGET/.github/rulesets/protect-main.json" ] && REQUIRED_RULESETS+=( "protect-main" )
     [ -f "$TARGET/.github/rulesets/protect-tags.json" ] && REQUIRED_RULESETS+=( "protect-tags" )
     if local_release_assets_present; then
-        REQUIRED_SECRETS+=( "RELEASE_TOKEN" )
-        REQUIRED_VARIABLES+=( "RELEASE_PLEASE_ALLOWED_ACTORS" )
+        NEED_WORKFLOW_PERMISSIONS="true"
     fi
 }
 
@@ -396,8 +398,10 @@ DEFAULT_BRANCH=""
 VISIBILITY=""
 ALLOWED_AUTO_MERGE=""
 DELETE_BRANCH_ON_MERGE=""
+REMOTE_SYNC_STATE="unknown"
 
 NEED_REPOSITORY_SETTINGS="false"
+NEED_WORKFLOW_PERMISSIONS="false"
 REQUIRED_RULESETS=()
 REQUIRED_SECRETS=()
 REQUIRED_VARIABLES=()
@@ -516,6 +520,108 @@ if [ -z "$VISIBILITY" ]; then
     VISIBILITY="unknown"
 fi
 
+assess_remote_sync_state() {
+    local local_ref remote_ref counts left_count right_count status detail
+    REMOTE_SYNC_STATE="unknown"
+
+    if [ "$HAS_GIT" != "true" ] || [ ! -d "$TARGET/.git" ]; then
+        REMOTE_SYNC_STATE="no_git"
+        add_item '{"kind":"remote_sync","status":"needs_initialization","state":"no_git","description_nl":"缺少 Git 仓库上下文，无法判断本地与远端分支关系。"}' "needs_initialization"
+        return 0
+    fi
+
+    if ! git -C "$TARGET" rev-parse --verify HEAD >/dev/null 2>&1; then
+        REMOTE_SYNC_STATE="no_local_commit"
+        add_item '{"kind":"remote_sync","status":"needs_initialization","state":"no_local_commit","description_nl":"本地尚无提交，无法与远端分支比较。"}' "needs_initialization"
+        return 0
+    fi
+
+    if ! git -C "$TARGET" remote get-url origin >/dev/null 2>&1; then
+        REMOTE_SYNC_STATE="no_remote"
+        add_item '{"kind":"remote_sync","status":"missing","state":"no_remote","description_nl":"尚未配置 origin，创建或绑定远端后才能比较分支关系。"}' "missing"
+        return 0
+    fi
+
+    git -C "$TARGET" fetch origin "$DEFAULT_BRANCH" --quiet >/dev/null 2>&1 || true
+    local_ref="HEAD"
+    remote_ref="refs/remotes/origin/${DEFAULT_BRANCH}"
+
+    if ! git -C "$TARGET" rev-parse --verify "$remote_ref" >/dev/null 2>&1; then
+        REMOTE_SYNC_STATE="remote_missing"
+        add_item "{\"kind\":\"remote_sync\",\"status\":\"missing\",\"state\":\"remote_missing\",\"description_nl\":\"远端 origin/${DEFAULT_BRANCH} 不存在，允许首次推送当前默认分支。\"}" "missing"
+        return 0
+    fi
+
+    counts="$(git -C "$TARGET" rev-list --left-right --count "${remote_ref}...${local_ref}" 2>/dev/null || true)"
+    left_count="$(printf '%s' "$counts" | awk '{print $1}')"
+    right_count="$(printf '%s' "$counts" | awk '{print $2}')"
+    left_count="${left_count:-0}"
+    right_count="${right_count:-0}"
+
+    if [ "$left_count" = "0" ] && [ "$right_count" = "0" ]; then
+        REMOTE_SYNC_STATE="same"
+        status="ok"
+        detail="本地 ${DEFAULT_BRANCH} 与 origin/${DEFAULT_BRANCH} 一致。"
+    elif [ "$left_count" = "0" ]; then
+        REMOTE_SYNC_STATE="ahead"
+        status="ok"
+        detail="本地 ${DEFAULT_BRANCH} 领先 origin/${DEFAULT_BRANCH} ${right_count} 个提交，可正常推送。"
+    elif [ "$right_count" = "0" ]; then
+        REMOTE_SYNC_STATE="behind"
+        if [ "$MODE" = "apply" ]; then
+            status="ok"
+            detail="本地 ${DEFAULT_BRANCH} 落后 origin/${DEFAULT_BRANCH} ${left_count} 个提交；apply 将推送初始化分支并创建 PR，禁止 force push。"
+        else
+            status="needs_user_action"
+            detail="本地 ${DEFAULT_BRANCH} 落后 origin/${DEFAULT_BRANCH} ${left_count} 个提交；需要通过初始化分支 PR 同步，禁止 force push。"
+        fi
+    else
+        REMOTE_SYNC_STATE="diverged"
+        if [ "$MODE" = "apply" ]; then
+            status="ok"
+            detail="本地 ${DEFAULT_BRANCH} 与 origin/${DEFAULT_BRANCH} 已分叉（远端 ${left_count}、本地 ${right_count}）；apply 将推送初始化分支并创建 PR，禁止 force push。"
+        else
+            status="needs_user_action"
+            detail="本地 ${DEFAULT_BRANCH} 与 origin/${DEFAULT_BRANCH} 已分叉（远端 ${left_count}、本地 ${right_count}）；默认通过初始化分支 PR 同步，禁止 force push。"
+        fi
+    fi
+
+    add_item "{\"kind\":\"remote_sync\",\"status\":\"${status}\",\"state\":\"${REMOTE_SYNC_STATE}\",\"remote_ahead\":${left_count},\"local_ahead\":${right_count},\"description_nl\":\"$(json_escape "$detail")\"}" "$status"
+}
+
+push_initialization_pr() {
+    local short_sha init_branch pr_body push_output push_rc pr_output pr_rc
+
+    short_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
+    init_branch="dayu-harness/init-${short_sha}"
+    pr_body="Dayu Harness 初始化分支。远端 ${DEFAULT_BRANCH} 已领先或分叉，因此本次初始化通过 PR 同步，且全程不使用 force push。"
+
+    set +e
+    push_output="$(git -C "$TARGET" push -u origin "HEAD:${init_branch}" 2>&1)"
+    push_rc=$?
+    set -e
+
+    if [ "$push_rc" -ne 0 ]; then
+        add_item "{\"kind\":\"remote\",\"action\":\"push_init_branch\",\"branch\":\"$(json_escape "$init_branch")\",\"status\":\"error\",\"description_nl\":\"初始化分支推送失败：$(json_escape "$push_output")\"}" "error"
+        return 1
+    fi
+
+    add_item "{\"kind\":\"remote\",\"action\":\"push_init_branch\",\"branch\":\"$(json_escape "$init_branch")\",\"status\":\"ok\",\"description_nl\":\"已推送初始化分支 ${init_branch}，未使用 force push。\"}" "ok"
+
+    set +e
+    pr_output="$(gh pr create --repo "$REPOSITORY" --base "$DEFAULT_BRANCH" --head "$init_branch" --title "chore: initialize Dayu Harness" --body "$pr_body" 2>&1)"
+    pr_rc=$?
+    set -e
+
+    if [ "$pr_rc" -eq 0 ]; then
+        add_item "{\"kind\":\"pull_request\",\"action\":\"create\",\"branch\":\"$(json_escape "$init_branch")\",\"base\":\"$(json_escape "$DEFAULT_BRANCH")\",\"status\":\"ok\",\"description_nl\":\"已基于 ${DEFAULT_BRANCH} 创建初始化 PR。\"}" "ok"
+        return 0
+    fi
+
+    add_item "{\"kind\":\"pull_request\",\"action\":\"create\",\"branch\":\"$(json_escape "$init_branch")\",\"base\":\"$(json_escape "$DEFAULT_BRANCH")\",\"status\":\"error\",\"description_nl\":\"初始化 PR 创建失败：$(json_escape "$pr_output")\"}" "error"
+    return 1
+}
+
 check_mode() {
     local desc
     local status
@@ -535,6 +641,10 @@ check_mode() {
             status="needs_initialization"
         fi
         desc="未能解析仓库信息；建议设置 DAYU_HARNESS_GITHUB_REPOSITORY 或配置 origin。"
+    fi
+    if [ "$HAS_GIT" = "true" ] && [ -d "$TARGET/.git" ]; then
+        assess_remote_sync_state
+        status="$(summary_status check)"
     fi
     emit_output "$status" "$desc"
 }
@@ -607,8 +717,12 @@ apply_mode() {
             DEFAULT_BRANCH="$(normalize_branch_name "$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null || true)")"
         fi
         ensure_default_branch_fallback
-
-        if git -C "$TARGET" push -u origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        assess_remote_sync_state
+        if [ "$REMOTE_SYNC_STATE" = "behind" ] || [ "$REMOTE_SYNC_STATE" = "diverged" ]; then
+            if push_initialization_pr; then
+                push_ok="branch_pr"
+            fi
+        elif git -C "$TARGET" push -u origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
             push_ok="true"
             add_item '{"kind":"remote","action":"push","status":"ok","description_nl":"已执行 git push -u origin <default_branch>。"}' "ok"
         else
@@ -622,6 +736,7 @@ apply_mode() {
         sync_default_branch_after_push
     fi
     apply_repository_settings
+    apply_workflow_permissions
     apply_ruleset_file "$TARGET/.github/rulesets/protect-main.json" "protect-main"
     apply_ruleset_file "$TARGET/.github/rulesets/protect-tags.json" "protect-tags"
 
@@ -648,6 +763,24 @@ apply_repository_settings() {
         add_item "{\"kind\":\"repository_settings\",\"action\":\"patch\",\"status\":\"ok\",\"description_nl\":\"已同步 GitHub 仓库设置 allow_auto_merge=${allow_auto_merge}, delete_branch_on_merge=${delete_branch_on_merge}。\"}" "ok"
     else
         add_item "{\"kind\":\"repository_settings\",\"action\":\"patch\",\"status\":\"error\",\"description_nl\":\"GitHub 仓库设置同步失败：$(json_escape "$api_output")\"}" "error"
+    fi
+}
+
+apply_workflow_permissions() {
+    local api_output api_rc
+    [ "$NEED_WORKFLOW_PERMISSIONS" = "true" ] || return 0
+    [ -n "$REPOSITORY" ] || return 0
+    [ "$GH_AUTH_OK" = "true" ] || return 0
+
+    set +e
+    api_output="$(gh api -X PUT "repos/$REPOSITORY/actions/permissions/workflow" -f "default_workflow_permissions=write" -F "can_approve_pull_request_reviews=true" 2>&1)"
+    api_rc=$?
+    set -e
+
+    if [ "$api_rc" -eq 0 ]; then
+        add_item '{"kind":"workflow_permissions","action":"put","status":"ok","description_nl":"已同步 GitHub Actions workflow permissions：default_workflow_permissions=write，can_approve_pull_request_reviews=true。"}' "ok"
+    else
+        add_item "{\"kind\":\"workflow_permissions\",\"action\":\"put\",\"status\":\"error\",\"description_nl\":\"GitHub Actions workflow permissions 同步失败：$(json_escape "$api_output")\"}" "error"
     fi
 }
 
@@ -758,17 +891,23 @@ verify_mode() {
     local present_default_branch=""
     local missing_settings=""
     local present_settings=""
+    local missing_workflow_permissions=""
+    local present_workflow_permissions=""
     local branch_to_json
     local branches_json
     local rulesets_json
     local secrets_json
     local variables_json
+    local workflow_permissions_json
+    local default_workflow_permissions=""
+    local can_approve_pull_request_reviews=""
     local need_branch_verify="false"
 
     branches_json="$(gh api "repos/$REPOSITORY/branches" 2>/dev/null || true)"
     rulesets_json="$(gh api "repos/$REPOSITORY/rulesets" 2>/dev/null || true)"
     secrets_json="$(gh api "repos/$REPOSITORY/actions/secrets" 2>/dev/null || true)"
     variables_json="$(gh api "repos/$REPOSITORY/actions/variables" 2>/dev/null || true)"
+    workflow_permissions_json="$(gh api "repos/$REPOSITORY/actions/permissions/workflow" 2>/dev/null || true)"
 
     branches_lines="$(parse_json_array_names "$branches_json" '[].name // empty')"
     rulesets_lines="$(parse_json_array_names "$rulesets_json" '(.rulesets // .)[]?.name // empty')"
@@ -818,6 +957,27 @@ verify_mode() {
                 present_settings+=$'\n'
             fi
             present_settings+="delete_branch_on_merge"
+        fi
+    fi
+
+    if [ "$NEED_WORKFLOW_PERMISSIONS" = "true" ]; then
+        default_workflow_permissions="$(printf '%s' "$workflow_permissions_json" | jq -r '.default_workflow_permissions // ""' 2>/dev/null || true)"
+        can_approve_pull_request_reviews="$(printf '%s' "$workflow_permissions_json" | jq -r '.can_approve_pull_request_reviews // ""' 2>/dev/null || true)"
+        if [ "$default_workflow_permissions" != "write" ]; then
+            missing_workflow_permissions+="default_workflow_permissions=write"
+        else
+            present_workflow_permissions+="default_workflow_permissions=write"
+        fi
+        if [ "$can_approve_pull_request_reviews" != "true" ]; then
+            if [ -n "$missing_workflow_permissions" ]; then
+                missing_workflow_permissions+=$'\n'
+            fi
+            missing_workflow_permissions+="can_approve_pull_request_reviews=true"
+        else
+            if [ -n "$present_workflow_permissions" ]; then
+                present_workflow_permissions+=$'\n'
+            fi
+            present_workflow_permissions+="can_approve_pull_request_reviews=true"
         fi
     fi
 
@@ -889,6 +1049,16 @@ verify_mode() {
           "$(to_json_array_from_lines "$present_settings")" \
           "$(to_json_array_from_lines "$missing_settings")" \
           "仓库设置 allow_auto_merge/delete_branch_on_merge 当前值：allow_auto_merge=${ALLOWED_AUTO_MERGE:-unknown}；delete_branch_on_merge=${DELETE_BRANCH_ON_MERGE:-unknown}。"
+    fi
+
+    if [ "$NEED_WORKFLOW_PERMISSIONS" = "true" ]; then
+        add_resource_item \
+          "workflow_permissions" \
+          "$( [ -n "$missing_workflow_permissions" ] && echo missing || echo ok )" \
+          "$(to_json_array default_workflow_permissions=write can_approve_pull_request_reviews=true)" \
+          "$(to_json_array_from_lines "$present_workflow_permissions")" \
+          "$(to_json_array_from_lines "$missing_workflow_permissions")" \
+          "检测 GitHub Actions workflow permissions 当前值：default_workflow_permissions=${default_workflow_permissions:-unknown}；can_approve_pull_request_reviews=${can_approve_pull_request_reviews:-unknown}。"
     fi
 
     if [ -n "$REQUESTED_DEFAULT_BRANCH" ]; then
