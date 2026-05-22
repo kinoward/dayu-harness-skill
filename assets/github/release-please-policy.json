@@ -36,6 +36,13 @@
     "label_gate_required": false,
     "github_token_required": true,
     "publish_mode_required": true,
+    "release_trigger_types": [
+      "feat",
+      "fix",
+      "perf",
+      "revert"
+    ],
+    "release_trigger_breaking_change": true,
     "plain_version_sync_required": true,
     "forbid_legacy_release_auth": true
   },
@@ -65,6 +72,8 @@
   "release_please_config": {
     "file": "release-please-config.json",
     "pull_request_title_pattern": "Release ${version}",
+    "root_package_only": true,
+    "include_component_in_tag": false,
     "require_full_changelog_types": true,
     "required_changelog_types": [
       "feat",

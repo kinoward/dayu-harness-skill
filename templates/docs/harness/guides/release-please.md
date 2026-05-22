@@ -53,6 +53,20 @@ release workflow 对 release PR 的 clone/push 使用 Git credential helper 注�
 
 这些类型不应配置为 `hidden: true`。`release_please_policy.py` 会拒绝隐藏 changelog section，确保 changelog 和 GitHub Release notes 保留完整历史记录。
 
+## 发布触发边界
+
+`release-please.yml` 在 push 触发后会先扫描自最近 `v*` tag 以来的提交。只有出现以下提交时才创建或更新 release PR：
+
+- `feat`
+- `fix`
+- `perf`
+- `revert`
+- 任意 Conventional Commit `!` 或 `BREAKING CHANGE` / `BREAKING-CHANGE`
+
+`docs`、`style`、`test`、`build`、`ci`、`chore`、普通 `refactor` 等提交即使命中路径过滤，也不会单独创建 release PR。它们仍保留在 `release-please-config.json` 的 changelog section 中；当同一未发布区间内后续出现可发布提交时，会进入下一次 release PR 的 changelog。
+
+当前模板只支持 `packages["."]` 根包发布，并要求 `include-component-in-tag: false`。release gate 使用 `.release-please-manifest.json` 的根版本和 `v*` tag 计算未发布提交区间；如果项目需要 monorepo 多包或 component tag，必须先扩展 `.github/scripts/release_please_policy.py` 和 `release-please.yml` 的 tag 解析逻辑。
+
 ## 路径过滤策略
 
 `release-please` 的变更过滤与路径策略由 `.github/release-please-policy.json` 维护。变更策略（包含路径白名单、排除规则、发布边界）应通过该文件调整，更新后与 `release-please-config.json` 同步应用，避免在配置中重复编码业务策略。

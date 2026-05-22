@@ -1499,8 +1499,12 @@ PY
     jq -e '.workflow.additional_workflows | index(".github/workflows/pr-lint.yml")' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.github_token_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.publish_mode_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.release_trigger_types == ["feat","fix","perf","revert"]' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.release_trigger_breaking_change == true' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.forbid_legacy_release_auth == true' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.label_gate_required == false' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_please_config.root_package_only == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_please_config.include_component_in_tag == false' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.branch_prefix == "release-please--"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.title_pattern == "Release ${version}"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.allowed_paths | length > 0' "$REPO_ROOT/assets/github/release-please-policy.json"
@@ -1521,6 +1525,8 @@ PY
     grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
     grep -Fq '.github/release-please-policy.json' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '只支持 `packages["."]` 根包发布' "$REPO_ROOT/templates/docs/harness/guides/release-please.md"
+    grep -Fq 'supports only the `packages["."]` root package' "$REPO_ROOT/templates.en/docs/harness/guides/release-please.md"
 }
 
 @test "maintenance docs align quality.tdd applicability conditions" {
@@ -2140,8 +2146,22 @@ PY
 
 @test "Release workflow enables merge path + dispatch and enforce merge command" {
     grep -q 'workflow_dispatch:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'paths:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'release-please-config.json' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'Detect releasable commits' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release_trigger_types' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release_trigger_breaking_change' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "(github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' || steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml" && {
+        echo "workflow_dispatch mode=pr must not bypass release gate"
+        exit 1
+    }
+    grep -q "steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'No releasable commits found; release-please PR creation is skipped.' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -Fq '^[A-Za-z]+(\\([^)]+\\))?!:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'gh pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q -- '--auto --merge --delete-branch' "$REPO_ROOT/assets/github/workflows/release-please.yml"
@@ -2149,7 +2169,7 @@ PY
     grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/release-please.yml"
-    grep -q 'name: Checkout repository for policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'name: Checkout repository for release gate and policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'uses: actions/checkout@v4' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'persist-credentials: false' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'secrets.GITHUB_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
@@ -2173,6 +2193,35 @@ PY
     grep -q 'for path in touched' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'has_autorelease_label' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+}
+
+@test "release trigger gate classifies releasable and non-releasable commit messages" {
+    gate_result() {
+        local message="$1"
+        local messages_file="$WORK_DIR/release-gate-message.txt"
+        local release_types="feat|fix|perf|revert"
+        local breaking_change="true"
+        local should_run="false"
+
+        printf '%s\n' "$message" > "$messages_file"
+        if grep -Eq "^(${release_types})(\\([^)]+\\))?!?:[[:space:]]+" "$messages_file"; then
+            should_run="true"
+        elif [ "$breaking_change" = "true" ] && grep -Eq "^[A-Za-z]+(\\([^)]+\\))?!:[[:space:]]+" "$messages_file"; then
+            should_run="true"
+        elif [ "$breaking_change" = "true" ] && grep -Eiq "^BREAKING[ -]CHANGE:" "$messages_file"; then
+            should_run="true"
+        fi
+        printf '%s\n' "$should_run"
+    }
+
+    [ "$(gate_result 'docs: update guide')" = "false" ]
+    [ "$(gate_result 'chore: update tooling')" = "false" ]
+    [ "$(gate_result 'feat: add translation mode')" = "true" ]
+    [ "$(gate_result 'fix(api): handle retries')" = "true" ]
+    [ "$(gate_result 'perf: speed up batching')" = "true" ]
+    [ "$(gate_result 'revert: remove broken change')" = "true" ]
+    [ "$(gate_result 'refactor!: change public API')" = "true" ]
+    [ "$(gate_result $'docs: update guide\n\nBREAKING CHANGE: configuration changed')" = "true" ]
 }
 
 @test "PR lint rejects Conventional Commit PR titles for release-please merge strategy" {

@@ -238,6 +238,22 @@ def has_publish_only_mode(workflow_text: str) -> bool:
     )
 
 
+def has_release_trigger_gate(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "Detect releasable commits",
+            "release_trigger_types",
+            "release_trigger_breaking_change",
+            "github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'",
+            "github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'",
+            "(github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true'",
+            "steps.release-gate.outputs.should_run == 'true'",
+            "No releasable commits found; release-please PR creation is skipped.",
+        )
+    )
+
+
 def has_publish_dispatch_after_merge(workflow_text: str) -> bool:
     return bool(
         re.search(r"\bgh\s+workflow\s+run\s+release-please\.yml\b", workflow_text)
@@ -501,6 +517,21 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
         errors.append(
             f"{workflow_path}: workflow_dispatch mode=publish with skip-github-pull-request is required."
         )
+
+    release_trigger_types = workflow_policy.get("release_trigger_types")
+    if not isinstance(release_trigger_types, list) or not release_trigger_types:
+        errors.append("workflow.release_trigger_types must be a non-empty array.")
+        release_trigger_types = []
+    elif any(not isinstance(item, str) or not item.strip() for item in release_trigger_types):
+        errors.append("workflow.release_trigger_types entries must be non-empty strings.")
+
+    if workflow_policy.get("release_trigger_breaking_change") is not True:
+        errors.append("workflow.release_trigger_breaking_change must be true.")
+    if not has_release_trigger_gate(workflow_text):
+        errors.append(
+            f"{workflow_path}: push-triggered and workflow_dispatch mode=pr release-please runs must be gated by release_trigger_types and breaking-change detection."
+        )
+
     if not has_publish_dispatch_after_merge(workflow_text):
         errors.append(
             f"{workflow_path}: release PR merge path must dispatch workflow_dispatch mode=publish."
@@ -640,6 +671,13 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
             f"{config_path}: missing default package configuration at packages['.']."
         )
         return
+    if config_policy.get("root_package_only") is not True:
+        errors.append("release_please_config.root_package_only must be true.")
+    elif set(packages.keys()) != {"."}:
+        extra_packages = sorted(package for package in packages if package != ".")
+        errors.append(
+            f"{config_path}: release-please config must only define the root package '.', found extra packages: {', '.join(extra_packages)}."
+        )
 
     expected_title = config_policy.get("pull_request_title_pattern")
     if isinstance(expected_title, str):
@@ -659,6 +697,13 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
 
     if package_cfg.get("release-type") != "node":
         errors.append(f"{config_path}: packages['.'].release-type must be 'node'.")
+
+    if config_policy.get("include_component_in_tag") is not False:
+        errors.append("release_please_config.include_component_in_tag must be false.")
+    elif package_cfg.get("include-component-in-tag") is not False:
+        errors.append(
+            f"{config_path}: packages['.'].include-component-in-tag must be false so release gating can use v* tags."
+        )
 
     extra_files = package_cfg.get("extra-files")
     if extra_files is not None:

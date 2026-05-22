@@ -876,7 +876,21 @@ JSON
       "  release-please:" \
       "    runs-on: ubuntu-latest" \
       "    steps:" \
+      "      - name: Checkout repository for release gate and policy/config checks" \
+      "        if: \${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}" \
+      "        uses: actions/checkout@v4" \
+      "        with:" \
+      "          fetch-depth: 0" \
+      "          persist-credentials: false" \
+      "      - name: Detect releasable commits" \
+      "        id: release-gate" \
+      "        if: \${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}" \
+      "        run: |" \
+      "          release_trigger_types" \
+      "          release_trigger_breaking_change" \
+      "          echo \"No releasable commits found; release-please PR creation is skipped.\"" \
       "      - uses: googleapis/release-please-action@v4" \
+      "        if: \${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true' }}" \
       "        with:" \
       '          token: ${{ secrets.GITHUB_TOKEN }}' \
       "          skip-github-pull-request: \${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}" \
@@ -923,6 +937,7 @@ JSON
   "packages": {
     ".": {
       "release-type": "node",
+      "include-component-in-tag": false,
       "changelog-sections": [
         {
           "type": "feat",
@@ -951,6 +966,8 @@ JSON
     "label_gate_required": false,
     "github_token_required": true,
     "publish_mode_required": true,
+    "release_trigger_types": ["feat", "fix", "perf", "revert"],
+    "release_trigger_breaking_change": true,
     "plain_version_sync_required": true,
     "git_credential_helper_required": true,
     "forbid_inline_http_extraheader": true,
@@ -967,6 +984,8 @@ JSON
   "release_please_config": {
     "file": "release-please-config.json",
     "pull_request_title_pattern": "Release ${version}",
+    "root_package_only": true,
+    "include_component_in_tag": false,
     "require_full_changelog_types": true,
     "required_changelog_types": ["feat", "fix"]
   },
@@ -993,6 +1012,67 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 0 ]
+}
+
+@test "release_please_policy.py rejects workflow_dispatch pr bypassing release gate" {
+    local policy_file="$TEST_DIR/.github/release-please-policy.json"
+    local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
+    local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
+    local config_file="$TEST_DIR/release-please-config.json"
+    local manifest_file="$TEST_DIR/.release-please-manifest.json"
+    local settings_file="$TEST_DIR/.github/repository/pull-request-settings.json"
+
+    mkdir -p "$TEST_DIR/.github/workflows" "$TEST_DIR/.github/repository"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$policy_file"
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$workflow_file"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$lint_workflow_file"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$config_file"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$manifest_file"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$settings_file"
+
+    perl -0pi -e "s#\\(github\\.event_name == 'workflow_dispatch' && inputs\\.mode == 'publish'\\) \\|\\| steps\\.release-gate\\.outputs\\.should_run == 'true'#github.event_name == 'workflow_dispatch' || steps.release-gate.outputs.should_run == 'true'#" "$workflow_file"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"workflow_dispatch mode=pr release-please runs must be gated"* ]]
+}
+
+@test "release_please_policy.py rejects component-tag release config" {
+    local policy_file="$TEST_DIR/.github/release-please-policy.json"
+    local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
+    local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
+    local config_file="$TEST_DIR/release-please-config.json"
+    local manifest_file="$TEST_DIR/.release-please-manifest.json"
+    local settings_file="$TEST_DIR/.github/repository/pull-request-settings.json"
+
+    mkdir -p "$TEST_DIR/.github/workflows" "$TEST_DIR/.github/repository"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$policy_file"
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$workflow_file"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$lint_workflow_file"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$config_file"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$manifest_file"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$settings_file"
+
+    python3 - "$config_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8"))
+config["packages"]["."]["include-component-in-tag"] = True
+config["packages"]["packages/extra"] = {
+    "release-type": "node",
+    "include-component-in-tag": True,
+    "changelog-sections": [{"type": "feat", "section": "Features"}],
+}
+path.write_text(json.dumps(config), encoding="utf-8")
+PY
+
+    run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must only define the root package"* ]]
+    [[ "$output" == *"include-component-in-tag must be false"* ]]
 }
 
 @test "release_please_policy.py rejects policy redirecting workflow.file to non-release workflow" {

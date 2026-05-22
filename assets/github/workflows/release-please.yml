@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Mode: pr creates/updates the release PR; publish creates the tag and GitHub Release only."
+        description: "Mode: pr runs the releasable-commit gate before creating/updating the release PR; publish creates the tag and GitHub Release only."
         required: true
         default: "pr"
         type: choice
@@ -43,26 +43,93 @@ permissions:
 
 jobs:
   release-please:
-    if: ${{ github.event_name == 'push' || inputs.mode == 'publish' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository for release gate and policy/config checks
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect releasable commits
+        id: release-gate
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}
+        env:
+          RELEASE_PLEASE_POLICY_PATH: .github/release-please-policy.json
+        run: |
+          set -eu
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "jq not available."
+            exit 1
+          fi
+
+          if [ ! -f "$RELEASE_PLEASE_POLICY_PATH" ]; then
+            echo "Missing release-please policy file: $RELEASE_PLEASE_POLICY_PATH"
+            exit 1
+          fi
+
+          release_types="$(
+            jq -r '
+              .workflow.release_trigger_types
+              | if type == "array" then map(select(type == "string" and length > 0)) | join("|") else "" end
+            ' "$RELEASE_PLEASE_POLICY_PATH"
+          )"
+          if [ -z "$release_types" ]; then
+            echo "release_trigger_types must be a non-empty string array."
+            exit 1
+          fi
+
+          breaking_change="$(
+            jq -r '.workflow.release_trigger_breaking_change == true' "$RELEASE_PLEASE_POLICY_PATH"
+          )"
+
+          latest_tag=""
+          manifest_version=""
+          if [ -f ".release-please-manifest.json" ]; then
+            manifest_version="$(jq -r '."." // empty' .release-please-manifest.json 2>/dev/null || true)"
+          fi
+          if [ -n "$manifest_version" ] && git rev-parse --verify --quiet "v$manifest_version" >/dev/null; then
+            latest_tag="v$manifest_version"
+          else
+            latest_tag="$(git describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || true)"
+          fi
+
+          messages_file="$(mktemp)"
+          if [ -n "$latest_tag" ]; then
+            git log --format=%B "$latest_tag..HEAD" > "$messages_file"
+          else
+            git log --format=%B > "$messages_file"
+          fi
+
+          should_run=false
+          if grep -Eq "^(${release_types})(\\([^)]+\\))?!?:[[:space:]]+" "$messages_file"; then
+            should_run=true
+          elif [ "$breaking_change" = "true" ] && grep -Eq "^[A-Za-z]+(\\([^)]+\\))?!:[[:space:]]+" "$messages_file"; then
+            should_run=true
+          elif [ "$breaking_change" = "true" ] && grep -Eiq "^BREAKING[ -]CHANGE:" "$messages_file"; then
+            should_run=true
+          fi
+
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+          if [ "$should_run" = "true" ]; then
+            echo "Release-please will run because releasable commits were found."
+          else
+            echo "No releasable commits found; release-please PR creation is skipped."
+          fi
+
       - uses: googleapis/release-please-action@v4
         id: release
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true' }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-pull-request: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}
 
-      - name: Checkout repository for policy/config checks
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Merge release-please PR
-        if: ${{ github.event_name == 'push' && steps.release.outcome == 'success' }}
+        if: ${{ github.event_name == 'push' && steps.release-gate.outputs.should_run == 'true' && steps.release.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}

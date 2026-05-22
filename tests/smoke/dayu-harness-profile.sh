@@ -13,7 +13,7 @@ Usage: tests/smoke/dayu-harness-profile.sh [--profile local-fast|remote-smoke|re
 Profiles:
   local-fast      Run local generation and validation checks only.
   remote-smoke    Opt-in disposable GitHub repo smoke for Issue -> PR flow.
-  remote-release  Opt-in release-please remote flow; never treats workflow_dispatch as success.
+  remote-release  Opt-in release-please remote flow; checks docs/chore negative gates and feat positive trigger.
 
 Remote profiles are gated:
   RUN_DAYU_REMOTE_SMOKE=1 tests/smoke/dayu-harness-profile.sh --profile remote-smoke
@@ -212,7 +212,7 @@ run_remote_release() {
     require_cmd jq
     gh auth status >/dev/null
 
-    local owner repo tmp project vis head_sha release_pr_count
+    local owner repo tmp project vis docs_head_sha chore_head_sha head_sha release_pr_count
     owner="$(github_owner)"
     repo="${DAYU_REMOTE_REPO:-$owner/dayu-harness-remote-release-$(date +%s)}"
     tmp="$(mktemp -d "${TMPDIR:-/tmp}/dayu-remote-release.XXXXXX")"
@@ -231,8 +231,34 @@ run_remote_release() {
     gh api -X PUT "repos/$repo/actions/permissions/workflow" -f default_workflow_permissions=write -F can_approve_pull_request_reviews=true >/dev/null
 
     mkdir -p "$project/src"
-    printf 'remote release smoke %s\n' "$(date +%s)" > "$project/src/remote-release.txt"
+    printf 'remote release docs gate %s\n' "$(date +%s)" > "$project/src/remote-release.txt"
     git -C "$project" add .
+    git -C "$project" commit -m "docs: remote release smoke must not publish" >/dev/null
+    git -C "$project" push origin main >/dev/null
+    docs_head_sha="$(git -C "$project" rev-parse HEAD)"
+
+    wait_workflow_success "$repo" "release-please.yml" "$docs_head_sha" "push"
+    release_pr_count="$(gh pr list --repo "$repo" --state open --json title --jq '[.[] | select(.title | test("^Release "))] | length')"
+    if [ "$release_pr_count" -ne 0 ]; then
+        echo "docs: commit unexpectedly created a Release PR." >&2
+        exit 1
+    fi
+
+    printf 'remote release chore gate %s\n' "$(date +%s)" > "$project/src/remote-release.txt"
+    git -C "$project" add src/remote-release.txt
+    git -C "$project" commit -m "chore: remote release smoke must not publish" >/dev/null
+    git -C "$project" push origin main >/dev/null
+    chore_head_sha="$(git -C "$project" rev-parse HEAD)"
+
+    wait_workflow_success "$repo" "release-please.yml" "$chore_head_sha" "push"
+    release_pr_count="$(gh pr list --repo "$repo" --state open --json title --jq '[.[] | select(.title | test("^Release "))] | length')"
+    if [ "$release_pr_count" -ne 0 ]; then
+        echo "chore: commit unexpectedly created a Release PR." >&2
+        exit 1
+    fi
+
+    printf 'remote release smoke %s\n' "$(date +%s)" > "$project/src/remote-release.txt"
+    git -C "$project" add src/remote-release.txt
     git -C "$project" commit -m "feat: remote release smoke" >/dev/null
     git -C "$project" push origin main >/dev/null
     head_sha="$(git -C "$project" rev-parse HEAD)"
@@ -245,9 +271,9 @@ run_remote_release() {
     fi
 
     if [ "$JSON_MODE" = true ]; then
-        emit_json "pass" "$PROFILE" "remote-release passed for $repo from push-triggered release-please workflow."
+        emit_json "pass" "$PROFILE" "remote-release passed for $repo: docs/chore commits did not create Release PRs, and feat did."
     else
-        echo "remote-release passed for $repo from push-triggered release-please workflow."
+        echo "remote-release passed for $repo: docs/chore commits did not create Release PRs, and feat did."
     fi
 }
 

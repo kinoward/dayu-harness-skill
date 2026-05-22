@@ -53,6 +53,20 @@ Regular PAT owners and extra actor variables are not valid release PR bypasses. 
 
 Do not configure these sections as `hidden: true`. `release_please_policy.py` rejects hidden changelog sections so CHANGELOG and GitHub Release notes retain a complete historical record.
 
+## Release Trigger Boundary
+
+After a push trigger, `release-please.yml` first scans commits since the latest `v*` tag. It creates or updates a release PR only when one of these commits is present:
+
+- `feat`
+- `fix`
+- `perf`
+- `revert`
+- Any Conventional Commit with `!`, or `BREAKING CHANGE` / `BREAKING-CHANGE`
+
+`docs`, `style`, `test`, `build`, `ci`, `chore`, and ordinary `refactor` commits do not create a release PR by themselves, even when they match the workflow path filters. They remain in `release-please-config.json` changelog sections; when a later releasable commit appears in the same unreleased range, they are included in the next release PR changelog.
+
+The current template supports only the `packages["."]` root package and requires `include-component-in-tag: false`. The release gate uses the root version from `.release-please-manifest.json` and `v*` tags to calculate the unreleased commit range. If a project needs monorepo packages or component tags, extend the tag resolution logic in `.github/scripts/release_please_policy.py` and `release-please.yml` first.
+
 ## Path Filter Strategy
 
 `release-please` scope filtering is maintained in `.github/release-please-policy.json`. Path and package selection rules are configured in this policy file to avoid duplicating behavior in other release-please config.
