@@ -373,5 +373,5 @@ Merge plan:
 6. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 `scaffold.sh --dry-run` 与 diff-helper/manual review 产出对比描述。
 7. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`。
 8. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`；GitHub 能力启用时再执行 `scripts/github-remote.sh <project-root> --verify`。这些只属于结构/配置验证，不能替代 GitHub 端到端测试。
-9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验；目标仓库启用 `github.issue` + `github.pr` 且已执行 `--github-remote apply` 时，Skill 必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，测试 PR 保持打开不自动合并；`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR 合并和自动关闭；`remote-release` 只在显式开启时验证 release-please；不得用 `workflow_dispatch` 作为远端成功标准。
+9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验；目标仓库启用 `github.issue` + `github.pr` 且已执行 `--github-remote apply` 时，Skill 必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，随后关闭测试 PR、关闭测试 Issue 并删除测试分支；`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR 合并和自动关闭；`remote-release` 只在显式开启时验证 release-please 的 `docs:`/`chore:` 负向边界和 `feat:` 正向触发；不得用 `workflow_dispatch` 作为远端成功标准。
 10. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项。

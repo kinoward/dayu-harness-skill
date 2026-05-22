@@ -135,7 +135,7 @@ usage() {
     echo "  - --locale 选择模板语言。默认 zh-CN；en 将优先使用 manifest.template_files_i18n.en（如存在）"
     echo "  - --github-remote 控制 GitHub remote 编排。默认 auto：dry-run/check 只检查，apply 不推送；apply 需用户显式选择"
     echo "  - --github-repository / --github-visibility 显式指定远端仓库和可见性，等价于对应 DAYU_HARNESS_GITHUB_* 环境变量"
-    echo "  - --github-e2e 控制 GitHub Issue/PR 端到端验证。默认 auto：--github-remote apply 且启用 issue+pr 时创建测试 Issue/PR 并等待 PR checks"
+    echo "  - --github-e2e 控制 GitHub Issue/PR 端到端验证。默认 auto：--github-remote apply 且启用 issue+pr 时创建测试 Issue/PR，等待 PR checks 后清理测试产物"
     echo "  - --finalize-git auto 会在部署和本地验证通过后精确 stage managed_paths 并创建初始化提交；默认 skip"
 }
 
@@ -2151,9 +2151,22 @@ run_github_target_e2e() {
         return 0
     fi
 
-    restore_github_e2e_branch
+    if ! gh pr close "$pr_number" --repo "$repo" --comment "Dayu Harness GitHub E2E validation passed; closing this test PR without merge." --delete-branch >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation passed lint checks, but failed to close the test PR or delete the remote test branch." "$issue_url" "$pr_url" "$branch"
+        return 0
+    fi
+    if ! gh issue close "$issue_number" --repo "$repo" --comment "Dayu Harness GitHub E2E validation passed; closing this test issue." >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation passed lint checks and closed the test PR, but failed to close the test issue." "$issue_url" "$pr_url" "$branch"
+        return 0
+    fi
 
-    github_e2e_result_json "passed" "GitHub Issue/PR E2E validation passed; test PR is left open for review and is not merged by scaffold." "$issue_url" "$pr_url" "$branch"
+    restore_github_e2e_branch
+    if ! git -C "$TARGET" branch -D "$branch" >/dev/null 2>&1; then
+        fail_github_e2e "GitHub Issue/PR E2E validation passed, but failed to delete the local test branch." "$issue_url" "$pr_url" "$branch"
+        return 0
+    fi
+
+    github_e2e_result_json "passed" "GitHub Issue/PR E2E validation passed; test PR, test issue and test branch were closed or deleted without merging." "$issue_url" "$pr_url" "$branch"
 }
 
 do_dry_run() {

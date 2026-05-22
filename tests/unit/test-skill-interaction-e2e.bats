@@ -291,10 +291,11 @@ json_from_output() {
 	        echo "target E2E PR title must use natural language, not Conventional Commits"
 	        exit 1
 	    fi
-	    if grep -Fq "gh issue close" "$REPO_ROOT/scripts/scaffold.sh"; then
-	        echo "target E2E must not manually close issues"
-	        exit 1
-	    fi
+	    grep -Fq 'gh pr close "$pr_number"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq -- '--delete-branch' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'gh issue close "$issue_number"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'branch -D "$branch"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "test PR, test issue and test branch were closed or deleted without merging" "$REPO_ROOT/scripts/scaffold.sh"
 	}
 
 	@test "conversation replay: release settlement waits for init PR and validates origin default branch" {
@@ -468,6 +469,10 @@ json_from_output() {
     [[ "$output" == *"remote-release"* ]]
     grep -Fq "Depends on: #" "$profile_script"
     grep -Fq "createdAt" "$profile_script"
+    grep -Fq "docs: remote release smoke must not publish" "$profile_script"
+    grep -Fq "chore: remote release smoke must not publish" "$profile_script"
+    grep -Fq "unexpectedly created a Release PR" "$profile_script"
+    grep -Fq "docs/chore commits did not create Release PRs, and feat did" "$profile_script"
 
     run env RUN_DAYU_REMOTE_SMOKE=0 bash "$profile_script" --profile remote-smoke --json
     [ "$status" -eq 0 ]
