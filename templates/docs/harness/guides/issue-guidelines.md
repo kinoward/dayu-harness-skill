@@ -10,6 +10,15 @@
 
 ## 依赖关系约定
 
+Issue body 属于固定格式内容。AI 应先提取 summary、background、depends-on issue 编号等结构化字段，再用确定性工具生成正文：
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs issue-body \
+  --summary "需要处理的问题或任务" \
+  --background "必要背景" \
+  --depends-on 12
+```
+
 使用 `Depends on: #N` 表示处理顺序：
 
 - `Depends on: #N` 表示当前 Issue 依赖 N 号 Issue，应在 N 号 Issue 之后处理。

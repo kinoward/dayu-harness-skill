@@ -146,6 +146,7 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 - `AGENTS.md` 根治理入口，以及必要的子目录索引。
 - `docs/harness/` 下的协作指南、维护说明和检查脚本。
 - Git hooks、CI 工作流、提交规范、PR 指南和质量检查配置。
+- `dayu-format.mjs` 固定格式生成器，用于确定性生成 PR body、Issue body 和 commit message。
 - `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/` 等长期知识目录。
 - 仓库设置策略说明、Issue 依赖治理说明、可配置的 TDD 门禁策略文件，以及用户确认后才执行的 GitHub 远端设置同步。
 - `docs/product-specs/project-status.md` 及项目背景状态短快照入口。

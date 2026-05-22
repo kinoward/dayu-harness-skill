@@ -58,6 +58,11 @@
       "executable": true
     },
     {
+      "src": "templates/docs/harness/sensors/scripts/dayu-format.mjs",
+      "dst": "docs/harness/sensors/scripts/dayu-format.mjs",
+      "executable": true
+    },
+    {
       "src": "templates/docs/harness/sensors/reviews/AGENTS.md",
       "dst": "docs/harness/sensors/reviews/AGENTS.md"
     },
@@ -85,7 +90,8 @@
     "Harness indexes exist",
     "Generated docs index exists",
     "Maintenance scripts AGENTS index exists",
-    "Maintenance scripts are executable"
+    "Maintenance scripts are executable",
+    "Fixed-format content renderer exists"
   ],
   "suggested_when": "Always deploy in every scaffold run.",
   "template_files_i18n": {
@@ -140,6 +146,11 @@
       {
         "src": "templates.en/docs/harness/sensors/scripts/validate.sh",
         "dst": "docs/harness/sensors/scripts/validate.sh",
+        "executable": true
+      },
+      {
+        "src": "templates.en/docs/harness/sensors/scripts/dayu-format.mjs",
+        "dst": "docs/harness/sensors/scripts/dayu-format.mjs",
         "executable": true
       },
       {

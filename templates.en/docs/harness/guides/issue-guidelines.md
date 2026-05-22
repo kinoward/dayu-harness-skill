@@ -10,6 +10,15 @@
 
 ## Dependency Convention
 
+Issue bodies are fixed-format content. AI should extract structured fields such as summary, background, and depends-on issue numbers, then generate the body with deterministic tooling:
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs issue-body \
+  --summary "Problem or task to handle" \
+  --background "Relevant context" \
+  --depends-on 12
+```
+
 Use `Depends on: #N` to express ordering:
 
 - `Depends on: #N` means the current issue should be handled after issue `#N`.

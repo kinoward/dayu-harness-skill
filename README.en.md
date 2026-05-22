@@ -146,6 +146,7 @@ Dayu Harness Skill organizes project collaboration rules into the target reposit
 - A root `AGENTS.md` governance entrypoint and required subdirectory indexes.
 - Collaboration guides, maintenance instructions, and check scripts under `docs/harness/`.
 - Git hooks, CI workflows, commit conventions, PR guidelines, and quality check configs.
+- The `dayu-format.mjs` fixed-format renderer for deterministic PR bodies, issue bodies, and commit messages.
 - Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
 - Repository settings policy docs, Issue dependency guidance, configurable TDD gate strategy files, and GitHub remote settings sync only after user confirmation.
 - `docs/product-specs/project-status.md` as a short project status snapshot entry point.

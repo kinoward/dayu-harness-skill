@@ -13,6 +13,21 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 
 ## PR 正文模板
 
+PR body 属于固定格式内容。AI 不应自由生成整段 Markdown；应先收集结构化字段（summary、implementation notes、test commands、issue number、是否 final），再用确定性工具渲染：
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs pr-body \
+  --summary "用户可读的变更摘要" \
+  --implementation "关键实现说明" \
+  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --issue 123 \
+  --final yes > /tmp/pr-body.md
+
+gh pr create --title "自然语言 PR 标题" --body-file /tmp/pr-body.md
+```
+
+如项目团队已有其他固定模板或内部 CLI，也应采用“结构化输入 -> 脚本/模板渲染 -> validator 校验”的流程，模型只负责提供字段值和解释校验结果。
+
 三段结构 + Issue 关联 trailer：
 
 ```markdown

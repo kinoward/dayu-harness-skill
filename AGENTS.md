@@ -133,6 +133,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 | `docs/harness/sensors/scripts/validate.sh --json <project-root>` | 在目标项目中检查启用的 hooks、配置和工作流。 |
 | `docs/harness/sensors/scripts/audit.sh --json <project-root>` | 检查入口文件、文档索引和治理结构完整性。 |
 | `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>` | 检查文档链接、索引同步和孤儿文档。 |
+| `docs/harness/sensors/scripts/dayu-format.mjs pr-body|issue-body|commit-message ...` | 确定性生成 PR、Issue、commit 等固定格式内容。 |
 | `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>` | 为已有文件和即将写入文件生成结构化合并建议。 |
 
 ## 目标项目产物
@@ -167,6 +168,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 │   │       │   ├── AGENTS.md
 │   │       │   ├── audit.sh
 │   │       │   ├── check-consistency.sh
+│   │       │   ├── dayu-format.mjs
 │   │       │   ├── diff-helper.sh
 │   │       │   └── validate.sh
 │   │       └── reviews/

@@ -20,6 +20,19 @@ type(scope): description
 - `docs: update API usage instructions`
 - `chore: add gitignore`
 
+## 固定格式生成
+
+Commit message 属于固定格式内容。AI 不应只凭自由文本拼写最终提交信息；应优先使用确定性工具生成或校验：
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs commit-message \
+  --type test \
+  --scope harness \
+  --subject "verify deployment smoke checks"
+```
+
+也可以使用成熟 CLI，例如 Commitizen/cz-git 交互式生成 Conventional Commits，再由 commitlint 校验。模型负责判断 type/scope/subject 的语义是否合适，不负责绕过格式工具。
+
 ## 提交原则
 
 - 按逻辑变更拆分 commit，每个 commit 仅含单一职责

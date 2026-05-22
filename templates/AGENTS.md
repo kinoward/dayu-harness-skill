@@ -45,12 +45,13 @@
 > 触发：每次 git commit 前或 hook 拒绝时
 - 读取 `docs/harness/guides/commit-guidelines.md`
 - 读取 `docs/harness/guides/ai-execution.md`
+- 固定格式提交信息优先由 `docs/harness/sensors/scripts/dayu-format.mjs commit-message ...` 或 Commitizen/cz-git 等 CLI 生成，不让模型自由拼写格式
 
 ## 当你准备创建或修改 PR
 
 > 触发：创建 PR、修正文案、CI 反馈失败
 - 本项目已启用 `github.pr`，请读取 `docs/harness/guides/pr-guidelines.md`
-- 本项目已启用 `github.pr`，请按 `Summary / Implementation notes / Test plan` 写 PR body
+- 本项目已启用 `github.pr`，PR body 优先由 `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...` 生成，再通过 `gh pr create --body-file` 使用
 - 关闭 issue 使用 GitHub closing keyword trailer，例如 `Closes #123`
 
 ## 当你发布版本、审阅 PR、排查环境

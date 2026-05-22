@@ -13,6 +13,21 @@ Requirements:
 
 ## PR Body Template
 
+PR bodies are fixed-format content. AI should not freely compose the full Markdown document. Collect structured fields first (summary, implementation notes, test commands, issue number, final/non-final status), then render them with deterministic tooling:
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs pr-body \
+  --summary "Readable change summary" \
+  --implementation "Key implementation note" \
+  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --issue 123 \
+  --final yes > /tmp/pr-body.md
+
+gh pr create --title "Natural language PR title" --body-file /tmp/pr-body.md
+```
+
+If the team already has another fixed template or internal CLI, use the same flow: structured input -> script/template rendering -> validator check. The model should provide field values and explain validation results, not free-form the final format.
+
 Three sections + issue trailer:
 
 ```markdown
