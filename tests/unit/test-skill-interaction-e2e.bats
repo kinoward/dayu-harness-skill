@@ -140,10 +140,15 @@ json_from_output() {
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable "$enabled" --strategy merge
     echo "$output" | jq -e '.status == "ok"'
-    echo "$output" | jq -e '.applied_count == 35'
+    echo "$output" | jq -e '.applied_count == 36'
     echo "$output" | jq -e '.validation == "passed"'
     echo "$output" | jq -e '.post_apply_checks.status == "passed"'
-    echo "$output" | jq -e '.post_apply_checks.checks | map(.name) == ["validate","audit","check-consistency"]'
+    echo "$output" | jq -e '.post_apply_checks.checks | map(.name) == ["validate","audit","check-consistency","capability-smoke"]'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="project.gitignore" and .name=="gitignore-rules" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="git.commit-format" and .name=="commitlint-cli" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="git.commit-format" and .name=="commit-msg-hook" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="quality.node-tooling" and .name=="tooling-cli" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="quality.node-tooling" and .name=="pre-commit-hook" and .status=="passed")'
     echo "$output" | jq -e '.managed_paths | index("package-lock.json")'
     echo "$output" | jq -e '.managed_paths | index(".claude/") | not'
     echo "$output" | jq -e '.managed_paths | index("skills-lock.json") | not'
@@ -164,6 +169,7 @@ json_from_output() {
     jq -e '.version == "0.1.0" and .packages[""].version == "0.1.0"' "$project_dir/package-lock.json"
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.cjs"
+    assert_path "$project_dir/docs/harness/sensors/scripts/dayu-format.mjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
     assert_path "$project_dir/docs/product-specs/project-status.md"
     assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
@@ -279,8 +285,12 @@ json_from_output() {
 	    [ -n "$issue_line" ]
 	    [ -n "$pr_line" ]
 	    [ "$issue_line" -lt "$pr_line" ]
-	    grep -Fq "Final PR: yes" "$REPO_ROOT/scripts/scaffold.sh"
-	    grep -Fq 'Closes #$issue_number' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "render_dayu_pr_body" "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "Dayu Harness GitHub E2E verification" "$REPO_ROOT/scripts/scaffold.sh"
+	    if grep -Fq 'title "test: verify Dayu Harness GitHub E2E"' "$REPO_ROOT/scripts/scaffold.sh"; then
+	        echo "target E2E PR title must use natural language, not Conventional Commits"
+	        exit 1
+	    fi
 	    if grep -Fq "gh issue close" "$REPO_ROOT/scripts/scaffold.sh"; then
 	        echo "target E2E must not manually close issues"
 	        exit 1
@@ -291,7 +301,7 @@ json_from_output() {
 	    grep -Fq 'github_remote_initialization_pr_pending "$apply_json"' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'Release post-remote revalidation waits until the initialization PR is merged' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'git -C "$TARGET" worktree add --detach "$tmp_worktree" "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
-	    grep -Fq 'run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT" "$@"' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'if [ "$local_head" = "$remote_head" ]; then' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'git -C "$TARGET" merge-base --is-ancestor HEAD "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
 	    if grep -Fq 'refresh_status="skipped"' "$REPO_ROOT/scripts/scaffold.sh"; then
@@ -301,13 +311,13 @@ json_from_output() {
 	}
 
 	@test "conversation replay: initialization PR body follows Dayu PR template" {
-	    grep -Fq "## Summary" "$REPO_ROOT/scripts/github-remote.sh"
-	    grep -Fq "<!-- dayu-harness:summary -->" "$REPO_ROOT/scripts/github-remote.sh"
-	    grep -Fq "## Implementation notes" "$REPO_ROOT/scripts/github-remote.sh"
-	    grep -Fq "<!-- dayu-harness:implementation-notes -->" "$REPO_ROOT/scripts/github-remote.sh"
-	    grep -Fq "## Test plan" "$REPO_ROOT/scripts/github-remote.sh"
-	    grep -Fq "<!-- dayu-harness:test-plan -->" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "render_dayu_pr_body" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "Initialize Dayu Harness governance" "$REPO_ROOT/scripts/github-remote.sh"
 	    grep -Fq "Final PR: yes" "$REPO_ROOT/scripts/github-remote.sh"
+	    if grep -Fq 'title "chore: initialize Dayu Harness"' "$REPO_ROOT/scripts/github-remote.sh"; then
+	        echo "initialization PR title must use natural language, not Conventional Commits"
+	        exit 1
+	    fi
 	}
 
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {

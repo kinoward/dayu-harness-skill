@@ -457,6 +457,7 @@ expected_agents_h1() {
     jq -e '.template_files[] | select(.src == "templates/docs/harness/maintenance.md" and .dst == "docs/harness/maintenance.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/harness/AGENTS.md" and .dst == "docs/harness/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/harness/sensors/scripts/AGENTS.md" and .dst == "docs/harness/sensors/scripts/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/harness/sensors/scripts/dayu-format.mjs" and .dst == "docs/harness/sensors/scripts/dayu-format.mjs" and .executable == true)' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/exec-plans/AGENTS.md" and .dst == "docs/exec-plans/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/generated/AGENTS.md" and .dst == "docs/generated/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.acceptance | index("Harness indexes exist")' "$REPO_ROOT/capabilities/core.json"
@@ -481,6 +482,7 @@ expected_agents_h1() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/check-consistency.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/diff-helper.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/validate.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/dayu-format.mjs")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/commit-guidelines.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/ai-execution.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/design-docs/AGENTS.md")] | length == 1'

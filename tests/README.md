@@ -36,7 +36,7 @@
 
 - 空项目：模拟用户用旧 id 追加质量能力，验证默认 Git/知识库能力与兼容展开后的新原子能力。
 - 已有项目：模拟用户在默认能力基础上追加 GitHub PR、分支保护、版本保护和质量工具，明确跳过 release-please，并确认 merge 既有 hook。
-- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh`、`commit-msg`、`pre-push` main 分支保护和 release tag 保护。
+- 部署后能力：验证 `validate.sh`、`audit.sh`、`check-consistency.sh` 与 `capability-smoke`，覆盖所有已部署能力的 manifest 文件、`.gitignore`、`dayu-format.mjs`、commitlint CLI、`commit-msg`、linter CLI、pre-commit lint-staged、`pre-push` main 分支保护和 release tag 保护。
 - 融合行为：验证已有项目中的 `CLAUDE.md`、根 `AGENTS.md` 断链和孤儿旧文档在用户确认后被修复并纳入渐进式文档索引。
 - 双语部署：分别部署默认中文与 `--locale en` 英文产物，使用 [helpers/compare-i18n-deployments.sh](helpers/compare-i18n-deployments.sh) 验证真实治理产物只有语言差异，且 Git 约束存在、GitHub 约束不存在。
 

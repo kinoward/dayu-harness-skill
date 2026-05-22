@@ -140,6 +140,12 @@ JSON
         exit 0
         ;;
       "repos/$REPO/rulesets")
+        if [ "$SCENARIO" = "ruleset_detail_only" ]; then
+          cat <<JSON
+[{"id":42,"name":"protect-main","conditions":null},{"id":43,"name":"protect-tags","conditions":null}]
+JSON
+          exit 0
+        fi
         if [ "$SCENARIO" = "real_arrays" ]; then
           cat <<JSON
 [{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}},{"id":43,"name":"protect-tags","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}}}]
@@ -161,6 +167,18 @@ JSON
 {"total_count":2,"rulesets":[{"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}},{"name":"protect-tags"}]}
 JSON
         fi
+        exit 0
+        ;;
+      "repos/$REPO/rulesets/42")
+        cat <<JSON
+{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}}
+JSON
+        exit 0
+        ;;
+      "repos/$REPO/rulesets/43")
+        cat <<JSON
+{"id":43,"name":"protect-tags","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}}}
+JSON
         exit 0
         ;;
       "repos/$REPO/actions/secrets")
@@ -875,4 +893,25 @@ JSON
     echo "$output" | jq -e '.items | any(.kind=="branches" and .status=="ok" and (.present | index("main") != null))'
     echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="ok" and (.present | index("protect-main") != null) and (.present | index("protect-tags") != null))'
     echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .status=="ok" and (.present | index("can_approve_pull_request_reviews=true") != null))'
+}
+
+@test "github-remote --verify fetches ruleset detail when list omits conditions" {
+    local repo_dir="$TEST_DIR/verify-ruleset-detail-only"
+    local call_log="$TEST_DIR/ruleset-detail.log"
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/verify-ruleset-detail.git"
+
+    export DAYU_HARNESS_GH_SCENARIO="ruleset_detail_only"
+    export DAYU_HARNESS_GH_REPO="acme/verify-ruleset-detail"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/verify-ruleset-detail"
+    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
+    write_fake_gh ruleset_detail_only
+
+    run bash "$SCRIPT" "$repo_dir" --verify
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="ok" and (.missing == []))'
+    grep -Fq "api repos/acme/verify-ruleset-detail/rulesets/42" "$call_log"
 }

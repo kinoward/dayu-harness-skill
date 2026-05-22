@@ -147,6 +147,48 @@ JSON
     [ "$status" -eq 0 ]
 }
 
+@test "dayu-format.mjs renders PR body accepted by validator" {
+    local body_file="$TEST_DIR/rendered-pr-body.md"
+
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" pr-body \
+      --summary "verify deterministic renderer" \
+      --implementation "render a strict Dayu PR body" \
+      --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+      --issue 42 \
+      --final yes
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" > "$body_file"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dayu-format.mjs renders issue body accepted by dependency validator" {
+    local payload="$TEST_DIR/rendered-issue-payload.json"
+    local body
+
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" issue-body \
+      --summary "verify deterministic issue renderer" \
+      --background "local unit test" \
+      --depends-on 12
+    [ "$status" -eq 0 ]
+    body="$output"
+
+    jq -n --arg body "$body" '{issue:{body:$body}}' > "$payload"
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: Issue depends-on line is valid."* ]]
+}
+
+@test "dayu-format.mjs renders conventional commit messages" {
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" commit-message \
+      --type test \
+      --scope harness \
+      --subject "verify deterministic formatting"
+    [ "$status" -eq 0 ]
+    [ "$output" = "test(harness): verify deterministic formatting" ]
+}
+
 @test "pr_body_structure.py blocks closing keyword while sibling PR remains open" {
     local body_file="$TEST_DIR/pr-body-final.md"
     local open_prs="$TEST_DIR/open-prs.json"
