@@ -39,6 +39,7 @@ After deployment, target project behavior does not depend on internal Skill file
 - **Subdirectories must have AGENTS.md**: every direct `docs/` subdirectory must contain its own entrypoint AGENTS.
 - **Index-only indexing**: `AGENTS.md` should contain only heading + trigger + links; detailed content lives in standalone documents.
 - **Index sync**: maintain directory lists, links, and `## Directory Index` together to avoid drift from real files or enabled capabilities.
+- **Use scripts for fixed formats**: PR bodies, issue bodies, commit messages, and similar fixed-format content should be generated and validated with deterministic tools such as `docs/harness/sensors/scripts/dayu-format.mjs`, GitHub CLI, Commitizen/cz-git, and commitlint. AI provides structured fields, explains errors, and drives fixes; it should not freely compose the final format.
 
 ### Trigger Block Format
 
@@ -130,6 +131,7 @@ Prefer `docs/harness/sensors/scripts/audit.sh` when present. If unavailable, per
 3. **Coupled Constraint Completeness**
    - Coupled components are deployed and executable according to capability manifest
    - Each rule in coupling tables maps to both documentation and coupled components
+   - The completion report's `capability-smoke` covers the capabilities deployed in this run; if no script entrypoint exists, manually spot-check the corresponding hooks, linters, PR/Issue/TDD/release helpers
 
 4. **Naming Standards**
    - File names should be lowercase letters and hyphens
@@ -197,7 +199,8 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 | `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | Complex configuration should still be reviewed by humans |
 | `project.gitignore` | .gitignore installer | Select Node/Python/Go/Rust/Java/Dotnet templates from the `github/gitignore` snapshot by project contents, then append Dayu local exclusions |
 | `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | GitHub-only; depends on `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`; uses `GITHUB_TOKEN` and workflow permissions |
-| `diagnostics` | audit.sh + check-consistency.sh | Automated documentation integrity checks |
+| Fixed-format content | `dayu-format.mjs` | Deterministically renders PR bodies, issue bodies, and commit messages; use with GitHub CLI, commitlint, and PR/Issue validators |
+| `diagnostics` | audit.sh + check-consistency.sh + validate.sh | Automated documentation integrity and post-deployment status checks |
 
 > Document-only capabilities (`ai.execution`, `ai.memory`, knowledge directories) are enforced with `default=true` and are not asked in capability questions. Optional capabilities remain under manifest control.
 

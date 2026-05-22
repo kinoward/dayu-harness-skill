@@ -613,13 +613,16 @@ assess_remote_sync_state() {
 }
 
 push_initialization_pr() {
-    local short_sha init_branch init_issue_url init_issue_number issue_output issue_rc pr_body push_output push_rc pr_output pr_rc
+    local short_sha init_branch init_issue_url init_issue_number issue_body issue_output issue_rc pr_body push_output push_rc pr_output pr_rc
 
     short_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
     init_branch="dayu-harness/init-${short_sha}"
+    issue_body="$(render_dayu_issue_body \
+      "Track the Dayu Harness initialization PR for ${DEFAULT_BRANCH}." \
+      "Created by github-remote.sh so initialization remains issue-first and PR lint can close the loop automatically.")"
 
     set +e
-    issue_output="$(gh issue create --repo "$REPOSITORY" --title "chore: initialize Dayu Harness" --body "Track the Dayu Harness initialization PR for ${DEFAULT_BRANCH}. This issue is created by github-remote.sh so initialization remains issue-first and PR lint can close the loop automatically." 2>&1)"
+    issue_output="$(gh issue create --repo "$REPOSITORY" --title "Initialize Dayu Harness governance" --body "$issue_body" 2>&1)"
     issue_rc=$?
     set -e
     if [ "$issue_rc" -eq 0 ] && [ -n "$issue_output" ]; then
@@ -631,27 +634,13 @@ push_initialization_pr() {
         return 1
     fi
 
-    pr_body="## Summary
-<!-- dayu-harness:summary -->
-
-- Initialize Dayu Harness governance through an initialization branch.
-- Keep remote ${DEFAULT_BRANCH} synchronized through a PR without force push.
-
-## Implementation notes
-<!-- dayu-harness:implementation-notes -->
-
-- Remote ${DEFAULT_BRANCH} may already be ahead, diverged, or protected from direct local pushes.
-- This PR contains the managed initialization output staged by Dayu Harness.
-
-## Test plan
-<!-- dayu-harness:test-plan -->
-
-- [x] \`docs/harness/sensors/scripts/validate.sh --json .\`
-- [x] \`git push -u origin HEAD:${init_branch}\`
-
-Final PR: yes"
-    pr_body="${pr_body}
-Closes #${init_issue_number}"
+    pr_body="$(render_dayu_pr_body "$init_issue_number" \
+      "Initialize Dayu Harness governance through an initialization branch." \
+      "Keep remote ${DEFAULT_BRANCH} synchronized through a PR without force push." \
+      "Remote ${DEFAULT_BRANCH} may already be ahead, diverged, or protected from direct local pushes." \
+      "This PR contains the managed initialization output staged by Dayu Harness." \
+      "docs/harness/sensors/scripts/validate.sh --json ." \
+      "git push -u origin HEAD:${init_branch}")"
 
     set +e
     push_output="$(git -C "$TARGET" push -u origin "HEAD:${init_branch}" 2>&1)"
@@ -666,7 +655,7 @@ Closes #${init_issue_number}"
     add_item "{\"kind\":\"remote\",\"action\":\"push_init_branch\",\"branch\":\"$(json_escape "$init_branch")\",\"status\":\"ok\",\"description_nl\":\"已推送初始化分支 ${init_branch}，未使用 force push。\"}" "ok"
 
     set +e
-    pr_output="$(gh pr create --repo "$REPOSITORY" --base "$DEFAULT_BRANCH" --head "$init_branch" --title "chore: initialize Dayu Harness" --body "$pr_body" 2>&1)"
+    pr_output="$(gh pr create --repo "$REPOSITORY" --base "$DEFAULT_BRANCH" --head "$init_branch" --title "Initialize Dayu Harness governance" --body "$pr_body" 2>&1)"
     pr_rc=$?
     set -e
 
@@ -691,6 +680,88 @@ default_branch_direct_push_blocked() {
     local hook="$TARGET/.husky/pre-push"
     [ -f "$hook" ] || return 1
     grep -Fq 'direct push to $ref_name is not allowed' "$hook" 2>/dev/null || grep -Fq 'direct push to' "$hook" 2>/dev/null
+}
+
+render_dayu_issue_body() {
+    local summary="$1"
+    local background="$2"
+    local formatter="$TARGET/docs/harness/sensors/scripts/dayu-format.mjs"
+    local rendered formatter_rc
+
+    if [ -f "$formatter" ] && command -v node >/dev/null 2>&1; then
+        set +e
+        rendered="$(node "$formatter" issue-body --summary "$summary" --background "$background" 2>/dev/null)"
+        formatter_rc=$?
+        set -e
+        if [ "$formatter_rc" -eq 0 ] && [ -n "$rendered" ]; then
+            printf '%s\n' "$rendered"
+            return 0
+        fi
+    fi
+
+    cat <<EOF
+## Summary
+
+- $summary
+
+## Background
+
+- $background
+EOF
+}
+
+render_dayu_pr_body() {
+    local issue="$1"
+    local summary_one="$2"
+    local summary_two="$3"
+    local implementation_one="$4"
+    local implementation_two="$5"
+    local command_one="$6"
+    local command_two="$7"
+    local formatter="$TARGET/docs/harness/sensors/scripts/dayu-format.mjs"
+    local rendered formatter_rc
+
+    if [ -f "$formatter" ] && command -v node >/dev/null 2>&1; then
+        set +e
+        rendered="$(node "$formatter" pr-body \
+          --summary "$summary_one" \
+          --summary "$summary_two" \
+          --implementation "$implementation_one" \
+          --implementation "$implementation_two" \
+          --test-command "$command_one" \
+          --test-command "$command_two" \
+          --issue "$issue" \
+          --final yes 2>/dev/null)"
+        formatter_rc=$?
+        set -e
+        if [ "$formatter_rc" -eq 0 ] && [ -n "$rendered" ]; then
+            printf '%s\n' "$rendered"
+            return 0
+        fi
+    fi
+
+    cat <<EOF
+## Summary
+<!-- dayu-harness:summary -->
+
+- $summary_one
+- $summary_two
+
+## Implementation notes
+<!-- dayu-harness:implementation-notes -->
+
+- $implementation_one
+- $implementation_two
+
+## Test plan
+<!-- dayu-harness:test-plan -->
+
+- [x] \`$command_one\`
+- [x] \`$command_two\`
+
+Final PR: yes
+Closes #$issue
+EOF
 }
 
 check_mode() {
@@ -887,6 +958,38 @@ ruleset_id_for_name() {
     local rulesets_json="$1"
     local ruleset_name="$2"
     printf '%s' "$rulesets_json" | jq -r --arg name "$ruleset_name" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == $name) | (.id // empty)' 2>/dev/null | sed -n '1p'
+}
+
+ruleset_json_for_name() {
+    local rulesets_json="$1"
+    local ruleset_name="$2"
+    local ruleset_id list_entry detail
+
+    list_entry="$(printf '%s' "$rulesets_json" | jq -c --arg name "$ruleset_name" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == $name)' 2>/dev/null | sed -n '1p')"
+    if [ -n "$list_entry" ] && printf '%s' "$list_entry" | jq -e '.conditions != null' >/dev/null 2>&1; then
+        printf '%s' "$list_entry"
+        return 0
+    fi
+
+    ruleset_id="$(printf '%s' "$list_entry" | jq -r '.id // empty' 2>/dev/null | sed -n '1p')"
+    if [ -z "$ruleset_id" ]; then
+        ruleset_id="$(ruleset_id_for_name "$rulesets_json" "$ruleset_name")"
+    fi
+    [ -n "$ruleset_id" ] || return 1
+
+    detail="$(gh api "repos/$REPOSITORY/rulesets/$ruleset_id" 2>/dev/null || true)"
+    [ -n "$detail" ] || return 1
+    printf '%s' "$detail"
+}
+
+ruleset_ref_includes() {
+    local rulesets_json="$1"
+    local ruleset_name="$2"
+    local ref="$3"
+    local detail
+    detail="$(ruleset_json_for_name "$rulesets_json" "$ruleset_name" 2>/dev/null || true)"
+    [ -n "$detail" ] || return 1
+    printf '%s' "$detail" | jq -e --arg ref "$ref" '(.conditions.ref_name.include // []) | index($ref)' >/dev/null 2>&1
 }
 
 apply_ruleset_file() {
@@ -1101,7 +1204,7 @@ verify_mode() {
                 continue
             fi
             if [ "$req" = "protect-main" ] && [ -n "$DEFAULT_BRANCH" ]; then
-                if ! printf '%s' "$rulesets_json" | jq -e --arg ref "refs/heads/$DEFAULT_BRANCH" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == "protect-main") | (.conditions.ref_name.include // []) | index($ref)' >/dev/null 2>&1; then
+                if ! ruleset_ref_includes "$rulesets_json" "protect-main" "refs/heads/$DEFAULT_BRANCH"; then
                     if [ -n "$missing_rulesets" ]; then
                         missing_rulesets+=$'\n'
                     fi

@@ -63,7 +63,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 的交互门禁询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
 4. 展示确认汇总
 5. 用户确认后：调用 `scaffold.sh --dry-run --enable <optional capability ids>` 预览变更 → 对已有配置确认策略 → `scaffold.sh --apply --finalize-git auto --enable <optional capability ids>`（如有冲突再加 `--strategy`，如用户已确认远端同步再加 `--github-remote apply`；启用 GitHub Issue/PR 且需跳过目标仓库 E2E 时必须显式追加 `--github-e2e skip`）复制默认与可选模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
-6. `scaffold.sh --apply` 必须先完成 `validate/audit/check-consistency`，通过后再精确 stage managed paths、创建初始化提交，并按远端状态推送默认分支或创建初始化 PR；启用 GitHub Issue/PR 且远端同步成功后，必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，测试 PR 保持打开不自动合并；随后使用完成报告模板向用户汇报
+6. `scaffold.sh --apply` 必须先完成 `validate/audit/check-consistency/capability-smoke`，通过后再精确 stage managed paths、创建初始化提交，并按远端状态推送默认分支或创建初始化 PR；启用 GitHub Issue/PR 且远端同步成功后，必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，测试 PR 保持打开不自动合并；随后使用完成报告模板向用户汇报
 
 ### 2. 诊断
 
@@ -114,8 +114,9 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 1. `docs/harness/sensors/scripts/validate.sh --json <project-root>`：检查已启用的 hooks、配置和 workflow 是否可用。
 2. `docs/harness/sensors/scripts/audit.sh --json <project-root>`：检查 `AGENTS.md`、`CLAUDE.md`、docs 索引和维护脚本是否完整。
 3. `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`：检查文档链接、索引和孤儿文档。
+4. `scaffold.sh --apply` 输出中的 `post_apply_checks.capability-smoke`：必须覆盖本次所有已部署能力的 manifest 文件存在性和关键行为，包括 `.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy 和 release-please policy。不能只测试 GitHub 相关能力。
 
-以上三项属于本地结构/配置验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；该测试 PR 默认保持打开，不自动合并。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
+以上本地检查属于结构/配置/关键行为验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；该测试 PR 默认保持打开，不自动合并。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
 
 如果脚本不存在或暂时不可执行，按目标项目中的 `docs/harness/maintenance.md` 手动检查关键路径。
 
@@ -124,7 +125,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 - 检查通过：按 [docs/completion-report-template.md](docs/completion-report-template.md) 汇报已启用能力、已确认事项和未启用事项。
 - 检查发现可确定修复的问题：先修复，再重新运行检查。
 - 检查发现需要用户取舍的问题：说明影响，按交互门禁获取用户选择，不输出大段原始日志。
-- 未启用的能力出现 skip 或可选缺失时，不作为失败汇报，只说明这次没有安装相关内容。
+- `partial`、`failed`、`needs_user_action`、`skipped` 不能被改写成成功；必须说明对应影响。未启用的能力出现 skip 或可选缺失时，不作为失败汇报，只说明这次没有安装相关内容。
 
 ## 部署后的项目知识/经验沉淀约定
 
@@ -171,6 +172,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 - 环境前置脚本 `ensure-environment.sh --check [--capabilities "<resolved ids>"]` 必须输出统一字段：`status`、`items`、`summary`、`description_nl`；其中 `status` 至少支持 `ok/needs_install/needs_initialization/needs_user_action/error`
 - 退出码：0=成功/无变更，1=检测到冲突/失败，2=脚本自身错误
 - LLM 不应自行解析原始 diff 或文件内容来替代脚本的结构化输出
+- PR body、Issue body、commit message 等固定格式内容必须优先由 `docs/harness/sensors/scripts/dayu-format.mjs`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；LLM 只负责结构化输入字段和结果解释。
 
 ## 能力清单约定
 

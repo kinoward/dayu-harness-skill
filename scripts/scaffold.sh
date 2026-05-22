@@ -609,6 +609,16 @@ selected_has_release_please_capability() {
     return 1
 }
 
+selected_has_capability() {
+    local wanted="$1"
+    shift || true
+    local cap_id
+    for cap_id in "$@"; do
+        [ "$cap_id" = "$wanted" ] && return 0
+    done
+    return 1
+}
+
 run_github_remote() {
     local mode="$1"
     shift || true
@@ -1282,11 +1292,346 @@ json_payload_from_output() {
     awk 'BEGIN {emit=0} /^[[:space:]]*\{/ {emit=1} emit {print}'
 }
 
+render_dayu_issue_body() {
+    local summary="$1"
+    local background="${2:-}"
+    local formatter="$TARGET/docs/harness/sensors/scripts/dayu-format.mjs"
+    local rendered formatter_rc
+
+    if [ -f "$formatter" ] && command -v node >/dev/null 2>&1; then
+        set +e
+        rendered="$(node "$formatter" issue-body --summary "$summary" --background "$background" 2>/dev/null)"
+        formatter_rc=$?
+        set -e
+        if [ "$formatter_rc" -eq 0 ] && [ -n "$rendered" ]; then
+            printf '%s\n' "$rendered"
+            return 0
+        fi
+    fi
+
+    cat <<EOF
+## Summary
+
+- $summary
+
+## Background
+
+- $background
+EOF
+}
+
+render_dayu_pr_body() {
+    local issue="$1"
+    local summary="$2"
+    local implementation="$3"
+    local command_one="$4"
+    local command_two="${5:-}"
+    local formatter="$TARGET/docs/harness/sensors/scripts/dayu-format.mjs"
+    local rendered formatter_rc
+
+    if [ -f "$formatter" ] && command -v node >/dev/null 2>&1; then
+        set +e
+        if [ -n "$command_two" ]; then
+            rendered="$(node "$formatter" pr-body --summary "$summary" --implementation "$implementation" --test-command "$command_one" --test-command "$command_two" --issue "$issue" --final yes 2>/dev/null)"
+        else
+            rendered="$(node "$formatter" pr-body --summary "$summary" --implementation "$implementation" --test-command "$command_one" --issue "$issue" --final yes 2>/dev/null)"
+        fi
+        formatter_rc=$?
+        set -e
+        if [ "$formatter_rc" -eq 0 ] && [ -n "$rendered" ]; then
+            printf '%s\n' "$rendered"
+            return 0
+        fi
+    fi
+
+    cat <<EOF
+## Summary
+<!-- dayu-harness:summary -->
+
+- $summary
+
+## Implementation notes
+<!-- dayu-harness:implementation-notes -->
+
+- $implementation
+
+## Test plan
+<!-- dayu-harness:test-plan -->
+
+- [x] \`$command_one\`
+EOF
+    if [ -n "$command_two" ]; then
+        printf -- '- [x] `%s`\n' "$command_two"
+    fi
+    cat <<EOF
+
+Final PR: yes
+Closes #$issue
+EOF
+}
+
+run_capability_smoke_checks() {
+    local items=()
+    local failed=0
+    local partial=0
+    local cap_id manifest_path path missing_paths all_paths path_count
+    local status desc tmp_file body_file event_file input_file command_output command_rc body event_body
+
+    add_smoke_item() {
+        local capability="$1"
+        local name="$2"
+        local item_status="$3"
+        local item_desc="$4"
+        items+=( "{\"capability\":\"$(json_escape "$capability")\",\"name\":\"$(json_escape "$name")\",\"status\":\"$(json_escape "$item_status")\",\"description_nl\":\"$(json_escape "$item_desc")\"}" )
+        case "$item_status" in
+            failed)
+                failed=$((failed + 1))
+                ;;
+            partial|skipped)
+                partial=$((partial + 1))
+                ;;
+        esac
+    }
+
+    for cap_id in "$@"; do
+        manifest_path="$(manifest_path_for_id "$cap_id" 2>/dev/null || true)"
+        if [ -z "$manifest_path" ] || [ ! -f "$manifest_path" ]; then
+            add_smoke_item "$cap_id" "manifest-files" "failed" "找不到 capability manifest，无法验证部署文件。"
+            continue
+        fi
+
+        all_paths="$(jq -r '(.template_files // [])[]?.dst, (.asset_files // [])[]?.dst' "$manifest_path" 2>/dev/null | sed '/^$/d' || true)"
+        path_count="$(printf '%s\n' "$all_paths" | sed '/^$/d' | wc -l | tr -d ' ')"
+        missing_paths=""
+        while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            if [ ! -e "$TARGET/$path" ]; then
+                if [ -n "$missing_paths" ]; then
+                    missing_paths+=", "
+                fi
+                missing_paths+="$path"
+            fi
+        done < <(printf '%s\n' "$all_paths")
+
+        if [ -n "$missing_paths" ]; then
+            add_smoke_item "$cap_id" "manifest-files" "failed" "部署文件缺失：$missing_paths。"
+        elif [ "$path_count" -gt 0 ]; then
+            add_smoke_item "$cap_id" "manifest-files" "passed" "已验证 ${path_count} 个 manifest 声明文件存在。"
+        else
+            add_smoke_item "$cap_id" "manifest-files" "passed" "该能力无静态部署文件，跳过文件存在性检查。"
+        fi
+    done
+
+    if selected_has_capability "core" "$@"; then
+        if [ -x "$TARGET/docs/harness/sensors/scripts/dayu-format.mjs" ] && grep -Fq 'case "pr-body"' "$TARGET/docs/harness/sensors/scripts/dayu-format.mjs" 2>/dev/null; then
+            add_smoke_item "core" "fixed-format-renderer" "passed" "固定格式内容 renderer 已部署且包含 PR body 模式。"
+        else
+            add_smoke_item "core" "fixed-format-renderer" "failed" "固定格式内容 renderer 缺失、不可执行或不完整。"
+        fi
+    fi
+
+    if selected_has_capability "project.gitignore" "$@"; then
+        if [ -f "$TARGET/.gitignore" ] && grep -Fq "Dayu Harness local exclusions" "$TARGET/.gitignore" 2>/dev/null && grep -Fxq ".claude/" "$TARGET/.gitignore" 2>/dev/null; then
+            add_smoke_item "project.gitignore" "gitignore-rules" "passed" ".gitignore 已存在并包含 Dayu Harness 本地排除段。"
+        elif [ -f "$TARGET/.gitignore" ]; then
+            add_smoke_item "project.gitignore" "gitignore-rules" "failed" ".gitignore 已存在但缺少 Dayu Harness 本地排除段。"
+        else
+            add_smoke_item "project.gitignore" "gitignore-rules" "skipped" ".gitignore 未安装；可能是 installer strategy=skip。"
+        fi
+    fi
+
+    if selected_has_capability "git.commit-format" "$@"; then
+        if ! command -v npx >/dev/null 2>&1; then
+            add_smoke_item "git.commit-format" "commitlint-cli" "failed" "缺少 npx，无法验证 commitlint CLI。"
+        else
+            set +e
+            (cd "$TARGET" && npx --no-install commitlint --version >/dev/null 2>&1)
+            command_rc=$?
+            set -e
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "git.commit-format" "commitlint-cli" "passed" "commitlint CLI 可在目标项目本地解析。"
+            else
+                add_smoke_item "git.commit-format" "commitlint-cli" "failed" "commitlint CLI 无法在目标项目本地解析。"
+            fi
+        fi
+
+        if [ ! -f "$TARGET/.husky/commit-msg" ]; then
+            add_smoke_item "git.commit-format" "commit-msg-hook" "skipped" "commit-msg hook 未安装；可能是 installer strategy=skip。"
+        elif ! grep -Fq "commitlint" "$TARGET/.husky/commit-msg" 2>/dev/null; then
+            add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未包含 commitlint 校验片段。"
+        else
+            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-commit-msg.XXXXXX")"
+            printf '%s\n' "test: verify dayu harness commit hook" > "$tmp_file"
+            set +e
+            (cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" >/dev/null 2>&1)
+            command_rc=$?
+            set -e
+            rm -f "$tmp_file"
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "git.commit-format" "commit-msg-hook" "passed" "commit-msg hook 接受确定性生成的 Conventional Commit 消息。"
+            else
+                add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未接受有效 Conventional Commit 消息。"
+            fi
+        fi
+    fi
+
+    if selected_has_capability "quality.node-tooling" "$@"; then
+        if [ ! -f "$TARGET/eslint.config.cjs" ] || [ ! -f "$TARGET/.prettierrc" ] || [ ! -f "$TARGET/.lintstagedrc.json" ]; then
+            add_smoke_item "quality.node-tooling" "tooling-configs" "failed" "ESLint、Prettier 或 lint-staged 配置缺失。"
+        elif ! command -v npx >/dev/null 2>&1; then
+            add_smoke_item "quality.node-tooling" "tooling-cli" "failed" "缺少 npx，无法验证本地 linter/formatter CLI。"
+        else
+            set +e
+            (cd "$TARGET" && npx --no-install eslint --version >/dev/null 2>&1 && npx --no-install prettier --version >/dev/null 2>&1 && npx --no-install lint-staged --version >/dev/null 2>&1)
+            command_rc=$?
+            set -e
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "quality.node-tooling" "tooling-cli" "passed" "ESLint、Prettier 与 lint-staged CLI 可在目标项目本地解析。"
+            else
+                add_smoke_item "quality.node-tooling" "tooling-cli" "failed" "ESLint、Prettier 或 lint-staged CLI 无法在目标项目本地解析。"
+            fi
+        fi
+
+        if [ ! -f "$TARGET/.husky/pre-commit" ]; then
+            add_smoke_item "quality.node-tooling" "pre-commit-hook" "skipped" "pre-commit hook 未安装；可能是 installer strategy=skip。"
+        elif grep -Fq "lint-staged" "$TARGET/.husky/pre-commit" 2>/dev/null; then
+            add_smoke_item "quality.node-tooling" "pre-commit-hook" "passed" "pre-commit hook 已包含 lint-staged 执行片段。"
+        else
+            add_smoke_item "quality.node-tooling" "pre-commit-hook" "failed" "pre-commit hook 未包含 lint-staged 执行片段。"
+        fi
+    fi
+
+    if selected_has_capability "github.branch-protection" "$@"; then
+        if [ ! -f "$TARGET/.husky/pre-push" ]; then
+            add_smoke_item "github.branch-protection" "pre-push-default-branch" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
+        else
+            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-branch.XXXXXX")"
+            printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/$DEFAULT_BRANCH 2222222222222222222222222222222222222222" > "$input_file"
+            set +e
+            command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
+            command_rc=$?
+            set -e
+            rm -f "$input_file"
+            if [ "$command_rc" -ne 0 ] && printf '%s' "$command_output" | grep -Fq "direct push"; then
+                add_smoke_item "github.branch-protection" "pre-push-default-branch" "passed" "pre-push hook 会拒绝直接推送默认分支。"
+            else
+                add_smoke_item "github.branch-protection" "pre-push-default-branch" "failed" "pre-push hook 未按预期拒绝默认分支直接推送。"
+            fi
+        fi
+    fi
+
+    if selected_has_capability "release.versioning" "$@"; then
+        if [ ! -f "$TARGET/.husky/pre-push" ]; then
+            add_smoke_item "release.versioning" "pre-push-release-tag" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
+        else
+            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-tag.XXXXXX")"
+            printf '%s\n' "refs/tags/v0.1.0 1111111111111111111111111111111111111111 refs/tags/v0.1.0 2222222222222222222222222222222222222222" > "$input_file"
+            set +e
+            command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
+            command_rc=$?
+            set -e
+            rm -f "$input_file"
+            if [ "$command_rc" -ne 0 ] && printf '%s' "$command_output" | grep -Fq "release tag"; then
+                add_smoke_item "release.versioning" "pre-push-release-tag" "passed" "pre-push hook 会拒绝覆盖 release tag。"
+            else
+                add_smoke_item "release.versioning" "pre-push-release-tag" "failed" "pre-push hook 未按预期拒绝覆盖 release tag。"
+            fi
+        fi
+    fi
+
+    if selected_has_capability "github.pr" "$@"; then
+        if [ ! -f "$TARGET/.github/scripts/pr_body_structure.py" ]; then
+            add_smoke_item "github.pr" "pr-body-validator" "failed" "PR body validator 缺失。"
+        else
+            body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pr-body.XXXXXX")"
+            render_dayu_pr_body "1" "Verify deterministic PR body rendering." "Render and validate a Dayu Harness PR body without model free-form text." "docs/harness/sensors/scripts/validate.sh --json ." > "$body_file"
+            set +e
+            python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$body_file"
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "github.pr" "pr-body-validator" "passed" "确定性生成的 PR body 可通过 PR 结构校验。"
+            else
+                add_smoke_item "github.pr" "pr-body-validator" "failed" "确定性生成的 PR body 未通过 PR 结构校验。"
+            fi
+        fi
+    fi
+
+    if selected_has_capability "github.issue" "$@"; then
+        if [ ! -f "$TARGET/.github/scripts/issue_depends_on.py" ]; then
+            add_smoke_item "github.issue" "issue-body-validator" "failed" "Issue depends-on validator 缺失。"
+        else
+            body="$(render_dayu_issue_body "Verify deterministic issue body rendering." "Render and validate a Dayu Harness issue body without model free-form text.")"
+            event_file="$(mktemp "${TMPDIR:-/tmp}/dayu-issue-event.XXXXXX")"
+            jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
+            set +e
+            python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$event_file"
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "github.issue" "issue-body-validator" "passed" "确定性生成的 Issue body 可通过 Issue 依赖格式校验。"
+            else
+                add_smoke_item "github.issue" "issue-body-validator" "failed" "确定性生成的 Issue body 未通过 Issue 依赖格式校验。"
+            fi
+        fi
+    fi
+
+    if selected_has_capability "quality.tdd" "$@"; then
+        if [ -f "$TARGET/.github/scripts/pr_tdd_check.py" ] && [ -f "$TARGET/.github/dayu-harness/pr-tdd-policy.json" ]; then
+            set +e
+            python3 "$TARGET/.github/scripts/pr_tdd_check.py" "$TARGET/.github/dayu-harness/pr-tdd-policy.json" --validate-policy-only >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "quality.tdd" "policy-validator" "passed" "TDD policy 文件可被 checker 解析。"
+            else
+                add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD policy 文件未通过 checker 解析。"
+            fi
+        else
+            add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD checker 或 policy 文件缺失。"
+        fi
+    fi
+
+    if selected_has_capability "github.release-please" "$@"; then
+        if [ -f "$TARGET/.github/scripts/release_please_policy.py" ] && [ -f "$TARGET/.github/release-please-policy.json" ]; then
+            set +e
+            python3 "$TARGET/.github/scripts/release_please_policy.py" "$TARGET/.github/release-please-policy.json" "$TARGET" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "github.release-please" "release-policy-validator" "passed" "release-please policy 与目标项目文件通过本地校验。"
+            else
+                add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 本地校验失败。"
+            fi
+        else
+            add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 脚本或策略文件缺失。"
+        fi
+    fi
+
+    status="passed"
+    desc="已对所有已选择能力执行部署文件与关键行为 smoke 检查。"
+    if [ "$failed" -gt 0 ]; then
+        status="failed"
+        desc="能力 smoke 检查存在 ${failed} 个失败项。"
+    elif [ "$partial" -gt 0 ]; then
+        status="partial"
+        desc="能力 smoke 检查存在 ${partial} 个跳过或部分项。"
+    fi
+
+    printf '{"status":"%s","items":[%s],"description_nl":"%s"}' \
+        "$status" \
+        "$(join_json "${items[@]}")" \
+        "$(json_escape "$desc")"
+}
+
 run_post_apply_checks() {
     local check_name rel_path fallback_path script_path check_output check_rc payload desc status
     local items=()
     local failed=0
     local skipped=0
+    local partial=0
     POST_VALIDATE_STATUS="skipped"
     POST_VALIDATE_DESC=""
 
@@ -1336,14 +1681,31 @@ run_post_apply_checks() {
     run_one_check "audit" "docs/harness/sensors/scripts/audit.sh" "$SKILL_DIR/templates/docs/harness/sensors/scripts/audit.sh"
     run_one_check "check-consistency" "docs/harness/sensors/scripts/check-consistency.sh" "$SKILL_DIR/templates/docs/harness/sensors/scripts/check-consistency.sh"
 
+    payload="$(run_capability_smoke_checks "$@")"
+    status="$(printf '%s' "$payload" | jq -r '.status // "failed"' 2>/dev/null || echo "failed")"
+    desc="$(printf '%s' "$payload" | jq -r '.description_nl // empty' 2>/dev/null || true)"
+    [ -n "$desc" ] || desc="Capability smoke checks completed."
+    case "$status" in
+        passed)
+            ;;
+        partial)
+            partial=$((partial + 1))
+            ;;
+        *)
+            status="failed"
+            failed=$((failed + 1))
+            ;;
+    esac
+    items+=( "{\"name\":\"capability-smoke\",\"script\":\"builtin:capability-smoke\",\"status\":\"$status\",\"exit_code\":0,\"description_nl\":\"$(json_escape "$desc")\",\"details\":$payload}" )
+
     local overall="passed"
-    local description="部署后 validate、audit 与 check-consistency 均通过。"
+    local description="部署后 validate、audit、check-consistency 与 capability-smoke 均通过。"
     if [ "$failed" -gt 0 ]; then
         overall="failed"
         description="部署后验证存在 ${failed} 个失败项。"
-    elif [ "$skipped" -gt 0 ]; then
+    elif [ "$skipped" -gt 0 ] || [ "$partial" -gt 0 ]; then
         overall="partial"
-        description="部署后验证有 ${skipped} 个跳过项。"
+        description="部署后验证有 ${skipped} 个跳过项与 ${partial} 个部分项。"
     fi
 
     printf '{"status":"%s","checks":[%s],"description_nl":"%s"}' \
@@ -1482,10 +1844,11 @@ wait_release_please_workflow_quiet() {
 
 run_post_apply_checks_at_root() {
     local root="$1"
+    shift || true
     local original_target="$TARGET"
     local result
     TARGET="$root"
-    result="$(run_post_apply_checks)"
+    result="$(run_post_apply_checks "$@")"
     TARGET="$original_target"
     printf '%s' "$result"
 }
@@ -1636,11 +1999,11 @@ run_release_post_remote_revalidation() {
     fi
     refresh_status="${RELEASE_REFRESH_STATUS:-passed}"
 
-    checks_json="$(run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT")"
+    checks_json="$(run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT" "$@")"
     cleanup_release_validation_root
     checks_status="$(echo "$checks_json" | jq -r '.status // "skipped"' 2>/dev/null || echo "skipped")"
     if [ "$checks_status" = "failed" ]; then
-        desc="Release workflow settled, but post-release validate/audit/check-consistency failed."
+        desc="Release workflow settled, but post-release validate/audit/check-consistency/capability-smoke failed."
         release_settlement_result_json "failed" "$desc" "$wait_status" "$refresh_status" "$checks_json"
     elif [ "$checks_status" = "partial" ]; then
         desc="Release workflow settled, but post-release checks had skipped items."
@@ -1732,15 +2095,8 @@ run_github_target_e2e() {
         return 0
     fi
 
-    issue_body="## Summary
-
-- Verify Dayu Harness Issue -> PR governance after initialization.
-
-## Background
-
-- Created by scaffold.sh post-deployment E2E validation.
-"
-    if ! issue_url="$(gh issue create --repo "$repo" --title "test: Dayu Harness Issue PR E2E" --body "$issue_body" 2>/dev/null)"; then
+    issue_body="$(render_dayu_issue_body "Verify Dayu Harness Issue to PR governance after initialization." "Created by scaffold.sh post-deployment E2E validation.")"
+    if ! issue_url="$(gh issue create --repo "$repo" --title "Dayu Harness Issue PR E2E verification" --body "$issue_body" 2>/dev/null)"; then
         fail_github_e2e "GitHub Issue/PR E2E validation failed to create a test issue."
         return 0
     fi
@@ -1777,27 +2133,12 @@ run_github_target_e2e() {
     head_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
 
     body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-e2e-pr-body.XXXXXX")"
-    cat > "$body_file" <<EOF
-## Summary
-<!-- dayu-harness:summary -->
-
-- Verify Dayu Harness GitHub Issue -> PR governance after initialization.
-
-## Implementation notes
-<!-- dayu-harness:implementation-notes -->
-
-- Adds a smoke marker on an isolated validation branch.
-
-## Test plan
-<!-- dayu-harness:test-plan -->
-
-- [x] \`gh issue view $issue_number --repo $repo\`
-- [x] \`gh pr checks --repo $repo\`
-
-Final PR: yes
-Closes #$issue_number
-EOF
-    if ! pr_url="$(gh pr create --repo "$repo" --base "$DEFAULT_BRANCH" --head "$branch" --title "test: verify Dayu Harness GitHub E2E" --body-file "$body_file" 2>/dev/null)"; then
+    render_dayu_pr_body "$issue_number" \
+      "Verify Dayu Harness GitHub Issue to PR governance after initialization." \
+      "Adds a smoke marker on an isolated validation branch." \
+      "gh issue view $issue_number --repo $repo" \
+      "gh pr checks --repo $repo" > "$body_file"
+    if ! pr_url="$(gh pr create --repo "$repo" --base "$DEFAULT_BRANCH" --head "$branch" --title "Dayu Harness GitHub E2E verification" --body-file "$body_file" 2>/dev/null)"; then
         fail_github_e2e "GitHub Issue/PR E2E validation failed to create a test PR." "$issue_url" "" "$branch"
         return 0
     fi
@@ -2146,7 +2487,7 @@ JSONEOF
     fi
 
     local post_apply_checks_json post_apply_status validation_status validation_desc
-    post_apply_checks_json="$(run_post_apply_checks)"
+    post_apply_checks_json="$(run_post_apply_checks "${capability_ids[@]}")"
     post_apply_status="$(echo "$post_apply_checks_json" | jq -r '.status // "skipped"' 2>/dev/null || echo "skipped")"
     validation_status="$(echo "$post_apply_checks_json" | jq -r '.checks[]? | select(.name == "validate") | .status' 2>/dev/null | sed -n '1p')"
     validation_desc="$(echo "$post_apply_checks_json" | jq -r '.checks[]? | select(.name == "validate") | .description_nl' 2>/dev/null | sed -n '1p')"
