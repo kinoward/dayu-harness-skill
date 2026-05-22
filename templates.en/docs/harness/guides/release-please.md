@@ -26,6 +26,8 @@ The workflow intentionally uses `GITHUB_TOKEN` so release PRs do not trigger Day
 
 `VERSION` remains a plain text file. Before auto-merging a release PR, the release workflow reads the root version from that PR's `.release-please-manifest.json`, writes it back to `VERSION`, and then re-runs the release file allowlist check. Do not rely on `release-please-config.json` `extra-files` to update the plain text `VERSION` file.
 
+The release workflow uses a Git credential helper to inject `GITHUB_TOKEN` for release PR clone/push operations; do not restore inline `git -c http.extraheader=...` authentication. When merging release PRs, the workflow must use the PR title as `--subject`, pass `--body ""`, and explicitly delete the release branch after merge confirmation to avoid auth failures, branch leftovers, and duplicate changelog entries.
+
 By default, release-please auto-merge and PR lint skip are allowed for:
 - `github-actions[bot]`
 - `release-please[bot]`

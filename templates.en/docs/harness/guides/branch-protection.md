@@ -15,11 +15,11 @@ Default GitHub Flow is recommended: `__DAYU_DEFAULT_BRANCH__` → short-lived fe
 
 | Strategy | Command | Use case |
 |------|------|---------|
-| merge commit | `gh pr merge --merge` | Team collaboration while keeping full commit history |
+| merge commit | `gh pr merge --merge --subject "$pr_title" --body ""` | Team collaboration while keeping full commit history |
 | squash | `gh pr merge --squash` | Small feature changes, squashed into one commit |
 | rebase | `gh pr merge --rebase` | Personal projects, linear history |
 
-Default is merge commit. This project has enabled release-please, so child commits follow Conventional Commits, and PR titles should use natural language to avoid duplicate changelog entries.
+Default is merge commit. This project has enabled release-please, so child commits follow Conventional Commits, PR titles use natural language, and merge bodies stay empty to avoid duplicate changelog entries.
 
 ## Post-merge Cleanup
 

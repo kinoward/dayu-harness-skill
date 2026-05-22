@@ -9,7 +9,7 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 要求：
 - 长度至少 5 字符
 - 建议使用自然语言描述性标题
-- 如项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目
+- 如项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目；PR Lint 会拒绝 `feat:`、`fix:`、`docs:` 等 conventional commit 标题
 
 ## PR 正文模板
 
@@ -75,7 +75,12 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## PR 合并
 
-使用 `gh pr merge <PR-number> --merge`（merge commit），PR 内所有子 commit 完整保留进入默认分支（`__DAYU_DEFAULT_BRANCH__`）。
+使用 merge commit，PR 内所有子 commit 完整保留进入默认分支（`__DAYU_DEFAULT_BRANCH__`）。CLI 合并时建议显式保留 PR 标题并清空 merge body，避免 GitHub 把 PR 标题复制到 merge commit body 后被 release-please 二次解析：
+
+```bash
+pr_title="$(gh pr view <PR-number> --json title --jq '.title')"
+gh pr merge <PR-number> --merge --subject "$pr_title" --body ""
+```
 
 合并后清理：
 ```bash

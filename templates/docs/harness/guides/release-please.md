@@ -26,6 +26,8 @@ release-please 根据 Conventional Commits 自动生成 release PR、版本号�
 
 `VERSION` 保持纯文本格式。release workflow 在自动合并 release PR 前读取 release PR 内 `.release-please-manifest.json` 的根版本，并把该版本写回 `VERSION` 后再重新执行 release 文件 allowlist 校验。不要依赖 `release-please-config.json` 的 `extra-files` 更新纯文本 `VERSION`。
 
+release workflow 对 release PR 的 clone/push 使用 Git credential helper 注入 `GITHUB_TOKEN`，不得恢复为内联 `git -c http.extraheader=...`。合并 release PR 时必须使用 PR 标题作为 `--subject`、传入 `--body ""`，并在合并确认后显式删除 release 分支，避免认证失败、分支残留和 changelog 重复条目。
+
 默认允许以下 actor 触发 release-please 自动合并与 PR lint 跳过：
 - `github-actions[bot]`
 - `release-please[bot]`

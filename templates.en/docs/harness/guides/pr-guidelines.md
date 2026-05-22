@@ -9,7 +9,7 @@ PR titles are readable summaries for humans and tools. Use Chinese, English, or 
 Requirements:
 - At least 5 characters
 - Use a natural-language descriptive title
-- This project has enabled release-please with merge commit strategy; avoid Conventional Commits format in PR titles to prevent duplicate changelog entries.
+- This project has enabled release-please with merge commit strategy; avoid Conventional Commits format in PR titles to prevent duplicate changelog entries. PR Lint rejects titles such as `feat:`, `fix:`, and `docs:`.
 
 ## PR Body Template
 
@@ -75,7 +75,12 @@ When `gh pr create` fails:
 
 ## PR Merge
 
-Use `gh pr merge <PR-number> --merge` (merge commit) to keep all child commits intact in `__DAYU_DEFAULT_BRANCH__`.
+Use merge commit to keep all child commits intact in `__DAYU_DEFAULT_BRANCH__`. When merging through the CLI, preserve the PR title explicitly and clear the merge body so GitHub does not copy the PR title into the merge commit body for release-please to parse again:
+
+```bash
+pr_title="$(gh pr view <PR-number> --json title --jq '.title')"
+gh pr merge <PR-number> --merge --subject "$pr_title" --body ""
+```
 
 Post-merge cleanup:
 ```bash

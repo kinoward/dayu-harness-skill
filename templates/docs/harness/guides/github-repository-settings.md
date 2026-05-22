@@ -12,6 +12,9 @@
 
 ```json
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": false,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": true
 }
@@ -23,6 +26,9 @@
 
 ```bash
 gh api -X PATCH "repos/<owner>/<repo>" \
+  -F allow_merge_commit=true \
+  -F allow_squash_merge=false \
+  -F allow_rebase_merge=false \
   -F allow_auto_merge=true \
   -F delete_branch_on_merge=true
 ```
@@ -32,6 +38,7 @@ gh api -X PATCH "repos/<owner>/<repo>" \
 - `gh auth status` 已登录目标 GitHub 账号。
 - 当前账号具备仓库 administration 权限。
 - release-please 或其他自动合并流程已经使用 GitHub auto-merge，而不是人工 label gate。
+- 默认分支 ruleset 仅允许 merge commit；仓库级 squash/rebase 入口应同步关闭，避免绕过 release-please 的 changelog 去重策略。
 
 脚手架按以下顺序识别目标仓库：
 
@@ -45,5 +52,6 @@ gh api -X PATCH "repos/<owner>/<repo>" \
 
 - 该配置只表达仓库级事实，不替代 branch protection ruleset。
 - 修改 `.github/repository/pull-request-settings.json` 后，同步更新本文件。
+- 必须保持 `allow_merge_commit=true`、`allow_squash_merge=false`、`allow_rebase_merge=false`，使仓库 UI/API 与默认分支 ruleset 的 merge-only 策略一致。
 - 如果 release-please 依赖自动合并，必须保持 `allow_auto_merge` 为 `true`。
 - 如果希望合并后自动清理 release 分支，必须保持 `delete_branch_on_merge` 为 `true`。
