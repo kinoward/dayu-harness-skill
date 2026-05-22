@@ -161,21 +161,30 @@ check_pull_request_settings_json() {
     local file_path="$PROJECT_ROOT/$rel_path"
 
     if [ -f "$file_path" ]; then
+        local allow_merge_commit
+        local allow_squash_merge
+        local allow_rebase_merge
         local allow_auto_merge
         local delete_branch_on_merge
         local parse_error=""
 
         if command -v jq >/dev/null 2>&1; then
-            allow_auto_merge="$(jq -r '.allow_auto_merge // empty' "$file_path" 2>/dev/null || true)"
-            delete_branch_on_merge="$(jq -r '.delete_branch_on_merge // empty' "$file_path" 2>/dev/null || true)"
+            allow_merge_commit="$(jq -r 'if has("allow_merge_commit") then .allow_merge_commit else empty end' "$file_path" 2>/dev/null || true)"
+            allow_squash_merge="$(jq -r 'if has("allow_squash_merge") then .allow_squash_merge else empty end' "$file_path" 2>/dev/null || true)"
+            allow_rebase_merge="$(jq -r 'if has("allow_rebase_merge") then .allow_rebase_merge else empty end' "$file_path" 2>/dev/null || true)"
+            allow_auto_merge="$(jq -r 'if has("allow_auto_merge") then .allow_auto_merge else empty end' "$file_path" 2>/dev/null || true)"
+            delete_branch_on_merge="$(jq -r 'if has("delete_branch_on_merge") then .delete_branch_on_merge else empty end' "$file_path" 2>/dev/null || true)"
             if ! jq -e . "$file_path" >/dev/null 2>&1; then
                 parse_error="JSON parse error"
             fi
         elif command -v python3 >/dev/null 2>&1; then
             local settings_json
-            settings_json="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print("%s %s" % (str(data.get("allow_auto_merge")).lower(), str(data.get("delete_branch_on_merge")).lower()))' "$file_path" 2>/dev/null || true)"
-            allow_auto_merge="$(echo "$settings_json" | awk '{print $1}')"
-            delete_branch_on_merge="$(echo "$settings_json" | awk '{print $2}')"
+            settings_json="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print("%s %s %s %s %s" % (str(data.get("allow_merge_commit")).lower(), str(data.get("allow_squash_merge")).lower(), str(data.get("allow_rebase_merge")).lower(), str(data.get("allow_auto_merge")).lower(), str(data.get("delete_branch_on_merge")).lower()))' "$file_path" 2>/dev/null || true)"
+            allow_merge_commit="$(echo "$settings_json" | awk '{print $1}')"
+            allow_squash_merge="$(echo "$settings_json" | awk '{print $2}')"
+            allow_rebase_merge="$(echo "$settings_json" | awk '{print $3}')"
+            allow_auto_merge="$(echo "$settings_json" | awk '{print $4}')"
+            delete_branch_on_merge="$(echo "$settings_json" | awk '{print $5}')"
             if [ -z "$settings_json" ]; then
                 parse_error="JSON parse error"
             fi
@@ -191,17 +200,20 @@ check_pull_request_settings_json() {
             return
         fi
 
-        if [ "$allow_auto_merge" != "true" ] || [ "$delete_branch_on_merge" != "true" ]; then
+        if [ "$allow_merge_commit" != "true" ] || [ "$allow_squash_merge" != "false" ] || [ "$allow_rebase_merge" != "false" ] || [ "$allow_auto_merge" != "true" ] || [ "$delete_branch_on_merge" != "true" ]; then
             local failures=""
-            [ "$allow_auto_merge" != "true" ] && failures="allow_auto_merge=true"
+            [ "$allow_merge_commit" != "true" ] && failures="allow_merge_commit=true"
+            [ "$allow_squash_merge" != "false" ] && failures="${failures:+$failures, }allow_squash_merge=false"
+            [ "$allow_rebase_merge" != "false" ] && failures="${failures:+$failures, }allow_rebase_merge=false"
+            [ "$allow_auto_merge" != "true" ] && failures="${failures:+$failures, }allow_auto_merge=true"
             [ "$delete_branch_on_merge" != "true" ] && failures="${failures:+$failures, }delete_branch_on_merge=true"
             record_check "$item" "fail" "${rel_path} does not satisfy required pull-request settings: ${failures}"
             log_text "  ✗ ${rel_path} does not satisfy required pull-request settings: ${failures}"
             return
         fi
 
-        record_check "$item" "pass" "${rel_path} pull-request settings satisfy required automation flags"
-        log_text "  ✓ ${rel_path} pull-request settings satisfy required automation flags"
+        record_check "$item" "pass" "${rel_path} pull-request settings satisfy merge-only automation flags"
+        log_text "  ✓ ${rel_path} pull-request settings satisfy merge-only automation flags"
     else
         if [ "$required" = "required" ]; then
             record_check "$item" "fail" "${rel_path} missing (required capability may not be fully deployed)"

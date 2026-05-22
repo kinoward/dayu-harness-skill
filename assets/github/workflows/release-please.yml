@@ -70,6 +70,7 @@ jobs:
           RELEASE_PLEASE_CONFIG_PATH: release-please-config.json
           RELEASE_PLEASE_PR_OUTPUT: ${{ steps.release.outputs.prs }}
         run: |
+          git config --global credential.helper '!f() { echo "username=x-access-token"; echo "password=$GH_TOKEN"; }; f'
           if ! command -v gh >/dev/null 2>&1; then
             echo "gh CLI not available."
             exit 1
@@ -364,8 +365,7 @@ jobs:
             fi
 
             workdir="$(mktemp -d)"
-            git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" \
-              clone --depth 1 --branch "$head_ref" "https://github.com/$REPO.git" "$workdir"
+            git clone --depth 1 --branch "$head_ref" "https://github.com/$REPO.git" "$workdir"
 
             version="$(jq -r '."." // empty' "$workdir/.release-please-manifest.json" 2>/dev/null || true)"
             if [ -z "$version" ] || [ "$version" = "null" ]; then
@@ -394,8 +394,7 @@ jobs:
               return 0
             fi
             git -C "$workdir" commit -m "chore: sync VERSION for release $version"
-            git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" \
-              -C "$workdir" push origin "HEAD:$head_ref"
+            git -C "$workdir" push origin "HEAD:$head_ref"
             echo "Synchronized VERSION to $version for release PR #${pr_number}."
             rm -rf "$workdir"
           }
@@ -475,7 +474,8 @@ jobs:
             sync_version_from_manifest "$pr_number"
             assert_release_pr_allowed_files "$pr_number"
             echo "Merging release PR #${pr_number}..."
-            gh pr merge "$pr_number" --auto --merge --delete-branch --repo "$REPO"
+            pr_title="$(gh pr view "$pr_number" --repo "$REPO" --json title --jq '.title // empty')"
+            gh pr merge "$pr_number" --auto --merge --delete-branch --repo "$REPO" --subject "${pr_title:-Release}" --body ""
 
             merged="false"
             for _ in $(seq 1 60); do
@@ -489,6 +489,11 @@ jobs:
             if [ "$merged" != "true" ]; then
               echo "Release PR #${pr_number} did not merge before timeout; publish dispatch was not started."
               exit 1
+            fi
+
+            head_ref="$(gh pr view "$pr_number" --repo "$REPO" --json headRefName --jq '.headRefName // empty')"
+            if [ -n "$head_ref" ]; then
+              git push origin --delete "$head_ref" || echo "Warning: could not delete branch $head_ref"
             fi
 
             gh workflow run release-please.yml --repo "$REPO" --ref "$DEFAULT_BRANCH" -f mode=publish

@@ -1116,7 +1116,7 @@ collect_repository_settings_remote_entry_dry() {
     local cap_id="$1"
     [ "$cap_id" = "github.repository-settings" ] || return 0
 
-    DRY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"planned\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"启用 --github-remote apply 后，会由 scripts/github-remote.sh 统一同步 allow_auto_merge=true 与 delete_branch_on_merge=true。\"}" )
+    DRY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"planned\",\"needs_strategy\":false,\"allow_merge_commit\":true,\"allow_squash_merge\":false,\"allow_rebase_merge\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"启用 --github-remote apply 后，会由 scripts/github-remote.sh 统一同步 allow_merge_commit=true、allow_squash_merge=false、allow_rebase_merge=false、allow_auto_merge=true 与 delete_branch_on_merge=true。\"}" )
 }
 
 collect_repository_settings_remote_entry_apply() {
@@ -1147,7 +1147,7 @@ collect_repository_settings_remote_entry_apply() {
             ;;
     esac
 
-    APPLY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"$(json_escape "$status")\",\"needs_strategy\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"$(json_escape "$description")\"}" )
+    APPLY_ITEMS+=( "{\"kind\":\"remote_settings\",\"capability\":\"github.repository-settings\",\"api\":\"PATCH /repos/{owner}/{repo}\",\"status\":\"$(json_escape "$status")\",\"needs_strategy\":false,\"allow_merge_commit\":true,\"allow_squash_merge\":false,\"allow_rebase_merge\":false,\"allow_auto_merge\":true,\"delete_branch_on_merge\":true,\"description_nl\":\"$(json_escape "$description")\"}" )
 }
 
 collect_installer_entry_apply() {

@@ -321,6 +321,7 @@ jobs:
         run: |
           python3 - "$GITHUB_EVENT_PATH" <<'PY'
           import json
+          import re
           import sys
 
           payload = json.loads(open(sys.argv[1], encoding="utf-8").read())
@@ -332,8 +333,15 @@ jobs:
           if len(title) < 5:
             print("ERROR: PR title must be at least 5 characters.", file=sys.stderr)
             raise SystemExit(1)
+          if re.match(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?:\s+", title):
+            print(
+              "ERROR: PR title must use natural language, not Conventional Commits format. "
+              "Keep Conventional Commits in child commit messages to avoid duplicate release-please changelog entries.",
+              file=sys.stderr,
+            )
+            raise SystemExit(1)
 
-          print("OK: PR title length check passed.")
+          print("OK: PR title check passed.")
           PY
 
       - name: Check PR body structure

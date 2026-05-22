@@ -415,6 +415,9 @@ DEFAULT_BRANCH=""
 VISIBILITY=""
 ALLOWED_AUTO_MERGE=""
 DELETE_BRANCH_ON_MERGE=""
+ALLOW_MERGE_COMMIT=""
+ALLOW_SQUASH_MERGE=""
+ALLOW_REBASE_MERGE=""
 REMOTE_SYNC_STATE="unknown"
 
 NEED_REPOSITORY_SETTINGS="false"
@@ -509,8 +512,11 @@ if [ "$GH_AUTH_OK" = "true" ] && [ -n "$REPOSITORY" ]; then
         REMOTE_DEFAULT_BRANCH="$(normalize_branch_name "$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.default_branch // ""' 2>/dev/null || true)")"
         DEFAULT_BRANCH="$REMOTE_DEFAULT_BRANCH"
         VISIBILITY="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.visibility // ""' 2>/dev/null || true)"
-        ALLOWED_AUTO_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.allow_auto_merge // ""' 2>/dev/null || true)"
-        DELETE_BRANCH_ON_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.delete_branch_on_merge // ""' 2>/dev/null || true)"
+        ALLOW_MERGE_COMMIT="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_merge_commit") then .allow_merge_commit else empty end' 2>/dev/null || true)"
+        ALLOW_SQUASH_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_squash_merge") then .allow_squash_merge else empty end' 2>/dev/null || true)"
+        ALLOW_REBASE_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_rebase_merge") then .allow_rebase_merge else empty end' 2>/dev/null || true)"
+        ALLOWED_AUTO_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_auto_merge") then .allow_auto_merge else empty end' 2>/dev/null || true)"
+        DELETE_BRANCH_ON_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("delete_branch_on_merge") then .delete_branch_on_merge else empty end' 2>/dev/null || true)"
     fi
 fi
 
@@ -810,22 +816,25 @@ apply_mode() {
 
 apply_repository_settings() {
     local settings_file="$TARGET/.github/repository/pull-request-settings.json"
-    local allow_auto_merge delete_branch_on_merge api_output api_rc
+    local allow_merge_commit allow_squash_merge allow_rebase_merge allow_auto_merge delete_branch_on_merge api_output api_rc
     [ "$NEED_REPOSITORY_SETTINGS" = "true" ] || return 0
     [ -f "$settings_file" ] || return 0
     [ -n "$REPOSITORY" ] || return 0
     [ "$GH_AUTH_OK" = "true" ] || return 0
 
+    allow_merge_commit="$(jq -r '.allow_merge_commit // true' "$settings_file" 2>/dev/null || echo true)"
+    allow_squash_merge="$(jq -r '.allow_squash_merge // false' "$settings_file" 2>/dev/null || echo false)"
+    allow_rebase_merge="$(jq -r '.allow_rebase_merge // false' "$settings_file" 2>/dev/null || echo false)"
     allow_auto_merge="$(jq -r '.allow_auto_merge // true' "$settings_file" 2>/dev/null || echo true)"
     delete_branch_on_merge="$(jq -r '.delete_branch_on_merge // true' "$settings_file" 2>/dev/null || echo true)"
 
     set +e
-    api_output="$(gh api -X PATCH "repos/$REPOSITORY" -F "allow_auto_merge=$allow_auto_merge" -F "delete_branch_on_merge=$delete_branch_on_merge" 2>&1)"
+    api_output="$(gh api -X PATCH "repos/$REPOSITORY" -F "allow_merge_commit=$allow_merge_commit" -F "allow_squash_merge=$allow_squash_merge" -F "allow_rebase_merge=$allow_rebase_merge" -F "allow_auto_merge=$allow_auto_merge" -F "delete_branch_on_merge=$delete_branch_on_merge" 2>&1)"
     api_rc=$?
     set -e
 
     if [ "$api_rc" -eq 0 ]; then
-        add_item "{\"kind\":\"repository_settings\",\"action\":\"patch\",\"status\":\"ok\",\"description_nl\":\"已同步 GitHub 仓库设置 allow_auto_merge=${allow_auto_merge}, delete_branch_on_merge=${delete_branch_on_merge}。\"}" "ok"
+        add_item "{\"kind\":\"repository_settings\",\"action\":\"patch\",\"status\":\"ok\",\"description_nl\":\"已同步 GitHub 仓库设置 allow_merge_commit=${allow_merge_commit}, allow_squash_merge=${allow_squash_merge}, allow_rebase_merge=${allow_rebase_merge}, allow_auto_merge=${allow_auto_merge}, delete_branch_on_merge=${delete_branch_on_merge}。\"}" "ok"
     else
         add_item "{\"kind\":\"repository_settings\",\"action\":\"patch\",\"status\":\"error\",\"description_nl\":\"GitHub 仓库设置同步失败：$(json_escape "$api_output")\"}" "error"
     fi
@@ -938,8 +947,11 @@ verify_mode() {
             DEFAULT_BRANCH="$(normalize_branch_name "$REQUESTED_DEFAULT_BRANCH")"
         fi
         VISIBILITY="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.visibility // ""' 2>/dev/null || true)"
-        ALLOWED_AUTO_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.allow_auto_merge // ""' 2>/dev/null || true)"
-        DELETE_BRANCH_ON_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r '.delete_branch_on_merge // ""' 2>/dev/null || true)"
+        ALLOW_MERGE_COMMIT="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_merge_commit") then .allow_merge_commit else empty end' 2>/dev/null || true)"
+        ALLOW_SQUASH_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_squash_merge") then .allow_squash_merge else empty end' 2>/dev/null || true)"
+        ALLOW_REBASE_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_rebase_merge") then .allow_rebase_merge else empty end' 2>/dev/null || true)"
+        ALLOWED_AUTO_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("allow_auto_merge") then .allow_auto_merge else empty end' 2>/dev/null || true)"
+        DELETE_BRANCH_ON_MERGE="$(printf '%s' "$REPO_VIEW_JSON" | jq -r 'if has("delete_branch_on_merge") then .delete_branch_on_merge else empty end' 2>/dev/null || true)"
     else
         add_item '{"kind":"remote","name":"repos","status":"error","description_nl":"无法读取仓库对象。"}' "error"
     fi
@@ -1004,12 +1016,45 @@ verify_mode() {
     fi
 
     if [ "$NEED_REPOSITORY_SETTINGS" = "true" ]; then
+        if [ "${ALLOW_MERGE_COMMIT}" != "true" ]; then
+            if [ -n "$missing_settings" ]; then
+                missing_settings+=$'\n'
+            fi
+            missing_settings+="allow_merge_commit"
+        else
+            present_settings+="allow_merge_commit"
+        fi
+        if [ "${ALLOW_SQUASH_MERGE}" != "false" ]; then
+            if [ -n "$missing_settings" ]; then
+                missing_settings+=$'\n'
+            fi
+            missing_settings+="allow_squash_merge=false"
+        else
+            if [ -n "$present_settings" ]; then
+                present_settings+=$'\n'
+            fi
+            present_settings+="allow_squash_merge=false"
+        fi
+        if [ "${ALLOW_REBASE_MERGE}" != "false" ]; then
+            if [ -n "$missing_settings" ]; then
+                missing_settings+=$'\n'
+            fi
+            missing_settings+="allow_rebase_merge=false"
+        else
+            if [ -n "$present_settings" ]; then
+                present_settings+=$'\n'
+            fi
+            present_settings+="allow_rebase_merge=false"
+        fi
         if [ "${ALLOWED_AUTO_MERGE}" != "true" ]; then
             if [ -n "$missing_settings" ]; then
                 missing_settings+=$'\n'
             fi
             missing_settings+="allow_auto_merge"
         else
+            if [ -n "$present_settings" ]; then
+                present_settings+=$'\n'
+            fi
             present_settings+="allow_auto_merge"
         fi
         if [ "${DELETE_BRANCH_ON_MERGE}" != "true" ]; then
@@ -1110,10 +1155,10 @@ verify_mode() {
         add_resource_item \
           "repository_settings" \
           "$( [ -n "$missing_settings" ] && echo missing || echo ok )" \
-          "$(to_json_array allow_auto_merge delete_branch_on_merge)" \
+          "$(to_json_array allow_merge_commit allow_squash_merge=false allow_rebase_merge=false allow_auto_merge delete_branch_on_merge)" \
           "$(to_json_array_from_lines "$present_settings")" \
           "$(to_json_array_from_lines "$missing_settings")" \
-          "仓库设置 allow_auto_merge/delete_branch_on_merge 当前值：allow_auto_merge=${ALLOWED_AUTO_MERGE:-unknown}；delete_branch_on_merge=${DELETE_BRANCH_ON_MERGE:-unknown}。"
+          "仓库设置当前值：allow_merge_commit=${ALLOW_MERGE_COMMIT:-unknown}；allow_squash_merge=${ALLOW_SQUASH_MERGE:-unknown}；allow_rebase_merge=${ALLOW_REBASE_MERGE:-unknown}；allow_auto_merge=${ALLOWED_AUTO_MERGE:-unknown}；delete_branch_on_merge=${DELETE_BRANCH_ON_MERGE:-unknown}。"
     fi
 
     if [ "$NEED_WORKFLOW_PERMISSIONS" = "true" ]; then

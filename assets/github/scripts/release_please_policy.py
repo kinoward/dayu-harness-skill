@@ -259,18 +259,22 @@ def has_plain_version_manifest_sync(workflow_text: str) -> bool:
     )
 
 
-def has_actions_write_permission(workflow_text: str) -> bool:
-    return bool(re.search(r"(?m)^\s+actions\s*:\s*write\s*$", workflow_text))
-
-
-def has_legacy_release_auth_reference(workflow_text: str) -> bool:
-    return bool(
-        re.search(r"\bRELEASE_TOKEN\b", workflow_text)
-        or re.search(r"\bRELEASE_PLEASE_ALLOWED_ACTORS\b", workflow_text)
+def has_release_git_credential_helper(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "credential.helper",
+            "username=x-access-token",
+            "password=$GH_TOKEN",
+        )
     )
 
 
-def has_required_merge_command(workflow_text: str) -> bool:
+def has_inline_http_extraheader_auth(workflow_text: str) -> bool:
+    return bool(re.search(r"\bhttp\.extraheader\b", workflow_text, re.IGNORECASE))
+
+
+def iter_real_merge_commands(workflow_text: str):
     for line in workflow_text.splitlines():
         command = line.strip()
         if command.startswith("run:"):
@@ -295,10 +299,54 @@ def has_required_merge_command(workflow_text: str) -> bool:
         if not target or target.startswith("-"):
             continue
 
+        yield tokens
+
+
+def has_actions_write_permission(workflow_text: str) -> bool:
+    return bool(re.search(r"(?m)^\s+actions\s*:\s*write\s*$", workflow_text))
+
+
+def has_legacy_release_auth_reference(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bRELEASE_TOKEN\b", workflow_text)
+        or re.search(r"\bRELEASE_PLEASE_ALLOWED_ACTORS\b", workflow_text)
+    )
+
+
+def has_required_merge_command(workflow_text: str) -> bool:
+    for tokens in iter_real_merge_commands(workflow_text):
         if all(flag in tokens for flag in ("--auto", "--merge", "--delete-branch")):
             return True
 
     return False
+
+
+def has_clean_merge_metadata(workflow_text: str) -> tuple[bool, bool]:
+    has_subject = False
+    has_empty_body = False
+
+    for tokens in iter_real_merge_commands(workflow_text):
+        if not all(flag in tokens for flag in ("--auto", "--merge", "--delete-branch")):
+            continue
+
+        if "--subject" in tokens:
+            index = tokens.index("--subject")
+            if index + 1 < len(tokens) and tokens[index + 1]:
+                has_subject = True
+
+        if "--body" in tokens:
+            index = tokens.index("--body")
+            if index + 1 < len(tokens) and tokens[index + 1] == "":
+                has_empty_body = True
+
+    return has_subject, has_empty_body
+
+
+def has_release_branch_cleanup(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bgit\s+push\s+origin\s+--delete\b", workflow_text)
+        and "headRefName" in workflow_text
+    )
 
 
 def validate_release_pr_policy(policy: dict, errors: list[str]) -> None:
@@ -345,6 +393,14 @@ def validate_repository_settings(policy: dict, project_root: Path, errors: list[
         errors.append("repository_settings must be an object.")
         return
 
+    expected_settings = {
+        "allow_merge_commit": True,
+        "allow_squash_merge": False,
+        "allow_rebase_merge": False,
+        "allow_auto_merge": True,
+        "delete_branch_on_merge": True,
+    }
+
     settings_path = settings_policy.get("file", REQUIRED_REPOSITORY_SETTINGS_FILE)
     if not isinstance(settings_path, str) or not settings_path.strip():
         errors.append("repository_settings.file must be a non-empty string.")
@@ -356,11 +412,12 @@ def validate_repository_settings(policy: dict, project_root: Path, errors: list[
     settings_path = project_root / Path(settings_path)
     settings = load_json(settings_path)
 
-    if settings.get("allow_auto_merge") is not True:
-        errors.append(f"{settings_path}: allow_auto_merge must be true.")
-
-    if settings.get("delete_branch_on_merge") is not True:
-        errors.append(f"{settings_path}: delete_branch_on_merge must be true.")
+    for key, expected_value in expected_settings.items():
+        expected_literal = str(expected_value).lower()
+        if settings_policy.get(key) is not expected_value:
+            errors.append(f"repository_settings.{key} must be {expected_literal}.")
+        if settings.get(key) is not expected_value:
+            errors.append(f"{settings_path}: {key} must be {expected_literal}.")
 
 
 def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> None:
@@ -454,6 +511,43 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
         errors.append(
             f"{workflow_path}: release PR merge path must sync plain VERSION from .release-please-manifest.json before merging."
         )
+
+    if workflow_policy.get("git_credential_helper_required") is not True:
+        errors.append("workflow.git_credential_helper_required must be true.")
+    if not has_release_git_credential_helper(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must configure a git credential helper for clone/push operations."
+        )
+
+    if workflow_policy.get("forbid_inline_http_extraheader") is not True:
+        errors.append("workflow.forbid_inline_http_extraheader must be true.")
+    if has_inline_http_extraheader_auth(workflow_text):
+        errors.append(
+            f"{workflow_path}: inline git http.extraheader authentication is forbidden for release clone/push operations."
+        )
+
+    has_subject, has_empty_body = has_clean_merge_metadata(workflow_text)
+    if workflow_policy.get("merge_subject_required") is not True:
+        errors.append("workflow.merge_subject_required must be true.")
+    if not has_subject:
+        errors.append(
+            f"{workflow_path}: release PR merge command must set an explicit --subject from the release PR title."
+        )
+
+    if workflow_policy.get("merge_empty_body_required") is not True:
+        errors.append("workflow.merge_empty_body_required must be true.")
+    if not has_empty_body:
+        errors.append(
+            f"{workflow_path}: release PR merge command must pass --body \"\" to avoid changelog duplicate parsing."
+        )
+
+    if workflow_policy.get("release_branch_delete_required") is not True:
+        errors.append("workflow.release_branch_delete_required must be true.")
+    if not has_release_branch_cleanup(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must explicitly delete the release branch after merge."
+        )
+
     if not has_actions_write_permission(workflow_text):
         errors.append(
             f"{workflow_path}: release workflow must grant actions: write for publish dispatch."
