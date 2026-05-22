@@ -24,6 +24,8 @@ Deployment files:
 
 The workflow intentionally uses `GITHUB_TOKEN` so release PRs do not trigger Dayu-managed PR/Issue/TDD CI or token-derived follow-up workflow runs. The release workflow closes the loop by dispatching `workflow_dispatch mode=publish` after the release PR merges.
 
+`VERSION` remains a plain text file. Before auto-merging a release PR, the release workflow reads the root version from that PR's `.release-please-manifest.json`, writes it back to `VERSION`, and then re-runs the release file allowlist check. Do not rely on `release-please-config.json` `extra-files` to update the plain text `VERSION` file.
+
 By default, release-please auto-merge and PR lint skip are allowed for:
 - `github-actions[bot]`
 - `release-please[bot]`

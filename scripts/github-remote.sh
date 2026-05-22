@@ -165,6 +165,14 @@ parse_json_array_names() {
     printf '%s' "$parsed"
 }
 
+parse_resource_names() {
+    local payload="$1"
+    local collection_key="$2"
+    local parsed=""
+    parsed="$(printf '%s' "$payload" | jq -r --arg key "$collection_key" 'if type == "array" then .[]? elif type == "object" then (.[$key] // [])[]? else empty end | .name // empty' 2>/dev/null | sed '/^$/d' || true)"
+    printf '%s' "$parsed"
+}
+
 contains_line() {
     local needle="$1"
     local lines="$2"
@@ -173,9 +181,7 @@ contains_line() {
         if [ "$line" = "$needle" ]; then
             return 0
         fi
-    done <<JSON
-$lines
-JSON
+    done < <(printf '%s\n' "$lines")
     return 1
 }
 
@@ -193,9 +199,7 @@ to_json_array_from_lines() {
             out+=","
         fi
         out+="\"$(json_escape "$item")\""
-    done <<JSON
-$lines
-JSON
+    done < <(printf '%s\n' "$lines")
     out+=']'
     printf '%s' "$out"
 }
@@ -368,16 +372,14 @@ emit_output() {
     local items_json
     items_json="$(join_json "${ITEMS[@]}")"
 
-    cat <<JSONEOF
-{
-  "status":"$status",
-  "repository":"$(json_escape "${REPOSITORY}")",
-  "default_branch":"$(json_escape "${DEFAULT_BRANCH}")",
-  "visibility":"$(json_escape "${VISIBILITY}")",
-  "items":[${items_json}],
-  "description_nl":"$(json_escape "$description")"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "status":"%s",\n' "$status"
+    printf '  "repository":"%s",\n' "$(json_escape "${REPOSITORY}")"
+    printf '  "default_branch":"%s",\n' "$(json_escape "${DEFAULT_BRANCH}")"
+    printf '  "visibility":"%s",\n' "$(json_escape "${VISIBILITY}")"
+    printf '  "items":[%s],\n' "$items_json"
+    printf '  "description_nl":"%s"\n' "$(json_escape "$description")"
+    printf '}\n'
 }
 
 HAS_GIT="false"
@@ -605,11 +607,45 @@ assess_remote_sync_state() {
 }
 
 push_initialization_pr() {
-    local short_sha init_branch pr_body push_output push_rc pr_output pr_rc
+    local short_sha init_branch init_issue_url init_issue_number issue_output issue_rc pr_body push_output push_rc pr_output pr_rc
 
     short_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
     init_branch="dayu-harness/init-${short_sha}"
-    pr_body="Dayu Harness 初始化分支。远端 ${DEFAULT_BRANCH} 需要通过 PR 同步（可能因远端已领先/分叉，或本地默认分支保护已启用），且全程不使用 force push。"
+
+    set +e
+    issue_output="$(gh issue create --repo "$REPOSITORY" --title "chore: initialize Dayu Harness" --body "Track the Dayu Harness initialization PR for ${DEFAULT_BRANCH}. This issue is created by github-remote.sh so initialization remains issue-first and PR lint can close the loop automatically." 2>&1)"
+    issue_rc=$?
+    set -e
+    if [ "$issue_rc" -eq 0 ] && [ -n "$issue_output" ]; then
+        init_issue_url="$issue_output"
+        init_issue_number="${init_issue_url##*/}"
+        add_item "{\"kind\":\"issue\",\"action\":\"create\",\"number\":\"$(json_escape "$init_issue_number")\",\"status\":\"ok\",\"description_nl\":\"已创建 Dayu Harness 初始化 Issue #${init_issue_number}。\"}" "ok"
+    else
+        add_item "{\"kind\":\"issue\",\"action\":\"create\",\"status\":\"error\",\"description_nl\":\"初始化 Issue 创建失败，已停止创建初始化 PR，避免生成无法通过 PR lint 的半成品：$(json_escape "$issue_output")\"}" "error"
+        return 1
+    fi
+
+    pr_body="## Summary
+<!-- dayu-harness:summary -->
+
+- Initialize Dayu Harness governance through an initialization branch.
+- Keep remote ${DEFAULT_BRANCH} synchronized through a PR without force push.
+
+## Implementation notes
+<!-- dayu-harness:implementation-notes -->
+
+- Remote ${DEFAULT_BRANCH} may already be ahead, diverged, or protected from direct local pushes.
+- This PR contains the managed initialization output staged by Dayu Harness.
+
+## Test plan
+<!-- dayu-harness:test-plan -->
+
+- [x] \`docs/harness/sensors/scripts/validate.sh --json .\`
+- [x] \`git push -u origin HEAD:${init_branch}\`
+
+Final PR: yes"
+    pr_body="${pr_body}
+Closes #${init_issue_number}"
 
     set +e
     push_output="$(git -C "$TARGET" push -u origin "HEAD:${init_branch}" 2>&1)"
@@ -841,7 +877,7 @@ rulesets_api_payload() {
 ruleset_id_for_name() {
     local rulesets_json="$1"
     local ruleset_name="$2"
-    printf '%s' "$rulesets_json" | jq -r --arg name "$ruleset_name" '(.rulesets // .)[]? | select(.name == $name) | (.id // empty)' 2>/dev/null | sed -n '1p'
+    printf '%s' "$rulesets_json" | jq -r --arg name "$ruleset_name" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == $name) | (.id // empty)' 2>/dev/null | sed -n '1p'
 }
 
 apply_ruleset_file() {
@@ -938,10 +974,10 @@ verify_mode() {
     variables_json="$(gh api "repos/$REPOSITORY/actions/variables" 2>/dev/null || true)"
     workflow_permissions_json="$(gh api "repos/$REPOSITORY/actions/permissions/workflow" 2>/dev/null || true)"
 
-    branches_lines="$(parse_json_array_names "$branches_json" '[].name // empty')"
-    rulesets_lines="$(parse_json_array_names "$rulesets_json" '(.rulesets // .)[]?.name // empty')"
-    secrets_lines="$(parse_json_array_names "$secrets_json" '.secrets[]?.name // empty')"
-    variables_lines="$(parse_json_array_names "$variables_json" '.variables[]?.name // empty')"
+    branches_lines="$(parse_resource_names "$branches_json" "branches")"
+    rulesets_lines="$(parse_resource_names "$rulesets_json" "rulesets")"
+    secrets_lines="$(parse_resource_names "$secrets_json" "secrets")"
+    variables_lines="$(parse_resource_names "$variables_json" "variables")"
 
     if [ -z "${DEFAULT_BRANCH}" ]; then
         DEFAULT_BRANCH="${TARGET_BRANCH:-main}"
@@ -1020,7 +1056,7 @@ verify_mode() {
                 continue
             fi
             if [ "$req" = "protect-main" ] && [ -n "$DEFAULT_BRANCH" ]; then
-                if ! printf '%s' "$rulesets_json" | jq -e --arg ref "refs/heads/$DEFAULT_BRANCH" '(.rulesets // .)[]? | select(.name == "protect-main") | (.conditions.ref_name.include // []) | index($ref)' >/dev/null 2>&1; then
+                if ! printf '%s' "$rulesets_json" | jq -e --arg ref "refs/heads/$DEFAULT_BRANCH" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == "protect-main") | (.conditions.ref_name.include // []) | index($ref)' >/dev/null 2>&1; then
                     if [ -n "$missing_rulesets" ]; then
                         missing_rulesets+=$'\n'
                     fi

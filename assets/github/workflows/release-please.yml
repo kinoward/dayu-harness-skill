@@ -350,8 +350,130 @@ jobs:
             exit 0
           fi
 
+          sync_version_from_manifest() {
+            pr_number="$1"
+            if ! command -v jq >/dev/null 2>&1; then
+              echo "jq not available."
+              exit 1
+            fi
+
+            head_ref="$(gh pr view "$pr_number" --repo "$REPO" --json headRefName --jq '.headRefName // empty')"
+            if [ -z "$head_ref" ]; then
+              echo "Could not resolve release PR #${pr_number} head branch."
+              exit 1
+            fi
+
+            workdir="$(mktemp -d)"
+            git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" \
+              clone --depth 1 --branch "$head_ref" "https://github.com/$REPO.git" "$workdir"
+
+            version="$(jq -r '."." // empty' "$workdir/.release-please-manifest.json" 2>/dev/null || true)"
+            if [ -z "$version" ] || [ "$version" = "null" ]; then
+              echo "Release PR #${pr_number} does not contain a root manifest version."
+              exit 1
+            fi
+
+            current_version=""
+            if [ -f "$workdir/VERSION" ]; then
+              current_version="$(tr -d '\r\n' < "$workdir/VERSION")"
+            fi
+
+            if [ "$current_version" = "$version" ]; then
+              echo "VERSION is already synchronized for release $version."
+              rm -rf "$workdir"
+              return 0
+            fi
+
+            printf '%s\n' "$version" > "$workdir/VERSION"
+            git -C "$workdir" config user.name "github-actions[bot]"
+            git -C "$workdir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "$workdir" add VERSION
+            if git -C "$workdir" diff --cached --quiet -- VERSION; then
+              echo "VERSION has no staged changes after synchronization."
+              rm -rf "$workdir"
+              return 0
+            fi
+            git -C "$workdir" commit -m "chore: sync VERSION for release $version"
+            git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" \
+              -C "$workdir" push origin "HEAD:$head_ref"
+            echo "Synchronized VERSION to $version for release PR #${pr_number}."
+            rm -rf "$workdir"
+          }
+
+          assert_release_pr_allowed_files() {
+            pr_number="$1"
+            files_file="$(mktemp)"
+            if ! gh api "repos/$REPO/pulls/$pr_number/files?per_page=100" --paginate > "$files_file"; then
+              echo "Failed to fetch release PR #${pr_number} files after VERSION synchronization."
+              rm -f "$files_file"
+              exit 1
+            fi
+
+            if ! python3 - "$RELEASE_PLEASE_POLICY_PATH" "$files_file" <<'PY'
+          import fnmatch
+          import json
+          import sys
+
+          policy_path, files_path = sys.argv[1:3]
+          with open(policy_path, encoding="utf-8") as file_obj:
+              policy = json.load(file_obj)
+
+          allowed_patterns = policy.get("release_pr", {}).get("allowed_paths", [])
+          if not isinstance(allowed_patterns, list) or not allowed_patterns:
+              print("release_pr.allowed_paths must be a non-empty array.", file=sys.stderr)
+              raise SystemExit(1)
+
+          def is_allowed(path):
+              return any(
+                  isinstance(pattern, str)
+                  and pattern.strip()
+                  and fnmatch.fnmatch(path, pattern)
+                  for pattern in allowed_patterns
+              )
+
+          raw = open(files_path, encoding="utf-8").read()
+          decoder = json.JSONDecoder()
+          index = 0
+          files = []
+          while index < len(raw):
+              while index < len(raw) and raw[index].isspace():
+                  index += 1
+              if index >= len(raw):
+                  break
+              payload, index = decoder.raw_decode(raw, index)
+              if isinstance(payload, list):
+                  files.extend(payload)
+              elif isinstance(payload, dict):
+                  files.append(payload)
+
+          for item in files:
+              touched = []
+              filename = item.get("filename")
+              previous_filename = item.get("previous_filename")
+              if isinstance(filename, str):
+                  touched.append(filename)
+              if isinstance(previous_filename, str) and previous_filename:
+                  touched.append(previous_filename)
+              if not touched:
+                  print("release PR contains a file without a filename.", file=sys.stderr)
+                  raise SystemExit(1)
+              for path in touched:
+                  if not is_allowed(path):
+                      print(f"release PR touches disallowed file: {path}", file=sys.stderr)
+                      raise SystemExit(1)
+          PY
+            then
+              rm -f "$files_file"
+              exit 1
+            fi
+
+            rm -f "$files_file"
+          }
+
           while IFS= read -r pr_number; do
             [ -z "$pr_number" ] && continue
+            sync_version_from_manifest "$pr_number"
+            assert_release_pr_allowed_files "$pr_number"
             echo "Merging release PR #${pr_number}..."
             gh pr merge "$pr_number" --auto --merge --delete-branch --repo "$REPO"
 

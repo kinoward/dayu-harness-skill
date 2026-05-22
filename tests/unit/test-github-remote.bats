@@ -7,6 +7,7 @@ setup() {
     TEST_DIR="$(mktemp -d "$TEST_ROOT/run.XXXXXX")"
     SCRIPT="$REPO_ROOT/scripts/github-remote.sh"
     export SCRIPT
+    export DAYU_HARNESS_PR_BODY_VALIDATOR="$REPO_ROOT/assets/github/scripts/pr_body_structure.py"
 
     WRAPPER_DIR="$TEST_DIR/wrapper"
     mkdir -p "$WRAPPER_DIR"
@@ -74,6 +75,37 @@ if [ "${1:-}" = "repo" ]; then
     exit 0
 fi
 
+if [ "${1:-}" = "issue" ]; then
+    if [ "${2:-}" = "create" ]; then
+        printf 'https://github.com/%s/issues/42\n' "$REPO"
+        exit 0
+    fi
+    exit 0
+fi
+
+if [ "${1:-}" = "pr" ]; then
+    if [ "${2:-}" = "create" ]; then
+        BODY=""
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --body)
+                    BODY="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        if [ -n "${DAYU_HARNESS_PR_BODY_VALIDATOR:-}" ]; then
+            printf '%s\n' "$BODY" | python3 "$DAYU_HARNESS_PR_BODY_VALIDATOR" >/dev/null
+        fi
+        printf 'https://github.com/%s/pull/24\n' "$REPO"
+        exit 0
+    fi
+    exit 0
+fi
+
 if [ "${1:-}" = "api" ]; then
     if [ "${2:-}" = "-X" ]; then
         exit 0
@@ -108,6 +140,12 @@ JSON
         exit 0
         ;;
       "repos/$REPO/rulesets")
+        if [ "$SCENARIO" = "real_arrays" ]; then
+          cat <<JSON
+[{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}},{"id":43,"name":"protect-tags","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}}}]
+JSON
+          exit 0
+        fi
         if [ "$SCENARIO" = "apply_actions" ]; then
           cat <<JSON
 {"total_count":1,"rulesets":[{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}}]}
@@ -126,6 +164,12 @@ JSON
         exit 0
         ;;
       "repos/$REPO/actions/secrets")
+        if [ "$SCENARIO" = "real_arrays" ]; then
+          cat <<JSON
+[{"name":"RELEASE_TOKEN"}]
+JSON
+          exit 0
+        fi
         if [ "$SCENARIO" = "verify_missing" ]; then
           cat <<JSON
 {"total_count":0,"secrets":[]}
@@ -138,6 +182,12 @@ JSON
         exit 0
         ;;
       "repos/$REPO/actions/variables")
+        if [ "$SCENARIO" = "real_arrays" ]; then
+          cat <<JSON
+[{"name":"RELEASE_PLEASE_ALLOWED_ACTORS"}]
+JSON
+          exit 0
+        fi
         if [ "$SCENARIO" = "verify_missing" ]; then
           cat <<JSON
 {"total_count":1,"variables":[{"name":"RELEASE_PLEASE_ALLOWED_ACTORS"}]}
@@ -804,4 +854,24 @@ JSON
     echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .status=="missing" and (.missing | index("default_workflow_permissions=write") != null))'
     echo "$output" | jq -e '.items | any(.kind=="secrets" and .required == [])'
     echo "$output" | jq -e '.items | any(.kind=="variables" and .required == [])'
+}
+
+@test "github-remote --verify accepts real GitHub array responses for branches and rulesets" {
+    local repo_dir="$TEST_DIR/verify-real-arrays"
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/verify-real-arrays.git"
+
+    export DAYU_HARNESS_GH_SCENARIO="real_arrays"
+    export DAYU_HARNESS_GH_REPO="acme/verify-real-arrays"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/verify-real-arrays"
+    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"workflow_permissions"},{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
+    write_fake_gh real_arrays
+
+    run bash "$SCRIPT" "$repo_dir" --verify
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.items | any(.kind=="branches" and .status=="ok" and (.present | index("main") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="ok" and (.present | index("protect-main") != null) and (.present | index("protect-tags") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .status=="ok" and (.present | index("can_approve_pull_request_reviews=true") != null))'
 }

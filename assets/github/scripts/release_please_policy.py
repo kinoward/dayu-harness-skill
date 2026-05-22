@@ -245,6 +245,20 @@ def has_publish_dispatch_after_merge(workflow_text: str) -> bool:
     )
 
 
+def has_plain_version_manifest_sync(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "sync_version_from_manifest",
+            ".release-please-manifest.json",
+            "VERSION is already synchronized",
+            "git -C \"$workdir\" add VERSION",
+            "push origin \"HEAD:$head_ref\"",
+            "assert_release_pr_allowed_files",
+        )
+    )
+
+
 def has_actions_write_permission(workflow_text: str) -> bool:
     return bool(re.search(r"(?m)^\s+actions\s*:\s*write\s*$", workflow_text))
 
@@ -321,6 +335,8 @@ def validate_release_pr_policy(policy: dict, errors: list[str]) -> None:
     ]
     if invalid_items:
         errors.append("release_pr.allowed_paths entries must be non-empty strings.")
+    if "VERSION" not in allowed_paths:
+        errors.append("release_pr.allowed_paths must include VERSION.")
 
 
 def validate_repository_settings(policy: dict, project_root: Path, errors: list[str]) -> None:
@@ -431,6 +447,12 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
     if not has_publish_dispatch_after_merge(workflow_text):
         errors.append(
             f"{workflow_path}: release PR merge path must dispatch workflow_dispatch mode=publish."
+        )
+    if workflow_policy.get("plain_version_sync_required") is not True:
+        errors.append("workflow.plain_version_sync_required must be true.")
+    if not has_plain_version_manifest_sync(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must sync plain VERSION from .release-please-manifest.json before merging."
         )
     if not has_actions_write_permission(workflow_text):
         errors.append(
@@ -545,8 +567,13 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
         errors.append(f"{config_path}: packages['.'].release-type must be 'node'.")
 
     extra_files = package_cfg.get("extra-files")
-    if not isinstance(extra_files, list) or "VERSION" not in extra_files:
-        errors.append(f"{config_path}: packages['.'].extra-files must include VERSION.")
+    if extra_files is not None:
+        if not isinstance(extra_files, list):
+            errors.append(f"{config_path}: packages['.'].extra-files must be an array when present.")
+        elif "VERSION" in extra_files:
+            errors.append(
+                f"{config_path}: plain VERSION must be synchronized by the release workflow, not packages['.'].extra-files."
+            )
 
     seen_types: list[str] = []
     for idx, section in enumerate(sections):

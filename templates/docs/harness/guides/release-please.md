@@ -24,6 +24,8 @@ release-please 根据 Conventional Commits 自动生成 release PR、版本号�
 
 使用 `GITHUB_TOKEN` 的目的，是让 release PR 不触发 Dayu 自带 PR/Issue/TDD CI，也不触发依赖 token 派生事件的后续 workflow。发布闭环由同一个 release workflow 在 release PR 合并后触发 `workflow_dispatch mode=publish` 完成。
 
+`VERSION` 保持纯文本格式。release workflow 在自动合并 release PR 前读取 release PR 内 `.release-please-manifest.json` 的根版本，并把该版本写回 `VERSION` 后再重新执行 release 文件 allowlist 校验。不要依赖 `release-please-config.json` 的 `extra-files` 更新纯文本 `VERSION`。
+
 默认允许以下 actor 触发 release-please 自动合并与 PR lint 跳过：
 - `github-actions[bot]`
 - `release-please[bot]`

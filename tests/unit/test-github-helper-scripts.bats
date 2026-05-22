@@ -218,6 +218,7 @@ JSON
   "pull-request-title-pattern": "release ${version}",
   "packages": {
     ".": {
+      "extra-files": ["VERSION"],
       "changelog-sections": [
         {
           "type": "feat",
@@ -243,7 +244,7 @@ JSON
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -270,6 +271,7 @@ JSON
     [[ "$output" == *"allow_auto_merge must be true"* ]]
     [[ "$output" == *"pull-request-title-pattern must be 'Release \${version}'"* ]]
     [[ "$output" == *"missing types: fix"* ]]
+    [[ "$output" == *"plain VERSION must be synchronized by the release workflow"* ]]
 }
 
 @test "release_please_policy.py requires exact release push allowlist" {
@@ -345,7 +347,7 @@ JSON
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -444,7 +446,7 @@ JSON
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -656,6 +658,7 @@ JSON
     [ "$status" -eq 1 ]
     [[ "$output" == *"workflow.github_token_required must be true."* ]]
     [[ "$output" == *"workflow.publish_mode_required must be true."* ]]
+    [[ "$output" == *"workflow.plain_version_sync_required must be true."* ]]
     [[ "$output" == *"workflow.forbid_legacy_release_auth must be true."* ]]
 }
 
@@ -774,7 +777,7 @@ JSON
     [[ "$output" == *"legacy RELEASE_TOKEN or RELEASE_PLEASE_ALLOWED_ACTORS reference is forbidden"* ]]
 }
 
-@test "release_please_policy.py passes with GITHUB_TOKEN and publish-only mode" {
+@test "release_please_policy.py passes with GITHUB_TOKEN, plain VERSION sync, and publish-only mode" {
     local policy_file="$TEST_DIR/release-please-policy.json"
     local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
     local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
@@ -815,6 +818,15 @@ JSON
       "        with:" \
       '          token: ${{ secrets.GITHUB_TOKEN }}' \
       "          skip-github-pull-request: \${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}" \
+      "      - name: Sync VERSION in release PR" \
+      "        run: |" \
+      "          sync_version_from_manifest() {" \
+      "            jq -r '.\".\" // empty' .release-please-manifest.json" \
+      "            echo \"VERSION is already synchronized\"" \
+      "            git -C \"\$workdir\" add VERSION" \
+      "            git -C \"\$workdir\" push origin \"HEAD:\$head_ref\"" \
+      "          }" \
+      "          assert_release_pr_allowed_files 1" \
       "      - name: Merge release-please PR" \
       "        env:" \
       '          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}' \
@@ -843,7 +855,6 @@ JSON
   "packages": {
     ".": {
       "release-type": "node",
-      "extra-files": ["VERSION"],
       "changelog-sections": [
         {
           "type": "feat",
@@ -872,12 +883,13 @@ JSON
     "label_gate_required": false,
     "github_token_required": true,
     "publish_mode_required": true,
+    "plain_version_sync_required": true,
     "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",

@@ -190,6 +190,7 @@ PROJECT_VERSION="0.1.0"
 GITHUB_REMOTE_JSON='{"status":"skipped","description_nl":"GitHub remote orchestration was not requested."}'
 REMOTE_VALIDATION_JSON='{"status":"skipped","description_nl":"Remote validation was not requested."}'
 GITHUB_E2E_JSON='{"status":"skipped","description_nl":"GitHub Issue/PR E2E validation was not requested."}'
+RELEASE_SETTLEMENT_JSON='{"status":"skipped","description_nl":"Release post-remote revalidation was not requested."}'
 MANAGED_PATHS=()
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -210,6 +211,7 @@ if ! command -v jq >/dev/null 2>&1; then
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -599,10 +601,18 @@ selected_has_github_e2e_capabilities() {
     [ "$has_issue" = "true" ] && [ "$has_pr" = "true" ]
 }
 
+selected_has_release_please_capability() {
+    local cap_id
+    for cap_id in "$@"; do
+        [ "$cap_id" = "github.release-please" ] && return 0
+    done
+    return 1
+}
+
 run_github_remote() {
     local mode="$1"
     shift || true
-    local remote_output remote_rc
+    local remote_output remote_rc remote_stderr remote_stderr_file payload
     local remote_actions_json
     remote_actions_json="$(selected_remote_actions_json "$@")"
 
@@ -611,18 +621,35 @@ run_github_remote() {
         return 0
     fi
 
+    remote_stderr_file=""
+    if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
+        remote_stderr_file="$(mktemp "${TMPDIR%/}/dayu-github-remote-stderr.XXXXXX" 2>/dev/null || true)"
+    fi
+    if [ -z "$remote_stderr_file" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
+        remote_stderr_file="$(mktemp "/tmp/dayu-github-remote-stderr.XXXXXX" 2>/dev/null || true)"
+    fi
     set +e
-    remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_GITHUB_REPOSITORY="$GITHUB_REPOSITORY" DAYU_HARNESS_GITHUB_VISIBILITY="$GITHUB_VISIBILITY" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>&1)"
-    remote_rc=$?
+    if [ -n "$remote_stderr_file" ]; then
+        remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_GITHUB_REPOSITORY="$GITHUB_REPOSITORY" DAYU_HARNESS_GITHUB_VISIBILITY="$GITHUB_VISIBILITY" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>"$remote_stderr_file")"
+        remote_rc=$?
+        remote_stderr="$(sed -n '1,12p' "$remote_stderr_file" | tr '\n' ' ' || true)"
+        rm -f "$remote_stderr_file"
+    else
+        remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_GITHUB_REPOSITORY="$GITHUB_REPOSITORY" DAYU_HARNESS_GITHUB_VISIBILITY="$GITHUB_VISIBILITY" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>&1)"
+        remote_rc=$?
+        remote_stderr=""
+    fi
     set -e
 
-    if printf '%s' "$remote_output" | jq -e . >/dev/null 2>&1; then
-        printf '%s' "$remote_output"
+    payload="$(printf '%s\n' "$remote_output" | json_payload_from_output)"
+    if printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
+        printf '%s' "$payload"
     else
-        printf '{"status":"error","exit_code":%s,"description_nl":"github-remote.sh %s failed or returned non-JSON output.","raw":"%s"}' \
+        printf '{"status":"error","exit_code":%s,"description_nl":"github-remote.sh %s failed or returned non-JSON stdout.","stdout":"%s","stderr":"%s"}' \
             "$remote_rc" \
             "$(json_escape "$mode")" \
-            "$(json_escape "$remote_output")"
+            "$(json_escape "$remote_output")" \
+            "$(json_escape "$remote_stderr")"
     fi
 }
 
@@ -1399,6 +1426,231 @@ remote_workflow_exists() {
     gh api "repos/$repo/contents/.github/workflows/$workflow?ref=$DEFAULT_BRANCH" >/dev/null 2>&1
 }
 
+release_settlement_result_json() {
+    local status="$1"
+    local desc="$2"
+    local wait_status="${3:-skipped}"
+    local refresh_status="${4:-skipped}"
+    local checks_json="${5:-null}"
+    printf '{"status":"%s","wait_status":"%s","refresh_status":"%s","post_apply_checks":%s,"description_nl":"%s"}' \
+        "$(json_escape "$status")" \
+        "$(json_escape "$wait_status")" \
+        "$(json_escape "$refresh_status")" \
+        "$checks_json" \
+        "$(json_escape "$desc")"
+}
+
+github_remote_initialization_pr_pending() {
+    local apply_json="$1"
+    printf '%s' "$apply_json" | jq -e '.items[]? | select((.kind == "remote" and .action == "push_init_branch" and .status == "ok") or (.kind == "pull_request" and .action == "create" and .status == "ok"))' >/dev/null 2>&1
+}
+
+wait_release_please_workflow_quiet() {
+    local repo="$1"
+    local started_after="$2"
+    local timeout="${DAYU_HARNESS_RELEASE_SETTLE_TIMEOUT_SECONDS:-900}"
+    local deadline=$((SECONDS + timeout))
+    local runs_json recent_count active_count failed_count stable_count
+    stable_count=0
+
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        runs_json="$(gh run list --repo "$repo" --workflow "release-please.yml" --json databaseId,status,conclusion,event,createdAt --limit 30 2>/dev/null || true)"
+        recent_count="$(printf '%s' "$runs_json" | jq -r --arg after "$started_after" '[.[]? | select($after == "" or .createdAt >= $after)] | length' 2>/dev/null || echo 0)"
+        active_count="$(printf '%s' "$runs_json" | jq -r --arg after "$started_after" '[.[]? | select(($after == "" or .createdAt >= $after) and .status != "completed")] | length' 2>/dev/null || echo 0)"
+        failed_count="$(printf '%s' "$runs_json" | jq -r --arg after "$started_after" '[.[]? | select(($after == "" or .createdAt >= $after) and .status == "completed" and (.conclusion // "") != "success")] | length' 2>/dev/null || echo 0)"
+
+        recent_count="${recent_count:-0}"
+        active_count="${active_count:-0}"
+        failed_count="${failed_count:-0}"
+
+        if [ "$recent_count" -gt 0 ] && [ "$active_count" -eq 0 ]; then
+            stable_count=$((stable_count + 1))
+            if [ "$stable_count" -ge 2 ]; then
+                if [ "$failed_count" -gt 0 ]; then
+                    return 1
+                fi
+                return 0
+            fi
+        else
+            stable_count=0
+        fi
+        sleep 10
+    done
+
+    return 2
+}
+
+run_post_apply_checks_at_root() {
+    local root="$1"
+    local original_target="$TARGET"
+    local result
+    TARGET="$root"
+    result="$(run_post_apply_checks)"
+    TARGET="$original_target"
+    printf '%s' "$result"
+}
+
+make_writable_tmpdir() {
+    local prefix="$1"
+    local tmpdir=""
+    if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
+        tmpdir="$(mktemp -d "${TMPDIR%/}/${prefix}.XXXXXX" 2>/dev/null || true)"
+    fi
+    if [ -z "$tmpdir" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
+        tmpdir="$(mktemp -d "/tmp/${prefix}.XXXXXX" 2>/dev/null || true)"
+    fi
+    printf '%s' "$tmpdir"
+}
+
+prepare_release_validation_root() {
+    local current_branch remote_ref local_head remote_head pull_output tmp_parent tmp_worktree
+    RELEASE_VALIDATION_ROOT=""
+    RELEASE_VALIDATION_TMP_WORKTREE=""
+    RELEASE_REFRESH_STATUS="passed"
+
+    [ -n "$DEFAULT_BRANCH" ] || return 1
+    if ! git -C "$TARGET" fetch origin "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        return 1
+    fi
+    remote_ref="origin/$DEFAULT_BRANCH"
+    if ! git -C "$TARGET" rev-parse --verify "$remote_ref" >/dev/null 2>&1; then
+        return 1
+    fi
+    current_branch="$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    local_head="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
+    remote_head="$(git -C "$TARGET" rev-parse "$remote_ref" 2>/dev/null || true)"
+    [ -n "$remote_head" ] || return 1
+
+    if [ "$current_branch" = "$DEFAULT_BRANCH" ] && [ -z "$(git -C "$TARGET" status --porcelain)" ]; then
+        if [ "$local_head" = "$remote_head" ]; then
+            RELEASE_VALIDATION_ROOT="$TARGET"
+            return 0
+        fi
+        if git -C "$TARGET" merge-base --is-ancestor HEAD "$remote_ref" >/dev/null 2>&1; then
+            set +e
+            pull_output="$(git -C "$TARGET" pull --ff-only origin "$DEFAULT_BRANCH" 2>&1)"
+            local pull_rc=$?
+            set -e
+            if [ "$pull_rc" -ne 0 ]; then
+                printf '%s' "$pull_output" >&2
+                return 1
+            fi
+            local_head="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
+            if [ "$local_head" != "$remote_head" ]; then
+                return 1
+            fi
+            RELEASE_VALIDATION_ROOT="$TARGET"
+            return 0
+        fi
+    fi
+
+    tmp_parent="$(make_writable_tmpdir "dayu-release-remote-main")"
+    if [ -z "$tmp_parent" ]; then
+        return 1
+    fi
+    rmdir "$tmp_parent" >/dev/null 2>&1 || true
+    tmp_worktree="$tmp_parent"
+    if ! git -C "$TARGET" worktree add --detach "$tmp_worktree" "$remote_ref" >/dev/null 2>&1; then
+        rm -rf "$tmp_worktree" >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    RELEASE_VALIDATION_ROOT="$tmp_worktree"
+    RELEASE_VALIDATION_TMP_WORKTREE="$tmp_worktree"
+    RELEASE_REFRESH_STATUS="worktree"
+    return 0
+}
+
+cleanup_release_validation_root() {
+    if [ -n "${RELEASE_VALIDATION_TMP_WORKTREE:-}" ]; then
+        git -C "$TARGET" worktree remove --force "$RELEASE_VALIDATION_TMP_WORKTREE" >/dev/null 2>&1 || rm -rf "$RELEASE_VALIDATION_TMP_WORKTREE"
+        RELEASE_VALIDATION_TMP_WORKTREE=""
+    fi
+}
+
+run_release_post_remote_revalidation() {
+    local apply_json="$1"
+    local verify_json="$2"
+    local started_after="$3"
+    shift 3 || true
+    local repo wait_rc wait_status refresh_rc refresh_status checks_json checks_status desc
+
+    if ! selected_has_release_please_capability "$@"; then
+        release_settlement_result_json "skipped" "Release post-remote revalidation requires github.release-please."
+        return 0
+    fi
+    if [ "$GITHUB_REMOTE_MODE" != "apply" ] && [ "$GITHUB_REMOTE_MODE" != "verify" ]; then
+        release_settlement_result_json "skipped" "Release post-remote revalidation requires --github-remote apply or --github-remote verify."
+        return 0
+    fi
+    repo="$(repo_from_remote_json "$verify_json")"
+    if [ -z "$repo" ]; then
+        repo="$(repo_from_remote_json "$apply_json")"
+    fi
+    if [ -z "$repo" ]; then
+        release_settlement_result_json "failed" "Release post-remote revalidation could not resolve owner/repo."
+        return 0
+    fi
+    if ! command -v gh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+        release_settlement_result_json "failed" "Release post-remote revalidation requires gh, git and jq."
+        return 0
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        release_settlement_result_json "failed" "Release post-remote revalidation requires an authenticated GitHub CLI session."
+        return 0
+    fi
+    if github_remote_initialization_pr_pending "$apply_json"; then
+        release_settlement_result_json "skipped" "Release post-remote revalidation waits until the initialization PR is merged into the remote default branch." "skipped" "skipped"
+        return 0
+    fi
+    if ! remote_workflow_exists "$repo" "release-please.yml"; then
+        release_settlement_result_json "failed" "release-please.yml must exist on the remote default branch before release revalidation."
+        return 0
+    fi
+
+    wait_status="skipped"
+    if [ -n "$started_after" ]; then
+        wait_status="passed"
+        set +e
+        wait_release_please_workflow_quiet "$repo" "$started_after"
+        wait_rc=$?
+        set -e
+        if [ "$wait_rc" -ne 0 ]; then
+            if [ "$wait_rc" -eq 1 ]; then
+                release_settlement_result_json "failed" "release-please workflow completed with a non-success conclusion." "failed" "skipped"
+            else
+                release_settlement_result_json "failed" "release-please workflow did not settle before timeout." "timeout" "skipped"
+            fi
+            return 0
+        fi
+    fi
+
+    refresh_status="passed"
+    set +e
+    prepare_release_validation_root
+    refresh_rc=$?
+    set -e
+    if [ "$refresh_rc" -ne 0 ]; then
+        release_settlement_result_json "failed" "Release revalidation could not fetch or prepare the remote default branch for validation." "$wait_status" "failed"
+        return 0
+    fi
+    refresh_status="${RELEASE_REFRESH_STATUS:-passed}"
+
+    checks_json="$(run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT")"
+    cleanup_release_validation_root
+    checks_status="$(echo "$checks_json" | jq -r '.status // "skipped"' 2>/dev/null || echo "skipped")"
+    if [ "$checks_status" = "failed" ]; then
+        desc="Release workflow settled, but post-release validate/audit/check-consistency failed."
+        release_settlement_result_json "failed" "$desc" "$wait_status" "$refresh_status" "$checks_json"
+    elif [ "$checks_status" = "partial" ]; then
+        desc="Release workflow settled, but post-release checks had skipped items."
+        release_settlement_result_json "partial" "$desc" "$wait_status" "$refresh_status" "$checks_json"
+    else
+        desc="Release workflow settled; refreshed default branch and post-release checks passed."
+        release_settlement_result_json "passed" "$desc" "$wait_status" "$refresh_status" "$checks_json"
+    fi
+}
+
 run_github_target_e2e() {
     local apply_json="$1"
     local verify_json="$2"
@@ -1542,6 +1794,7 @@ run_github_target_e2e() {
 - [x] \`gh issue view $issue_number --repo $repo\`
 - [x] \`gh pr checks --repo $repo\`
 
+Final PR: yes
 Closes #$issue_number
 EOF
     if ! pr_url="$(gh pr create --repo "$repo" --base "$DEFAULT_BRANCH" --head "$branch" --title "test: verify Dayu Harness GitHub E2E" --body-file "$body_file" 2>/dev/null)"; then
@@ -1671,6 +1924,7 @@ do_dry_run() {
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),
@@ -1735,6 +1989,7 @@ do_apply() {
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
   "environment":${environment_json},
   "capabilities":[],
   "summary":"Environment preparation blocked deployment.",
@@ -1917,10 +2172,13 @@ JSONEOF
         fi
     fi
 
+    local release_remote_started_at=""
+    local release_settlement_status=""
     if [ "$has_remote_sync" = "true" ]; then
         case "$GITHUB_REMOTE_MODE" in
             apply)
                 if [ "$overall_status" = "ok" ]; then
+                    release_remote_started_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
                     GITHUB_REMOTE_JSON="$(run_github_remote apply "${capability_ids[@]}")"
                     REMOTE_VALIDATION_JSON="$(run_github_remote verify "${capability_ids[@]}")"
                 else
@@ -1961,6 +2219,20 @@ JSONEOF
                     overall_status="partial"
                 fi
             fi
+        fi
+    fi
+
+    if selected_has_release_please_capability "${capability_ids[@]}"; then
+        if [ "$overall_status" = "ok" ]; then
+            RELEASE_SETTLEMENT_JSON="$(run_release_post_remote_revalidation "$GITHUB_REMOTE_JSON" "$REMOTE_VALIDATION_JSON" "$release_remote_started_at" "${capability_ids[@]}")"
+            release_settlement_status="$(echo "$RELEASE_SETTLEMENT_JSON" | jq -r '.status // "skipped"' 2>/dev/null || echo "failed")"
+            if [ "$release_settlement_status" = "failed" ]; then
+                overall_status="error"
+            elif [ "$release_settlement_status" = "partial" ] && [ "$overall_status" = "ok" ]; then
+                overall_status="partial"
+            fi
+        else
+            RELEASE_SETTLEMENT_JSON='{"status":"skipped","description_nl":"Release post-remote revalidation waits until deployment, local validation, git finalization and remote verification are successful."}'
         fi
     fi
 
@@ -2011,6 +2283,7 @@ JSONEOF
   "github_remote":${GITHUB_REMOTE_JSON},
   "remote_validation":${REMOTE_VALIDATION_JSON},
   "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
   "environment":${environment_json},
   "capabilities":[${capabilities_json}],
   "managed_paths":$(json_array_from_lines "${MANAGED_PATHS[@]}"),

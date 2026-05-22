@@ -271,6 +271,45 @@ json_from_output() {
 	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply or --github-remote verify")'
 	}
 
+	@test "conversation replay: GitHub target E2E is issue-first and creates lint-ready PR body" {
+	    local issue_line pr_line
+	    issue_line="$(grep -n 'gh issue create' "$REPO_ROOT/scripts/scaffold.sh" | sed -n '1s/:.*//p')"
+	    pr_line="$(grep -n 'gh pr create' "$REPO_ROOT/scripts/scaffold.sh" | sed -n '1s/:.*//p')"
+
+	    [ -n "$issue_line" ]
+	    [ -n "$pr_line" ]
+	    [ "$issue_line" -lt "$pr_line" ]
+	    grep -Fq "Final PR: yes" "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'Closes #$issue_number' "$REPO_ROOT/scripts/scaffold.sh"
+	    if grep -Fq "gh issue close" "$REPO_ROOT/scripts/scaffold.sh"; then
+	        echo "target E2E must not manually close issues"
+	        exit 1
+	    fi
+	}
+
+	@test "conversation replay: release settlement waits for init PR and validates origin default branch" {
+	    grep -Fq 'github_remote_initialization_pr_pending "$apply_json"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'Release post-remote revalidation waits until the initialization PR is merged' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'git -C "$TARGET" worktree add --detach "$tmp_worktree" "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'if [ "$local_head" = "$remote_head" ]; then' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'git -C "$TARGET" merge-base --is-ancestor HEAD "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
+	    if grep -Fq 'refresh_status="skipped"' "$REPO_ROOT/scripts/scaffold.sh"; then
+	        echo "release settlement must not pass by skipping remote default-branch refresh"
+	        exit 1
+	    fi
+	}
+
+	@test "conversation replay: initialization PR body follows Dayu PR template" {
+	    grep -Fq "## Summary" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "<!-- dayu-harness:summary -->" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "## Implementation notes" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "<!-- dayu-harness:implementation-notes -->" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "## Test plan" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "<!-- dayu-harness:test-plan -->" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "Final PR: yes" "$REPO_ROOT/scripts/github-remote.sh"
+	}
+
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {
 	    local project_dir="$TEST_DIR/default-no-github-optional"
 	    cp -R "$REPO_ROOT/tests/fixtures/skill-empty-template" "$project_dir"
