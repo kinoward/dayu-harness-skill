@@ -76,10 +76,13 @@ TMP_WORKDIR=""
 if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
     TMP_WORKDIR="$(mktemp -d "${TMPDIR%/}/dayu-harness.XXXXXX" 2>/dev/null || true)"
 fi
+if [ -z "$TMP_WORKDIR" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
+    TMP_WORKDIR="$(mktemp -d "/tmp/dayu-harness.XXXXXX" 2>/dev/null || true)"
+fi
 if [ -z "$TMP_WORKDIR" ]; then
     TMP_WORKDIR="$PROJECT_ROOT/.dayu-harness-tmp.$$"
     mkdir -p "$TMP_WORKDIR" || {
-        echo "错误: 无法创建临时目录 '$TMP_WORKDIR'" >&2
+        echo "错误: 无法创建临时目录。请设置可写 TMPDIR，或确保 /tmp 可写。最后尝试位置: '$TMP_WORKDIR'" >&2
         exit 2
     }
 fi
@@ -738,18 +741,16 @@ output_json() {
     c3_status_json="pass"; [ "$c3_status" != "pass" ] && c3_status_json="fail"
     c4_status_json="pass"; [ "$c4_status" != "pass" ] && c4_status_json="fail"
 
-    cat <<JSONEOF
-{
-  "checks": [
-    {"id":"C1","name":"链接有效性","status":"$c1_status_json","issues":[$c1_issues_json],"detail":"$c1_detail"},
-    {"id":"C2","name":"索引计数","status":"$c2_status_json","issues":[$c2_issues_json],"detail":"$c2_detail"},
-    {"id":"C3","name":"孤儿检测","status":"$c3_status_json","issues":[$c3_issues_json],"detail":"$c3_detail"},
-    {"id":"C4","name":"脚本完整性","status":"$c4_status_json","issues":[$c4_issues_json],"detail":"$c4_detail"}
-  ],
-  "summary": {"total":$total,"passed":$passed,"failed":$failed},
-  "description_nl":"$desc"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "checks": [\n'
+    printf '    {"id":"C1","name":"链接有效性","status":"%s","issues":[%s],"detail":"%s"},\n' "$c1_status_json" "$c1_issues_json" "$c1_detail"
+    printf '    {"id":"C2","name":"索引计数","status":"%s","issues":[%s],"detail":"%s"},\n' "$c2_status_json" "$c2_issues_json" "$c2_detail"
+    printf '    {"id":"C3","name":"孤儿检测","status":"%s","issues":[%s],"detail":"%s"},\n' "$c3_status_json" "$c3_issues_json" "$c3_detail"
+    printf '    {"id":"C4","name":"脚本完整性","status":"%s","issues":[%s],"detail":"%s"}\n' "$c4_status_json" "$c4_issues_json" "$c4_detail"
+    printf '  ],\n'
+    printf '  "summary": {"total":%s,"passed":%s,"failed":%s},\n' "$total" "$passed" "$failed"
+    printf '  "description_nl":"%s"\n' "$desc"
+    printf '}\n'
 }
 
 # ---------------------------------------------------------------------------

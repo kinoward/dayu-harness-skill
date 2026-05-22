@@ -665,13 +665,11 @@ DESC_NL=$(build_description_nl)
 
 # 8. 结果输出
 if [ "$JSON_MODE" = true ]; then
-    cat <<JSONEOF
-{
-  "checks": [${CHECKS_JSON}],
-  "summary": {"passed": ${PASSED}, "failed": ${FAILED}},
-  "description_nl": "$(json_escape "$DESC_NL")"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "checks": [%s],\n' "$CHECKS_JSON"
+    printf '  "summary": {"passed": %s, "failed": %s},\n' "$PASSED" "$FAILED"
+    printf '  "description_nl": "%s"\n' "$(json_escape "$DESC_NL")"
+    printf '}\n'
 else
     echo ""
     echo "=== 校验结果 ==="
