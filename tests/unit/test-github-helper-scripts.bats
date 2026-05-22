@@ -253,7 +253,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -356,7 +361,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -455,7 +465,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -659,6 +674,11 @@ JSON
     [[ "$output" == *"workflow.github_token_required must be true."* ]]
     [[ "$output" == *"workflow.publish_mode_required must be true."* ]]
     [[ "$output" == *"workflow.plain_version_sync_required must be true."* ]]
+    [[ "$output" == *"workflow.git_credential_helper_required must be true."* ]]
+    [[ "$output" == *"workflow.forbid_inline_http_extraheader must be true."* ]]
+    [[ "$output" == *"workflow.merge_subject_required must be true."* ]]
+    [[ "$output" == *"workflow.merge_empty_body_required must be true."* ]]
+    [[ "$output" == *"workflow.release_branch_delete_required must be true."* ]]
     [[ "$output" == *"workflow.forbid_legacy_release_auth must be true."* ]]
 }
 
@@ -830,7 +850,13 @@ JSON
       "      - name: Merge release-please PR" \
       "        env:" \
       '          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}' \
-      "        run: gh pr merge 1 --auto --merge --delete-branch" \
+      "        run: |" \
+      "          git config --global credential.helper '!f() { echo \"username=x-access-token\"; echo \"password=\$GH_TOKEN\"; }; f'" \
+      "          pr_title=\"Release 1.2.3\"" \
+      "          gh pr view 1 --json headRefName --jq '.headRefName'" \
+      "          head_ref=\"release-please--branches--main\"" \
+      "          gh pr merge 1 --auto --merge --delete-branch --repo \"\$REPO\" --subject \"\${pr_title:-Release}\" --body \"\"" \
+      "          git push origin --delete \"\$head_ref\"" \
       "      - run: gh workflow run release-please.yml --ref main -f mode=publish"
 
     cat > "$lint_workflow_file" <<'YAML'
@@ -884,6 +910,11 @@ JSON
     "github_token_required": true,
     "publish_mode_required": true,
     "plain_version_sync_required": true,
+    "git_credential_helper_required": true,
+    "forbid_inline_http_extraheader": true,
+    "merge_subject_required": true,
+    "merge_empty_body_required": true,
+    "release_branch_delete_required": true,
     "forbid_legacy_release_auth": true
   },
   "release_pr": {
@@ -898,13 +929,21 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
 
     cat > "$settings_file" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": false,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": true
 }

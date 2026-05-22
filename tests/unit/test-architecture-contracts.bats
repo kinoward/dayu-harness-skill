@@ -31,6 +31,7 @@ setup() {
     done < <(
         find "$REPO_ROOT" \
             -path "$REPO_ROOT/.git" -prune \
+            -o -path "$REPO_ROOT/.tmp" -prune \
             -o -path "$REPO_ROOT/tests/unit/.tmp" -prune \
             -o -name AGENTS.md -type f -print |
             sort
@@ -138,7 +139,7 @@ if [ "${1:-}" = "api" ]; then
     printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
   fi
   if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
-    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+    printf '%s\n' '{"allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}'
   fi
   exit 0
 fi
@@ -947,7 +948,7 @@ expected_agents_h1() {
     echo "$output" | jq -e '.capabilities | map(.id) | index("github.repository-settings") != null'
     echo "$output" | jq -e 'has("github_remote") and has("remote_validation")'
     echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .remote_actions | any(.kind=="repository_settings")'
-    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="planned" and .allow_auto_merge == true and .delete_branch_on_merge == true)'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="planned" and .allow_merge_commit == true and .allow_squash_merge == false and .allow_rebase_merge == false and .allow_auto_merge == true and .delete_branch_on_merge == true)'
 }
 
 	@test "quality.tdd deploys policy and checker script" {
@@ -1332,6 +1333,9 @@ expected_agents_h1() {
     mkdir -p "$target/.github/repository"
     cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": true,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": false
 }
@@ -1339,7 +1343,7 @@ JSON
 
     run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
     [ "$status" -eq 1 ]
-    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="fail" and (.detail | contains("delete_branch_on_merge=true")))'
+    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="fail" and (.detail | contains("allow_squash_merge=false")) and (.detail | contains("delete_branch_on_merge=true")))'
 }
 
 @test "validate passes valid pull-request settings flags" {
@@ -1347,6 +1351,9 @@ JSON
     mkdir -p "$target/.github/repository"
     cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": false,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": true
 }
@@ -2148,6 +2155,11 @@ PY
     grep -q 'skip-github-pull-request' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'gh workflow run release-please.yml' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q -- '-f mode=publish' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'credential.helper' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'username=x-access-token' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'http.extraheader' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '--subject "${pr_title:-Release}" --body ""' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'git push origin --delete "$head_ref"' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'RELEASE_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'branch_prefix' "$REPO_ROOT/assets/github/workflows/release-please.yml"
@@ -2159,6 +2171,11 @@ PY
     grep -q 'for path in touched' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'has_autorelease_label' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+}
+
+@test "PR lint rejects Conventional Commit PR titles for release-please merge strategy" {
+    grep -q 'PR title must use natural language, not Conventional Commits format' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 're.match(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
 }
 
 @test "PR lint troubleshooting sync checks include previous_filename in rename handling" {

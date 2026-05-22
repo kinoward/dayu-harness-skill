@@ -118,11 +118,11 @@ if [ "${1:-}" = "api" ]; then
         fi
         if [ "$SCENARIO" = "verify_missing" ]; then
           cat <<JSON
-{"default_branch":"$DEFAULT_BRANCH","visibility":"public","allow_auto_merge":true,"delete_branch_on_merge":true}
+{"default_branch":"$DEFAULT_BRANCH","visibility":"public","allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}
 JSON
         else
           cat <<JSON
-{"default_branch":"$DEFAULT_BRANCH","visibility":"public","allow_auto_merge":true,"delete_branch_on_merge":true}
+{"default_branch":"$DEFAULT_BRANCH","visibility":"public","allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}
 JSON
         fi
         exit 0
@@ -503,7 +503,7 @@ JSON
     echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .action=="put" and .status=="ok")'
     echo "$output" | jq -e '.items | any(.kind=="ruleset" and .name=="protect-main" and .action=="update" and .status=="ok")'
     echo "$output" | jq -e '.items | any(.kind=="ruleset" and .name=="protect-tags" and .action=="create" and .status=="ok")'
-    grep -Fq "api -X PATCH repos/acme/actions-target -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
+    grep -Fq "api -X PATCH repos/acme/actions-target -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
     grep -Fq "api -X PUT repos/acme/actions-target/actions/permissions/workflow -f default_workflow_permissions=write -F can_approve_pull_request_reviews=true" "$call_log"
     grep -Fq "api -X PUT repos/acme/actions-target/rulesets/42 --input" "$call_log"
     grep -Fq "api -X POST repos/acme/actions-target/rulesets --input" "$call_log"
@@ -579,7 +579,7 @@ JSON
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
     grep -Fq "push -u origin HEAD:main" "$push_log"
-    grep -Fq "api -X PATCH repos/acme/no-actions -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
+    grep -Fq "api -X PATCH repos/acme/no-actions -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
     grep -Fq "api -X PUT repos/acme/no-actions/rulesets/42 --input" "$call_log"
     grep -Fq "api -X POST repos/acme/no-actions/rulesets --input" "$call_log"
 }
@@ -764,6 +764,7 @@ JSON
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
     echo "$output" | jq -e '.items | any(.kind=="repository_settings" and .status=="ok")'
+    echo "$output" | jq -e '.items[] | select(.kind=="repository_settings") | .present == ["allow_merge_commit","allow_squash_merge=false","allow_rebase_merge=false","allow_auto_merge","delete_branch_on_merge"]'
     echo "$output" | jq -e '.items | all(.kind!="secrets" or .required == [])'
 }
 
@@ -796,7 +797,7 @@ JSON
     run bash "$SCRIPT" "$repo_dir" --apply
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "ok"'
-    grep -Fq "api -X PATCH repos/acme/selected-actions -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
+    grep -Fq "api -X PATCH repos/acme/selected-actions -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true" "$call_log"
     if grep -Eq "api -X (POST|PUT) repos/acme/selected-actions/rulesets" "$call_log"; then
       echo "rulesets should not be applied when remote_actions only requests repository settings"
       exit 1

@@ -57,7 +57,7 @@ if [ "${1:-}" = "api" ]; then
     printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
   fi
   if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
-    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+    printf '%s\n' '{"allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}'
   fi
   exit 0
 fi
@@ -340,7 +340,7 @@ json_from_output() {
 	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
 	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply")'
 	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
-	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
 	    assert_path "$project_dir/.github/workflows/pr-lint.yml"
@@ -367,7 +367,7 @@ json_from_output() {
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable release.automated --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
 	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
-	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/workflows/release-please.yml"
 	    assert_path "$project_dir/.github/release-please-policy.json"
