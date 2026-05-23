@@ -1,10 +1,10 @@
 # Phase 1c 架构契约
 
-本文把 CEO Plan 中的 Phase 1c 落成可执行契约，供 Phase 1d TypeScript CLI 垂直切片直接引用。Phase 1c 不实现完整 CLI 写入流程；它先固定命令树、依赖图和三层边界，避免 Phase 1d 在执行层里重新解释架构。
+本文把 CEO Plan 中的 Phase 1c 落成可执行契约，供 Phase 1d/1e TypeScript CLI 垂直切片直接引用。Phase 1c 不实现完整 CLI 写入流程；它先固定命令树、依赖图和三层边界，避免执行层重新解释架构。Phase 1e 按最终关卡决议将公开命令收敛为 4 个。
 
 ## 目标
 
-- 固化 6 个 CLI 命令的职责边界：`init`、`apply`、`diagnose`、`merge`、`validate`、`generate`。
+- 固化 Phase 1 公开 CLI 命令的职责边界：`init`、`apply`、`diagnose`、`validate`。
 - 将依赖拆成部署 DAG 和概念依赖图，明确二者的消费者和错误语义。
 - 明确 Frontend / Tool / Product 三层分离，禁止跨层耦合。
 - 用 TypeScript 纯函数契约覆盖 Phase 1d 需要复用的静态行为。
@@ -21,16 +21,16 @@
 
 CLI 属于 Tool 层。Skill 负责自然语言引导和问题选择，CLI 不做交互式问答；所有命令都必须支持 `--json` 机器输出，默认输出人类可读摘要。
 
-| 命令 | 作用 | 对应旧模式 | Phase 1d 语义 |
+| 命令 | 作用 | 对应旧模式 | Phase 1 语义 |
 | --- | --- | --- | --- |
-| `init` | 若缺少 `dayu.config.yaml`，生成默认配置，然后委托 `apply` | scaffold 入口 | 可 dry-run；不做交互 |
-| `apply` | 读取 config，解析部署 DAG，渲染文件，运行 installer，输出漂移或冲突 | scaffold 执行阶段 | Phase 1d 核心路径 |
+| `init` | 若缺少 `dayu.config.yaml`，生成默认配置，然后委托 `apply` | scaffold 入口 | 默认 dry-run；`--apply` 才写入 |
+| `apply` | 读取 config，解析部署 DAG，渲染文件，运行 installer，输出漂移或冲突 | scaffold 执行阶段 | 支持 `--dry-run` 与 `--only <capability>` |
 | `diagnose` | 检查已部署治理体系健康状态，并承接 maintain 的不一致检测 | diagnose + maintain 检测 | 只读 |
-| `merge` | 检测已有配置，按能力粒度形成保留/替换/跳过计划 | merge | Phase 1d 先输出计划 |
 | `validate` | 校验 manifest、config、依赖和部署产物一致性 | 新命令 | 只读 |
-| `generate` | 独立渲染内容，不要求完整 scaffold/apply 流程 | generate + maintain 修复生成 | 先预览输出 |
 
 对应 TypeScript 契约位于 [src/architecture/cli-command-tree.ts](../src/architecture/cli-command-tree.ts)。
+
+`merge` 和 `generate` 的完整公开命令推迟到 Phase 2；Phase 1 不在 CLI help、命令树或公开测试入口暴露它们。
 
 ## 依赖模型
 
@@ -87,7 +87,7 @@ core -> git.hooks -> git.commit-format -> ai.execution
 
 对应 TypeScript 契约位于 [src/architecture/layers.ts](../src/architecture/layers.ts)。
 
-## Phase 1d 入口标准
+## Phase 1d/1e 入口标准
 
 进入 Phase 1d 前应满足：
 
@@ -95,3 +95,4 @@ core -> git.hooks -> git.commit-format -> ai.execution
 - `phase1c-architecture.test.ts` 通过，保证命令树、依赖图和层级边界可被代码引用。
 - `scaffold.sh` spike 已记录现有 Bash 逻辑，TypeScript port 不重新猜测旧行为。
 - Phase 1d 只面向 4 个 v2 试点能力读取 `ManifestV2Schema`；legacy manifest 全量迁移留到 Phase 2。
+- Phase 1e 公开 CLI 只暴露 4 个命令；`init` 默认 dry-run，`apply --only` 可部署单能力闭包。

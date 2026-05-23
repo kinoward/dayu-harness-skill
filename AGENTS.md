@@ -30,6 +30,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [scripts/github-remote.sh](scripts/github-remote.sh) - GitHub 远端检查、创建/绑定、推送与远端能力验证脚本
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
 - [docs/phase1d-cli.md](docs/phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
+- [docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md) - Phase 1e CLI 公开范围收口、init/apply 行为和验证方式
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
 - [tests/smoke/dayu-harness-profile.sh](tests/smoke/dayu-harness-profile.sh) - local-fast / remote-smoke / remote-release 分层测试入口
@@ -61,7 +62,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 1c 将 CLI 命令树、部署 DAG、概念依赖图和三层分离约束固化在 `src/architecture/` 与 `docs/phase1c-architecture.md`。Phase 1d 在 `src/cli/` 提供 3 个能力的 TypeScript CLI 垂直切片，验证 config handoff、dry-run、apply、diagnose、merge plan、validate 和 generate。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 1c 将 CLI 命令树、部署 DAG、概念依赖图和三层分离约束固化在 `src/architecture/` 与 `docs/phase1c-architecture.md`。Phase 1d 在 `src/cli/` 提供 3 个能力的 TypeScript CLI 垂直切片；Phase 1e 将公开命令收敛为 `init`、`apply`、`diagnose`、`validate`，并补齐默认 dry-run、`apply --only` 和原子写入契约。
 
 4. **机械化检查优先于文字承诺**
 
@@ -87,7 +88,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 ## 能力清单
 
-`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。Phase 1b 试点能力开始采用 manifest v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；其中 `kind` 区分 hard / soft / infra 能力，`rse` 描述 Rule-Sensor-Enforcer 链路或其子集。Phase 1c 明确 `deployment_deps` 只服务 CLI apply 的部署顺序，`conceptual_deps` 只服务 Skill/CLI 的说明与展示顺序，不阻塞部署。Phase 1d 只加载 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 四个 v2 试点能力，完整能力迁移留到 Phase 2。未迁移能力仍按旧 manifest 字段服务现有脚手架流程。
+`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。Phase 1b 试点能力开始采用 manifest v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；其中 `kind` 区分 hard / soft / infra 能力，`rse` 描述 Rule-Sensor-Enforcer 链路或其子集。Phase 1c 明确 `deployment_deps` 只服务 CLI apply 的部署顺序，`conceptual_deps` 只服务 Skill/CLI 的说明与展示顺序，不阻塞部署。Phase 1d/1e 只加载 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 四个 v2 试点能力，完整能力迁移和公开 `merge` / `generate` 命令留到 Phase 2。未迁移能力仍按旧 manifest 字段服务现有脚手架流程。
 
 | 分组 | 能力 ID | 部署内容 |
 | --- | --- | --- |
@@ -290,6 +291,7 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 npm run test:phase1b -- --test-reporter=spec
 npm run test:phase1c -- --test-reporter=spec
 npm run test:phase1d -- --test-reporter=spec
+npm run test:phase1e -- --test-reporter=spec
 npm run test:unit -- --test-reporter=spec
 npx tsc --noEmit
 bats tests/unit/test-architecture-contracts.bats
@@ -301,7 +303,7 @@ bats tests/unit
 验证重点：
 
 - `AGENTS.md` 目录索引完整性。
-- Phase 1b schema、Phase 1c 架构契约、Phase 1d CLI 垂直切片、能力 manifest 与模板/资产映射一致性。
+- Phase 1b schema、Phase 1c 架构契约、Phase 1d CLI 垂直切片、Phase 1e CLI 公开范围、能力 manifest 与模板/资产映射一致性。
 - 环境预检、dry-run 预览、merge plan 合并计划和收尾验证流程。
 - 默认能力与可选能力的部署结果。
 

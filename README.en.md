@@ -169,7 +169,7 @@ The README only shows a high-level structure; the complete directory tree and ow
 
 - Entry points & indexes: `README.md`, `README.en.md`, `AGENTS.md` (including subdirectory indexes)
 - Capabilities, schema, architecture contracts & deployment engine: `capabilities/`, `src/`, `locales/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
-- Local validation toolchain: `package.json`, `tsconfig.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`
+- Local validation toolchain: `package.json`, `tsconfig.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`
 - Outputs & maintenance materials: `docs/`, `marketing/`, `tests/`
 - Publishing & repository automation: `.github/workflows/update-contributors.yml` refreshes README dynamic blocks; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
 

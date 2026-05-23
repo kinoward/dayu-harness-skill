@@ -9,6 +9,7 @@ Skill 自身文档索引。
 - [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
 - [phase1d-cli.md](phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
+- [phase1e-cli-scope.md](phase1e-cli-scope.md) - Phase 1e CLI 公开范围收口、init/apply 行为和验证方式
 - [scaffold-sh-spike.md](scaffold-sh-spike.md) - `scaffold.sh` 内部逻辑 spike 与 TypeScript port 风险记录
 - [completion-report-template.md](completion-report-template.md) - Skill 执行完成后的验证与自然语言收尾模板
 
@@ -22,6 +23,7 @@ Skill 自身文档索引。
 - [optimization-2026-05.md](optimization-2026-05.md)：2026-05 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md)：Phase 1c CLI 命令树、DAG 和三层边界契约
 - [phase1d-cli.md](phase1d-cli.md)：Phase 1d TypeScript CLI 垂直切片实现边界、命令语义和验证方式
+- [phase1e-cli-scope.md](phase1e-cli-scope.md)：Phase 1e 公开 CLI 命令收口、默认 dry-run 和 `apply --only` 契约
 - [scaffold-sh-spike.md](scaffold-sh-spike.md)：现有 `scaffold.sh` 的关键执行语义与 TS port 注意事项
 - [completion-report-template.md](completion-report-template.md)：Skill 执行完成后如何检查目标项目并向用户汇报结果
 

@@ -15,7 +15,8 @@
 - `test-diff-helper.bats`：验证 diff/merge 描述辅助脚本。
 - `phase1b-schema.test.ts`：验证 manifest v2、`dayu.config.yaml` schema、key-based i18n catalog、路径安全和 Phase 1 兼容契约。
 - `phase1c-architecture.test.ts`：验证 CLI 命令树、部署 DAG、概念依赖图和 Frontend/Tool/Product 三层分离契约。
-- `phase1d-cli.test.ts`：验证 TypeScript CLI 垂直切片的 dry-run JSON、apply、no-op、冲突检测、init roundtrip、diagnose、validate 和 generate。
+- `phase1d-cli.test.ts`：验证 TypeScript CLI 垂直切片的 dry-run JSON、apply、no-op、冲突检测、init roundtrip、diagnose、validate 和 Phase 2 generate 原型。
+- `phase1e-cli-scope.test.ts`：验证 Phase 1e 公开 CLI 收口、init 默认 dry-run、`apply --only` 和原子写入。
 
 其中新增环境依赖前置断言，覆盖：
 - `scripts/ensure-environment.sh --check` 的标准 JSON 字段契约；
@@ -120,6 +121,12 @@ npm run test:phase1c -- --test-reporter=spec
 npm run test:phase1d -- --test-reporter=spec
 ```
 
+单独运行 Phase 1e CLI 公开范围检查：
+
+```bash
+npm run test:phase1e -- --test-reporter=spec
+```
+
 运行全部 TypeScript 单元契约：
 
 ```bash
@@ -146,6 +153,7 @@ bats tests/unit
 - 修改 manifest v2 字段、`dayu.config.yaml` schema、locale key 或 TypeScript schema 时，必须更新并运行 `phase1b-schema.test.ts`。
 - 修改 CLI 命令树、部署/概念依赖图、三层分离约束或 TypeScript 架构契约时，必须更新并运行 `phase1c-architecture.test.ts`。
 - 修改 TypeScript CLI、apply planner、installer adapter、diagnose/validate/generate 行为或 Phase 1d 试点能力部署语义时，必须更新并运行 `phase1d-cli.test.ts`。
+- 修改 Phase 1 public CLI 暴露命令、`init` 默认行为、`apply --only` 或原子写入时，必须更新并运行 `phase1e-cli-scope.test.ts`。
 - 修改执行测试模板或测试流程时，同步更新 `tests/fixtures/skill-usage-test-results.md`。
 - 只有当目标项目实际部署内容发生产品层变化时，才修改 `templates/`、`assets/`、`capabilities/`；不要为了测试记录改动部署内容。
 - TypeScript/tsx 运行缓存写入根 `.tmp/`；Bats fixture 和临时项目运行实例写入 `tests/unit/.tmp/`。两个目录均通过 `.gitignore` 忽略运行产物，只保留忽略规则本身。
