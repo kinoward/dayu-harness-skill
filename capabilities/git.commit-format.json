@@ -1,12 +1,52 @@
 {
   "id": "git.commit-format",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Conventional Commits validation and commit format guidance",
   "description_nl": "Enable Conventional Commits guidance, commitlint config, and commit-msg format validation.",
   "default": true,
+  "deployment_deps": [
+    "core",
+    "git.hooks"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core",
     "git.hooks"
   ],
+  "i18n": {
+    "title_key": "capability.git.commit-format.title",
+    "description_key": "capability.git.commit-format.description",
+    "acceptance_keys": [
+      "capability.git.commit-format.acceptance.hook",
+      "capability.git.commit-format.acceptance.commitlint",
+      "capability.git.commit-format.acceptance.no-replace"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.git.commit-format.rule",
+      "artifacts": [
+        "docs/harness/guides/commit-guidelines.md"
+      ]
+    },
+    "sensor": {
+      "type": "config",
+      "summary_key": "capability.git.commit-format.sensor",
+      "checks": [
+        "commitlint.config.cjs",
+        ".husky/commit-msg"
+      ]
+    },
+    "enforcer": {
+      "type": "hook",
+      "summary_key": "capability.git.commit-format.enforcer",
+      "mechanisms": [
+        "commit-msg"
+      ]
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/commit-guidelines.md",

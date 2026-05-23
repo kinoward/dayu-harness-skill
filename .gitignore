@@ -5,3 +5,6 @@ tests/unit/.tmp/*
 !tests/unit/.tmp/.gitignore
 __pycache__/
 *.pyc
+node_modules/
+coverage/
+.npm-cache/

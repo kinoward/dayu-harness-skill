@@ -1,11 +1,36 @@
 {
   "id": "ai.execution",
+  "schemaVersion": "2.0.0",
+  "kind": "soft",
   "description": "AI execution and collaboration practices",
   "description_nl": "Deploy AI execution practices for human/AI responsibilities, autonomous work, retries, and reporting.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.ai.execution.title",
+    "description_key": "capability.ai.execution.description",
+    "acceptance_keys": [
+      "capability.ai.execution.acceptance.document",
+      "capability.ai.execution.acceptance.autonomy"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.ai.execution.rule",
+      "artifacts": [
+        "docs/harness/guides/ai-execution.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/ai-execution.md",

@@ -1,0 +1,19 @@
+{
+  "name": "dayu-harness-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:phase1b",
+    "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.8.2",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,9 +1,37 @@
 {
   "id": "core",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Core governance documentation and maintenance scripts",
   "description_nl": "Deploy the core governance documentation and maintenance scripts.",
   "default": true,
+  "deployment_deps": [],
+  "conceptual_deps": [],
   "dependencies": [],
+  "i18n": {
+    "title_key": "capability.core.title",
+    "description_key": "capability.core.description",
+    "acceptance_keys": [
+      "capability.core.acceptance.docs",
+      "capability.core.acceptance.scripts",
+      "capability.core.acceptance.dayu-format"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.core.rule",
+      "artifacts": [
+        "AGENTS.md",
+        "docs/harness/maintenance.md",
+        "docs/harness/sensors/scripts/validate.sh",
+        "docs/harness/sensors/scripts/audit.sh",
+        "docs/harness/sensors/scripts/check-consistency.sh"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/CLAUDE.md",
