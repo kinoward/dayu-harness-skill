@@ -3,13 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "dayu-harness": "./src/cli/main.ts"
+  },
   "scripts": {
+    "dayu": "TMPDIR=.tmp tsx src/cli/main.ts",
     "test": "npm run test:unit",
     "test:unit": "TMPDIR=.tmp node --import tsx --test tests/unit/*.test.ts",
     "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts",
-    "test:phase1c": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1c-architecture.test.ts"
+    "test:phase1c": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1c-architecture.test.ts",
+    "test:phase1d": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1d-cli.test.ts"
   },
   "dependencies": {
+    "commander": "^14.0.3",
     "yaml": "^2.8.2",
     "zod": "^4.1.12"
   },
