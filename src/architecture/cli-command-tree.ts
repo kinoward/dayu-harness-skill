@@ -1,6 +1,6 @@
 import type { ArchitectureLayerId } from "./layers.js";
 
-export type CliCommandName = "init" | "apply" | "diagnose" | "merge" | "validate" | "generate";
+export type CliCommandName = "init" | "apply" | "diagnose" | "validate";
 
 export interface CliCommandSpec {
   name: CliCommandName;
@@ -13,7 +13,7 @@ export interface CliCommandSpec {
   supportsDryRun: boolean;
   supportsJson: boolean;
   interactive: boolean;
-  phase1dSlice: boolean;
+  phase1Slice: boolean;
 }
 
 export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
@@ -28,7 +28,7 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     supportsDryRun: true,
     supportsJson: true,
     interactive: false,
-    phase1dSlice: true
+    phase1Slice: true
   },
   {
     name: "apply",
@@ -41,7 +41,7 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     supportsDryRun: true,
     supportsJson: true,
     interactive: false,
-    phase1dSlice: true
+    phase1Slice: true
   },
   {
     name: "diagnose",
@@ -54,20 +54,7 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     supportsDryRun: false,
     supportsJson: true,
     interactive: false,
-    phase1dSlice: true
-  },
-  {
-    name: "merge",
-    layer: "tool",
-    purpose: "Detect existing configuration and plan keep/replace/skip decisions at capability granularity.",
-    mapsFromMode: "merge",
-    reads: ["dayu.config.yaml", "manifest v2 registry", "target project state"],
-    writes: ["merge plan", "product artifacts when --apply is used"],
-    delegatesTo: [],
-    supportsDryRun: true,
-    supportsJson: true,
-    interactive: false,
-    phase1dSlice: true
+    phase1Slice: true
   },
   {
     name: "validate",
@@ -80,20 +67,7 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     supportsDryRun: false,
     supportsJson: true,
     interactive: false,
-    phase1dSlice: true
-  },
-  {
-    name: "generate",
-    layer: "tool",
-    purpose: "Render content independently from the full scaffold/apply flow.",
-    mapsFromMode: "generate + maintain repair content generation",
-    reads: ["manifest v2 registry", "templates", "locales", "dayu.config.yaml"],
-    writes: ["rendered content preview", "product artifacts when explicitly applied"],
-    delegatesTo: [],
-    supportsDryRun: true,
-    supportsJson: true,
-    interactive: false,
-    phase1dSlice: true
+    phase1Slice: true
   }
 ];
 

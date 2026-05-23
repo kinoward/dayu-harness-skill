@@ -50,14 +50,20 @@ function humanizeReport(report: CliReport): string {
       return [
         `diagnose: ${report.status}`,
         `target: ${report.targetRoot}`,
-        `present=${report.summary.present} missing=${report.summary.missing} wrong-mode=${report.summary.wrongMode} drift=${report.summary.drift} needs-merge=${report.summary.needsMerge}`
+        `present=${report.summary.present} missing=${report.summary.missing} wrong-mode=${report.summary.wrongMode} drift=${report.summary.drift} needs-merge=${report.summary.needsMerge}`,
+        ...report.capabilities.map(
+          (capability) =>
+            `${capability.capabilityId}: ${capability.status} rule=${capability.rse.rule.present ? "yes" : "no"} sensor=${capability.rse.sensor.present ? "yes" : "no"} enforcer=${capability.rse.enforcer.present ? "yes" : "no"}`
+        )
       ].join("\n");
     case "merge":
       return [
         `merge: ${report.status}`,
+        `granularity: ${report.decisionGranularity}`,
         `target: ${report.targetRoot}`,
         ...report.capabilities.map(
-          (capability) => `${capability.capabilityId}: ${capability.status} (${capability.recommendation})`
+          (capability) =>
+            `${capability.capabilityId}: ${capability.status} default=${capability.defaultStrategy} choices=${capability.availableStrategies.join("/")}`
         )
       ].join("\n");
     case "validate":

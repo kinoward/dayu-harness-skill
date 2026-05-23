@@ -65,6 +65,52 @@ render_fragment() {
     fi
 }
 
+hook_write_target() {
+    local dst="$1"
+    if [ -L "$dst" ]; then
+        local link
+        link="$(readlink "$dst")" || return 1
+        case "$link" in
+            /*) printf '%s\n' "$link" ;;
+            *) printf '%s/%s\n' "$(cd "$(dirname "$dst")" && pwd)" "$link" ;;
+        esac
+    else
+        printf '%s\n' "$dst"
+    fi
+}
+
+hook_file_mode() {
+    local dst="$1"
+    stat -L -f '%Lp' "$dst" 2>/dev/null || stat -L -c '%a' "$dst" 2>/dev/null || true
+}
+
+write_hook_atomically() {
+    local dst="$1"
+    local mode="${2:-755}"
+    local write_target
+    local dir
+    local tmp
+
+    write_target="$(hook_write_target "$dst")" || return 1
+    dir="$(dirname "$write_target")"
+    mkdir -p "$dir"
+    tmp="$(mktemp "$dir/.dayu-harness.XXXXXX")" || return 1
+
+    if ! cat > "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    chmod "$mode" "$tmp" || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv "$tmp" "$write_target" || {
+        rm -f "$tmp"
+        return 1
+    }
+}
+
 if [ -z "$DEFAULT_BRANCH" ]; then
     DEFAULT_BRANCH="$(detect_default_branch)"
 fi
@@ -106,8 +152,7 @@ ensure_hook_file() {
                 echo 'COMMIT_MSG_FILE="$1"'
             fi
             echo ""
-        } > "$dst"
-        chmod +x "$dst"
+        } | write_hook_atomically "$dst" "755"
     fi
 }
 
@@ -127,14 +172,18 @@ append_fragment() {
         return 0
     fi
 
+    local mode
+    mode="$(hook_file_mode "$dst")"
+    [ -n "$mode" ] || mode="755"
     {
+        cat "$dst"
         echo ""
         echo "$marker_start"
         echo "# The following snippet is added by dayu-harness."
         echo "# Remove this marked section to revert this capability."
         render_fragment "$src"
         echo "$marker_end"
-    } >> "$dst"
+    } | write_hook_atomically "$dst" "$mode"
 }
 
 selected_hooks() {

@@ -1,6 +1,6 @@
 import type { DayuConfig, FileMapping, LocaleCode, ManifestV2 } from "../schemas/index.js";
 
-export type Phase1dCommandName = "init" | "apply" | "diagnose" | "merge" | "validate" | "generate";
+export type CliCommandName = "init" | "apply" | "diagnose" | "validate";
 
 export type ApplyStatus = "planned" | "applied" | "no-op" | "conflict" | "error";
 
@@ -96,13 +96,29 @@ export interface DiagnosticItem {
   reason?: string;
 }
 
-export interface DiagnoseReport {
-  command: "diagnose";
-  status: "healthy" | "unhealthy" | "error";
-  targetRoot: string;
-  configPath: string;
-  healthy: boolean;
-  items: readonly DiagnosticItem[];
+export interface RseSummary {
+  rule: {
+    present: boolean;
+    type?: string;
+    artifacts: readonly string[];
+  };
+  sensor: {
+    present: boolean;
+    type?: string;
+    checks: readonly string[];
+  };
+  enforcer: {
+    present: boolean;
+    type?: string;
+    mechanisms: readonly string[];
+  };
+}
+
+export interface CapabilityDiagnosticSummary {
+  capabilityId: string;
+  kind: ManifestV2["kind"];
+  status: "healthy" | "unhealthy";
+  rse: RseSummary;
   summary: {
     present: number;
     missing: number;
@@ -114,10 +130,45 @@ export interface DiagnoseReport {
   };
 }
 
+export interface DiagnoseReport {
+  command: "diagnose";
+  status: "healthy" | "unhealthy" | "error";
+  targetRoot: string;
+  configPath: string;
+  healthy: boolean;
+  items: readonly DiagnosticItem[];
+  capabilities: readonly CapabilityDiagnosticSummary[];
+  summary: {
+    present: number;
+    missing: number;
+    wrongMode: number;
+    drift: number;
+    needsMerge: number;
+    sourceMissing: number;
+    unsupported: number;
+  };
+}
+
+export type MergeStrategy = "keep" | "replace" | "skip";
+
 export interface MergeCapabilityPlan {
   capabilityId: string;
+  kind: ManifestV2["kind"];
   status: "clean" | "no-op" | "conflict" | "error";
+  decisionGranularity: "capability";
+  availableStrategies: readonly MergeStrategy[];
+  defaultStrategy: MergeStrategy;
   recommendation: "apply" | "skip" | "review";
+  rse: RseSummary;
+  summary: {
+    create: number;
+    chmod: number;
+    merge: number;
+    skip: number;
+    conflict: number;
+    missingSource: number;
+    unsupported: number;
+  };
   paths: readonly string[];
 }
 
@@ -125,6 +176,8 @@ export interface MergeReport {
   command: "merge";
   status: "planned" | "conflict" | "error";
   dryRun: boolean;
+  decisionGranularity: "capability";
+  strategyOptions: readonly MergeStrategy[];
   targetRoot: string;
   configPath: string;
   capabilities: readonly MergeCapabilityPlan[];
@@ -172,6 +225,7 @@ export interface ApplyOptions {
   targetRoot?: string;
   dryRun?: boolean;
   config?: DayuConfig;
+  onlyCapabilityId?: string;
 }
 
 export interface InitOptions {

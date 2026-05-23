@@ -5,8 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { applyDayuConfig, initDayuConfig } from "./apply.js";
 import { diagnoseDayuProject } from "./diagnose.js";
-import { generateDayuContent } from "./generate.js";
-import { planDayuMerge } from "./merge.js";
+import { CliError } from "./errors.js";
 import { writeError, writeReport, type CliReport } from "./output.js";
 import { validateDayuProject } from "./validate.js";
 
@@ -16,13 +15,14 @@ interface CommonOptions {
   dryRun?: boolean;
   json?: boolean;
   locale?: "zh" | "en";
-  capability?: string;
+  apply?: boolean;
+  only?: string;
 }
 
 export function buildProgram(): Command {
   const program = new Command();
 
-  program.name("dayu-harness").description("Dayu Harness Phase 1d TypeScript CLI").option("--json", "emit JSON");
+  program.name("dayu-harness").description("Dayu Harness Phase 1e TypeScript CLI").option("--json", "emit JSON");
 
   program
     .command("init")
@@ -31,13 +31,14 @@ export function buildProgram(): Command {
     .option("--target <path>", "target project root")
     .option("--locale <locale>", "default config locale: zh or en", "zh")
     .option("--dry-run", "preview without writing")
+    .option("--apply", "write dayu.config.yaml and deploy the default plan")
     .option("--json", "emit JSON")
     .action((options: CommonOptions, command: Command) =>
       execute(command, () =>
         initDayuConfig({
           configPath: options.config,
           targetRoot: options.target,
-          dryRun: options.dryRun,
+          dryRun: resolveInitDryRun(options),
           locale: options.locale
         })
       )
@@ -49,13 +50,15 @@ export function buildProgram(): Command {
     .option("--config <path>", "config path")
     .option("--target <path>", "target project root")
     .option("--dry-run", "preview without writing")
+    .option("--only <capability>", "deploy one enabled capability and its deployment dependencies")
     .option("--json", "emit JSON")
     .action((options: CommonOptions, command: Command) =>
       execute(command, () =>
         applyDayuConfig({
           configPath: options.config,
           targetRoot: options.target,
-          dryRun: options.dryRun
+          dryRun: options.dryRun,
+          onlyCapabilityId: options.only
         })
       )
     );
@@ -76,23 +79,6 @@ export function buildProgram(): Command {
     );
 
   program
-    .command("merge")
-    .description("build a capability-granular merge plan")
-    .option("--config <path>", "config path")
-    .option("--target <path>", "target project root")
-    .option("--dry-run", "preview without writing", true)
-    .option("--json", "emit JSON")
-    .action((options: CommonOptions, command: Command) =>
-      execute(command, () =>
-        planDayuMerge({
-          configPath: options.config,
-          targetRoot: options.target,
-          dryRun: true
-        })
-      )
-    );
-
-  program
     .command("validate")
     .description("validate manifest, config, dependency, and product consistency")
     .option("--config <path>", "config path")
@@ -107,29 +93,25 @@ export function buildProgram(): Command {
       )
     );
 
-  program
-    .command("generate")
-    .description("render content previews without applying the full scaffold flow")
-    .option("--config <path>", "config path")
-    .option("--target <path>", "target project root")
-    .option("--capability <id>", "limit previews to one requested capability")
-    .option("--json", "emit JSON")
-    .action((options: CommonOptions, command: Command) =>
-      execute(command, () =>
-        generateDayuContent({
-          configPath: options.config,
-          targetRoot: options.target,
-          capabilityId: options.capability
-        })
-      )
-    );
-
   return program;
 }
 
 export async function runCli(argv: readonly string[] = process.argv): Promise<void> {
   const program = buildProgram();
   await program.parseAsync(argv);
+}
+
+function resolveInitDryRun(options: CommonOptions): boolean {
+  if (options.apply && options.dryRun) {
+    throw new CliError("conflicting-options", "init accepts either --dry-run or --apply, not both", [
+      {
+        code: "conflicting-options",
+        message: "remove --dry-run to apply changes, or remove --apply to preview only"
+      }
+    ]);
+  }
+
+  return options.apply ? false : true;
 }
 
 async function execute(command: Command, action: () => CliReport): Promise<void> {

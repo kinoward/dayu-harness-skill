@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { resolveDeploymentOrder } from "../architecture/index.js";
 import type { CapabilityId, DayuConfig, FileMapping, ManifestV2 } from "../schemas/index.js";
 import { createDefaultDayuConfig, enabledCapabilityIds, readDayuConfig, writeDayuConfig } from "./config.js";
 import { CliError } from "./errors.js";
+import { writeFileAtomically } from "./filesystem.js";
 import { assertConfigCapabilitiesKnown, loadPhase1dManifestRegistry } from "./manifest-registry.js";
 import {
   DEFAULT_CONFIG_FILE,
@@ -41,10 +42,11 @@ interface ResolvedApplyInputs {
 
 export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
   const inputs = resolveApplyInputs(options);
-  const requestedCapabilities = enabledCapabilityIds(inputs.config);
+  const enabledCapabilities = enabledCapabilityIds(inputs.config);
 
   assertConfigCapabilitiesKnown(inputs.config, inputs.registry);
 
+  const requestedCapabilities = resolveRequestedCapabilities(enabledCapabilities, options.onlyCapabilityId);
   const deploymentOrder = resolveDeploymentOrder(
     inputs.registry.manifests,
     requestedCapabilities
@@ -106,7 +108,7 @@ export function applyDayuConfig(options: ApplyOptions = {}): ApplyReport {
     if (operation.status === "create") {
       const rendered = renderFileByPlan(plan, operation);
       mkdirSync(dirname(targetPath), { recursive: true });
-      writeFileSync(targetPath, rendered.content);
+      writeFileAtomically(targetPath, rendered.content);
     }
     if (operation.executable) {
       chmodSync(targetPath, 0o755);
@@ -148,7 +150,7 @@ export function initDayuConfig(options: InitOptions = {}): InitReport {
       ? dirname(explicitConfigPath)
       : resolveTargetRoot();
   const configPath = explicitConfigPath ?? resolveConfigPath(seedTargetRoot);
-  const dryRun = options.dryRun ?? false;
+  const dryRun = options.dryRun ?? true;
   const configExists = fileExists(configPath);
   const config = configExists ? readDayuConfig(configPath) : createDefaultDayuConfig(seedTargetRoot, options.locale ?? "zh");
   const targetRoot = options.targetRoot
@@ -214,6 +216,31 @@ function manifestsInOrder(registry: ManifestRegistry, order: readonly Capability
     }
     return manifest;
   });
+}
+
+function resolveRequestedCapabilities(
+  enabledCapabilities: readonly CapabilityId[],
+  onlyCapabilityId?: string
+): CapabilityId[] {
+  if (!onlyCapabilityId) {
+    return [...enabledCapabilities];
+  }
+
+  if (!enabledCapabilities.includes(onlyCapabilityId as CapabilityId)) {
+    throw new CliError(
+      "capability-not-enabled",
+      `capability '${onlyCapabilityId}' is not enabled in dayu.config.yaml`,
+      [
+        {
+          code: "capability-not-enabled",
+          message: `add '${onlyCapabilityId}' to dayu.config.yaml before using --only`,
+          path: "capabilities"
+        }
+      ]
+    );
+  }
+
+  return [onlyCapabilityId as CapabilityId];
 }
 
 function manifestFileMappings(manifest: ManifestV2, context: RenderContext): RenderedFileMapping[] {

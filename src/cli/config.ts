@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 
@@ -12,6 +12,7 @@ import {
   type LocaleCode
 } from "../schemas/index.js";
 import { CliError } from "./errors.js";
+import { writeFileAtomically } from "./filesystem.js";
 
 export const DEFAULT_PHASE1D_CAPABILITIES: readonly CapabilityId[] = [
   "core",
@@ -44,7 +45,7 @@ export function createDefaultDayuConfig(targetRoot: string, locale: LocaleCode =
 }
 
 export function writeDayuConfig(configPath: string, config: DayuConfig): void {
-  writeFileSync(configPath, stringifyDayuConfig(config), "utf8");
+  writeFileAtomically(configPath, stringifyDayuConfig(config));
 }
 
 export function stringifyDayuConfig(config: DayuConfig): string {
