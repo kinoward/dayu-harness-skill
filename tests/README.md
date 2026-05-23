@@ -76,6 +76,13 @@ RUN_DAYU_REMOTE_RELEASE=1 tests/smoke/dayu-harness-profile.sh --profile remote-r
 
 远端 profile 默认会在结束时删除 disposable 仓库，因此 GitHub CLI token 需要 `delete_repo` scope；缺少该 scope 时脚本会在创建仓库前停止。若需要保留临时仓库排查，可显式设置 `DAYU_KEEP_REMOTE_REPO=1`。
 
+真实远端 profile 运行后必须做收尾核对：
+
+- `gh pr list --repo <owner/repo>` 与 `gh issue list --repo <owner/repo>` 应为空，或只剩明确关闭的历史记录。
+- `git ls-remote --heads origin` 不应残留测试分支或 `release-please--*` 分支。
+- 如果 disposable repo 未能删除，先记录仓库名、确认 open PR/Issue 为空；刷新 `delete_repo` 权限后再执行 `gh repo delete <owner/repo> --yes`。
+- 本地临时项目只允许出现在 `${TMPDIR:-/tmp}/dayu-remote-smoke.XXXXXX/project` 或 `${TMPDIR:-/tmp}/dayu-remote-release.XXXXXX/project`；失败排查后应确认这些目录已删除。
+
 ## 运行方式
 
 单独运行执行层 E2E：
@@ -100,8 +107,10 @@ bats tests/unit
 
 当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。
 
-- `bats tests/unit/test-skill-interaction-e2e.bats`：2/2 通过。
-- `bats tests/unit`：完整维护者测试套件通过。
+- `bats tests/unit/test-github-helper-scripts.bats`：34/34 通过。
+- `bats tests/unit/test-skill-interaction-e2e.bats`：17/17 通过。
+- `bash tests/smoke/dayu-harness-profile.sh --profile local-fast --json`：通过。
+- `bats tests/unit`：完整维护者测试套件按需运行；远端 profile 默认不纳入本地快速基线。
 
 ## 迭代维护规则
 
