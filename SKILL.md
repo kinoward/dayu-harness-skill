@@ -178,7 +178,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 ## 能力清单约定
 
-- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。
+- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。
 - `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。通用质量实践、GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
@@ -191,8 +191,11 @@ Skill 目录中的其他文件按需加载：
 - **[docs/completion-report-template.md](docs/completion-report-template.md)**：Skill 执行完成后的验证流程和自然语言收尾模板。部署、融合、维护或生成操作完成后读取。
 - **[references/agent-compatibility.md](references/agent-compatibility.md)**：Claude、Codex 和通用 Agent Skills 客户端的兼容说明。需要安装、分发或调整触发策略时读取。
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
+- **[src/schemas/](src/schemas/)**：Phase 1 TypeScript/Zod schema，定义 manifest v2、`dayu.config.yaml`、locale catalog 和路径安全校验。
+- **[locales/](locales/)**：key-based i18n 文案 catalog，Phase 1b 用于 schema 与试点能力的中英文本契约。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），默认 Git 资产和用户选择的可选资产会部署到项目对应位置。
 - **[scripts/](scripts/)**：Skill 内部初始化脚本（`scaffold.sh`、`install-husky.sh`、`install-gitignore.sh`；其余能力按 manifest 指定 `installer.script` 调用），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
+- **[package.json](package.json)** 与 **[tsconfig.json](tsconfig.json)**：本地 TypeScript schema 验证工具链入口。
 - **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。

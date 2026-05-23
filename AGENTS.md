@@ -9,9 +9,15 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [README.md](README.md) - 使用者阅读概述与安装指南
 - [README.en.md](README.en.md) - 英文镜像说明文档
 - [.gitignore](.gitignore) - 本仓库临时测试产物忽略规则
+- [.tmp/](.tmp/) - 仓库内测试临时目录占位与运行时缓存承载
+- [package.json](package.json) - 本地 TypeScript schema 与验证工具链入口
+- [package-lock.json](package-lock.json) - Node 依赖锁定文件
+- [tsconfig.json](tsconfig.json) - TypeScript 编译与测试配置
 - [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 动态区块自动更新工作流
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
 - [LICENSE](LICENSE) - MIT 许可文件
+- [src/](src/) - Phase 1 TypeScript schema 与本地验证源码
+- [locales/](locales/) - key-based i18n 文案 catalog
 - [agents/](agents/) - Codex UI 与触发策略元数据
 - [references/agent-compatibility.md](references/agent-compatibility.md) - 跨 Agent 兼容说明
 - [capabilities/](capabilities/) - 治理能力 manifest，部署清单单一事实源
@@ -54,7 +60,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。
 
 4. **机械化检查优先于文字承诺**
 
@@ -80,7 +86,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 ## 能力清单
 
-`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。
+`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。Phase 1b 试点能力开始采用 manifest v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；其中 `kind` 区分 hard / soft / infra 能力，`rse` 描述 Rule-Sensor-Enforcer 链路或其子集。未迁移能力仍按旧 manifest 字段服务现有脚手架流程。
 
 | 分组 | 能力 ID | 部署内容 |
 | --- | --- | --- |
@@ -277,6 +283,8 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 维护本 Skill 后，建议按以下顺序执行：
 
 ```bash
+npm run test:phase1b -- --test-reporter=spec
+npx tsc --noEmit
 bats tests/unit/test-architecture-contracts.bats
 bats tests/unit/test-audit.bats
 bats tests/unit/test-skill-interaction-e2e.bats
@@ -286,7 +294,7 @@ bats tests/unit
 验证重点：
 
 - `AGENTS.md` 目录索引完整性。
-- 能力 manifest 与模板/资产映射一致性。
+- Phase 1b schema、能力 manifest 与模板/资产映射一致性。
 - 环境预检、dry-run 预览、merge plan 合并计划和收尾验证流程。
 - 默认能力与可选能力的部署结果。
 

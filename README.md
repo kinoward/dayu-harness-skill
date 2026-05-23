@@ -168,7 +168,8 @@ Dayu Harness Skill 以中文为源语言，并推荐默认中文部署；英文�
 README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md 中，作为仓库治理的长期事实来源。
 
 - 入口与索引：`README.md`、`README.en.md`、`AGENTS.md`（含子目录索引）
-- 能力与部署引擎：`capabilities/`、`templates/`、`templates.en/`、`assets/`、`scripts/`
+- 能力、schema 与部署引擎：`capabilities/`、`src/`、`locales/`、`templates/`、`templates.en/`、`assets/`、`scripts/`
+- 本地验证工具链：`package.json`、`tsconfig.json`、`tests/unit/phase1b-schema.test.ts`
 - 输出与维护资料：`docs/`、`marketing/`、`tests/`
 - 发布与仓库自动化：`.github/workflows/update-contributors.yml` 负责 README 动态区块；GitHub 能力相关 workflow、ruleset 与策略模板位于 `assets/github/`
 

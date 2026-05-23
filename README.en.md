@@ -168,7 +168,8 @@ The Q&A flow is grouped into blocking decision blocks, including version conflic
 The README only shows a high-level structure; the complete directory tree and ownership boundaries are maintained in AGENTS.md as the repository's long-lived governance source of truth.
 
 - Entry points & indexes: `README.md`, `README.en.md`, `AGENTS.md` (including subdirectory indexes)
-- Capabilities & deployment engine: `capabilities/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
+- Capabilities, schema & deployment engine: `capabilities/`, `src/`, `locales/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
+- Local validation toolchain: `package.json`, `tsconfig.json`, `tests/unit/phase1b-schema.test.ts`
 - Outputs & maintenance materials: `docs/`, `marketing/`, `tests/`
 - Publishing & repository automation: `.github/workflows/update-contributors.yml` refreshes README dynamic blocks; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
 

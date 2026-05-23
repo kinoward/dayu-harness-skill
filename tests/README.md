@@ -13,6 +13,7 @@
 - `test-architecture-contracts.bats`：验证 Skill 包结构、capability manifest、模板索引、脚手架行为和脚本 JSON 契约。
 - `test-audit.bats`：验证 `audit.sh`、`validate.sh`、`check-consistency.sh` 的核心诊断行为。
 - `test-diff-helper.bats`：验证 diff/merge 描述辅助脚本。
+- `phase1b-schema.test.ts`：验证 manifest v2、`dayu.config.yaml` schema、key-based i18n catalog、路径安全和 Phase 1 兼容契约。
 
 其中新增环境依赖前置断言，覆盖：
 - `scripts/ensure-environment.sh --check` 的标准 JSON 字段契约；
@@ -99,6 +100,13 @@ bash scripts/check-i18n-drift.sh --json
 
 该检查会验证英文镜像是否保持中文源的 Markdown 格式结构，包括 README、`templates/` 与 `templates.en/` 的文件树、标题层级、列表层级、表格、引用、代码块和链接行。
 
+单独运行 Phase 1b schema 契约检查：
+
+```bash
+npm run test:phase1b -- --test-reporter=spec
+npx tsc --noEmit
+```
+
 运行完整维护者测试：
 
 ```bash
@@ -115,6 +123,7 @@ bats tests/unit
 ## 迭代维护规则
 
 - 修改 Skill 问答策略、capability 依赖、脚手架行为、安装脚本或部署后校验逻辑时，必须更新并运行 `test-skill-interaction-e2e.bats`。
+- 修改 manifest v2 字段、`dayu.config.yaml` schema、locale key 或 TypeScript schema 时，必须更新并运行 `phase1b-schema.test.ts`。
 - 修改执行测试模板或测试流程时，同步更新 `tests/fixtures/skill-usage-test-results.md`。
 - 只有当目标项目实际部署内容发生产品层变化时，才修改 `templates/`、`assets/`、`capabilities/`；不要为了测试记录改动部署内容。
-- 临时运行实例只写入 `tests/unit/.tmp/`。该目录已用 `.gitignore` 忽略测试产物，只保留忽略规则本身。
+- TypeScript/tsx 运行缓存写入根 `.tmp/`；Bats fixture 和临时项目运行实例写入 `tests/unit/.tmp/`。两个目录均通过 `.gitignore` 忽略运行产物，只保留忽略规则本身。
