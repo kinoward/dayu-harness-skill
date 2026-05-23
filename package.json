@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run test:phase1b",
-    "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts"
+    "test": "npm run test:unit",
+    "test:unit": "TMPDIR=.tmp node --import tsx --test tests/unit/*.test.ts",
+    "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts",
+    "test:phase1c": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1c-architecture.test.ts"
   },
   "dependencies": {
     "yaml": "^2.8.2",
