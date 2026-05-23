@@ -39,6 +39,13 @@ EOF
 
     cat > "$WRAPPER_DIR/npx" <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--no-install" ] && [ "${2:-}" = "commitlint" ] && [ "${3:-}" = "--edit" ]; then
+  if grep -Fq "bad commit message" "${4:-}"; then
+    echo "ERROR: commit message does not follow Conventional Commits format."
+    exit 1
+  fi
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/npx"
@@ -57,7 +64,7 @@ if [ "${1:-}" = "api" ]; then
     printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
   fi
   if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
-    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+    printf '%s\n' '{"allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}'
   fi
   exit 0
 fi
@@ -133,22 +140,43 @@ json_from_output() {
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable "$enabled"
     echo "$output" | jq -e '.status == "needs_initialization"'
-    echo "$output" | jq -e '.environment.items | any(.action == "git init")'
+    echo "$output" | jq -e '.environment.items | any(.action | startswith("git init"))'
     echo "$output" | jq -e '.environment.items | any(.action == "npm init -y")'
     echo "$output" | jq -e '.capability_count == 13'
     echo "$output" | jq -e '.capabilities | map(.id) | sort == ["ai.execution","ai.memory","core","git.commit-format","git.hooks","knowledge.adr","knowledge.archive","knowledge.research","knowledge.troubleshooting","project.context","project.gitignore","quality.node-tooling","quality.practices"]'
 
     run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable "$enabled" --strategy merge
     echo "$output" | jq -e '.status == "ok"'
-    echo "$output" | jq -e '.applied_count == 35'
+    echo "$output" | jq -e '.applied_count == 36'
     echo "$output" | jq -e '.validation == "passed"'
+    echo "$output" | jq -e '.post_apply_checks.status == "passed"'
+    echo "$output" | jq -e '.post_apply_checks.checks | map(.name) == ["validate","audit","check-consistency","capability-smoke"]'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="project.gitignore" and .name=="gitignore-rules" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="git.commit-format" and .name=="commitlint-cli" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="git.commit-format" and .name=="commit-msg-hook" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="quality.node-tooling" and .name=="tooling-cli" and .status=="passed")'
+    echo "$output" | jq -e '.post_apply_checks.checks[] | select(.name=="capability-smoke") | .details.items | any(.capability=="quality.node-tooling" and .name=="pre-commit-hook" and .status=="passed")'
+    echo "$output" | jq -e '.managed_paths | index("package-lock.json")'
+    echo "$output" | jq -e '.managed_paths | index(".claude/") | not'
+    echo "$output" | jq -e '.managed_paths | index("skills-lock.json") | not'
+    echo "$output" | jq -e '.staging_policy.forbidden | index("git add .")'
+    echo "$output" | jq -e '.staging_policy.excluded == [".claude/","skills-lock.json"]'
 
     assert_path "$project_dir/.husky/commit-msg"
     assert_path "$project_dir/.husky/pre-commit"
     assert_no_path "$project_dir/.husky/pre-push"
     assert_path "$project_dir/package.json"
+    assert_path "$project_dir/README.md"
+    assert_path "$project_dir/VERSION"
+    assert_path "$project_dir/CHANGELOG.md"
+    [ "$(cat "$project_dir/VERSION")" = "0.1.0" ]
+    grep -Fq "## 0.1.0" "$project_dir/CHANGELOG.md"
+    jq -e '.version == "0.1.0"' "$project_dir/package.json"
+    assert_path "$project_dir/package-lock.json"
+    jq -e '.version == "0.1.0" and .packages[""].version == "0.1.0"' "$project_dir/package-lock.json"
     assert_path "$project_dir/commitlint.config.cjs"
     assert_path "$project_dir/eslint.config.cjs"
+    assert_path "$project_dir/docs/harness/sensors/scripts/dayu-format.mjs"
     assert_path "$project_dir/docs/references/research/AGENTS.md"
     assert_path "$project_dir/docs/product-specs/project-status.md"
     assert_no_path "$project_dir/.github/workflows/pr-lint.yml"
@@ -170,6 +198,144 @@ json_from_output() {
 	    write_file "$project_dir/.test-msg-cjk" "feat: 提交治理文档"
 	    run bash -c 'cd "$1" && .husky/commit-msg .test-msg-cjk' _ "$project_dir"
 	    [ "$status" -eq 0 ]
+	}
+
+@test "conversation replay: dynamic gitignore merges language snapshots and keeps user rules" {
+    local project_dir="$TEST_DIR/dynamic-gitignore"
+    mkdir -p "$project_dir"
+    write_file "$project_dir/package.json" '{"name":"dynamic-gitignore","version":"0.1.0"}'
+    write_file "$project_dir/pyproject.toml" "[project]"
+    write_file "$project_dir/go.mod" "module example.com/dynamic"
+    write_file "$project_dir/Cargo.toml" "[package]"
+    write_file "$project_dir/pom.xml" "<project></project>"
+    write_file "$project_dir/app.csproj" "<Project></Project>"
+    write_file "$project_dir/.gitignore" "custom-local-rule/"
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --check
+    echo "$output" | jq -e '.status == "conflict"'
+    echo "$output" | jq -e '.detected_templates | sort == ["Go","Java","Node","Python","Rust","VisualStudio"]'
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --apply merge
+    echo "$output" | jq -e '.status == "ok" and .action == "merge" and .added_count > 0'
+
+    grep -Fq "custom-local-rule/" "$project_dir/.gitignore"
+    grep -Fq "node_modules/" "$project_dir/.gitignore"
+    grep -Fq "__pycache__/" "$project_dir/.gitignore"
+    grep -Fq "*.test" "$project_dir/.gitignore"
+    grep -Fq "target/" "$project_dir/.gitignore"
+    grep -Fq ".gradle/" "$project_dir/.gitignore"
+    grep -Fq ".vs/" "$project_dir/.gitignore"
+    grep -Fq ".claude/" "$project_dir/.gitignore"
+    grep -Fq "skills-lock.json" "$project_dir/.gitignore"
+}
+
+	@test "conversation replay: empty project gitignore defaults to Node template" {
+    local project_dir="$TEST_DIR/empty-gitignore-default"
+    mkdir -p "$project_dir"
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --check
+    echo "$output" | jq -e '.status == "clean"'
+    echo "$output" | jq -e '.detected_templates == ["Node"]'
+
+    run_json bash "$REPO_ROOT/scripts/install-gitignore.sh" "$project_dir" --apply merge
+    echo "$output" | jq -e '.status == "ok" and .action == "merge"'
+    echo "$output" | jq -e '.detected_templates == ["Node"]'
+    grep -Fq "node_modules/" "$project_dir/.gitignore"
+    grep -Fq ".claude/" "$project_dir/.gitignore"
+    grep -Fq "skills-lock.json" "$project_dir/.gitignore"
+	}
+
+	@test "conversation replay: manual npm init default version stays at 0.1.0 in dry-run" {
+	    local project_dir="$TEST_DIR/manual-npm-init-default"
+	    mkdir -p "$project_dir"
+	    git -C "$project_dir" init -b main >/dev/null
+	    write_file "$project_dir/package.json" '{"name":"manual-npm-init-default","version":"1.0.0","devDependencies":{}}'
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable release.automated
+	    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+	    echo "$output" | jq -e '.environment.items | any(.name=="package.version" and (.description_nl | contains("npm init 默认")))'
+	}
+
+	@test "conversation replay: github remote options are parsed as options not target paths" {
+	    local project_dir="$TEST_DIR/github-remote-options"
+	    mkdir -p "$project_dir"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable github.delivery --github-repository kinoward/dayu-harness-skill-test --visibility public
+	    echo "$output" | jq -e '.github_remote.repository == "kinoward/dayu-harness-skill-test"'
+	}
+
+	@test "conversation replay: issue and PR workflows require remote sync for E2E" {
+	    local project_dir="$TEST_DIR/github-issue-pr-remote-sync"
+	    mkdir -p "$project_dir"
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --dry-run --enable github.issue,github.pr --github-repository kinoward/dayu-harness-skill-test
+	    echo "$output" | jq -e '.github_remote.repository == "kinoward/dayu-harness-skill-test"'
+
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote skip
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply")'
+
+	    local forced_dir="$TEST_DIR/github-issue-pr-forced-target"
+	    mkdir -p "$forced_dir"
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$forced_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote skip --github-e2e target
+	    echo "$output" | jq -e '.status == "ok"'
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply or --github-remote verify")'
+
+	    local unresolved_dir="$TEST_DIR/github-remote-unresolved-apply"
+	    mkdir -p "$unresolved_dir"
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$unresolved_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote apply
+	    echo "$output" | jq -e '.status == "needs_user_action"'
+	    echo "$output" | jq -e '.capabilities == []'
+	    echo "$output" | jq -e '.description_nl | contains("--github-repository owner/repo")'
+	    [ ! -f "$unresolved_dir/AGENTS.md" ]
+	}
+
+	@test "conversation replay: GitHub target E2E is issue-first and creates lint-ready PR body" {
+	    local issue_line pr_line
+	    issue_line="$(grep -n 'gh issue create' "$REPO_ROOT/scripts/scaffold.sh" | sed -n '1s/:.*//p')"
+	    pr_line="$(grep -n 'gh pr create' "$REPO_ROOT/scripts/scaffold.sh" | sed -n '1s/:.*//p')"
+
+	    [ -n "$issue_line" ]
+	    [ -n "$pr_line" ]
+	    [ "$issue_line" -lt "$pr_line" ]
+	    grep -Fq "render_dayu_pr_body" "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "Dayu Harness GitHub E2E verification" "$REPO_ROOT/scripts/scaffold.sh"
+	    if grep -Fq 'title "test: verify Dayu Harness GitHub E2E"' "$REPO_ROOT/scripts/scaffold.sh"; then
+	        echo "target E2E PR title must use natural language, not Conventional Commits"
+	        exit 1
+	    fi
+	    grep -Fq 'gh pr close "$pr_number"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq -- '--delete-branch' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'gh issue close "$issue_number"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'cleanup_github_e2e_remote_branch_ref "$branch"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'fetch --prune origin' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'branch -D "$branch"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "local remote-tracking refs were closed, deleted or pruned without merging" "$REPO_ROOT/scripts/scaffold.sh"
+	}
+
+	@test "conversation replay: release settlement waits for init PR and validates origin default branch" {
+	    grep -Fq 'github_remote_initialization_pr_pending "$apply_json"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'Release post-remote revalidation waits until the initialization PR is merged' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'git -C "$TARGET" worktree add --detach "$tmp_worktree" "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'run_post_apply_checks_at_root "$RELEASE_VALIDATION_ROOT" "$@"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'if [ "$local_head" = "$remote_head" ]; then' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'git -C "$TARGET" merge-base --is-ancestor HEAD "$remote_ref"' "$REPO_ROOT/scripts/scaffold.sh"
+	    if grep -Fq 'refresh_status="skipped"' "$REPO_ROOT/scripts/scaffold.sh"; then
+	        echo "release settlement must not pass by skipping remote default-branch refresh"
+	        exit 1
+	    fi
+	}
+
+	@test "conversation replay: initialization PR body follows Dayu PR template" {
+	    grep -Fq "render_dayu_pr_body" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "Initialize Dayu Harness governance" "$REPO_ROOT/scripts/github-remote.sh"
+	    grep -Fq "Final PR: yes" "$REPO_ROOT/scripts/github-remote.sh"
+	    if grep -Fq 'title "chore: initialize Dayu Harness"' "$REPO_ROOT/scripts/github-remote.sh"; then
+	        echo "initialization PR title must use natural language, not Conventional Commits"
+	        exit 1
+	    fi
 	}
 
 	@test "conversation replay: no GitHub optional capabilities in default deployment" {
@@ -199,12 +365,16 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable github.delivery --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
-	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
-	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
+	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply")'
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
 	    assert_path "$project_dir/.github/workflows/pr-lint.yml"
 	    assert_path "$project_dir/.github/workflows/issue-lint.yml"
+	    assert_path "$project_dir/.github/ISSUE_TEMPLATE/dayu-harness-issue.md"
+	    assert_path "$project_dir/.github/pull_request_template.md"
 	    assert_path "$project_dir/.github/rulesets/protect-main.json"
 	    assert_no_path "$project_dir/.github/rulesets/protect-tags.json"
 	    assert_path "$project_dir/docs/harness/guides/issue-guidelines.md"
@@ -224,8 +394,8 @@ json_from_output() {
 
 	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --enable release.automated --strategy merge
 	    echo "$output" | jq -e '.status == "ok"'
-	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="applied")'
-	    grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
+	    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="pending")'
+	    ! grep -Fq 'api -X PATCH repos/kinoward/dayu-harness-skill-test -F allow_merge_commit=true -F allow_squash_merge=false -F allow_rebase_merge=false -F allow_auto_merge=true -F delete_branch_on_merge=true' "$DAYU_HARNESS_GH_CALL_LOG"
 
 	    assert_path "$project_dir/.github/workflows/release-please.yml"
 	    assert_path "$project_dir/.github/release-please-policy.json"
@@ -233,6 +403,9 @@ json_from_output() {
 	    assert_path "$project_dir/release-please-config.json"
 	    assert_path "$project_dir/.release-please-manifest.json"
 	    assert_path "$project_dir/.github/repository/pull-request-settings.json"
+	    [ "$(cat "$project_dir/VERSION")" = "0.1.0" ]
+	    jq -e '."." == "0.1.0"' "$project_dir/.release-please-manifest.json"
+	    jq -e '.version == "0.1.0"' "$project_dir/package.json"
 
 	    assert_no_path "$project_dir/.github/workflows/issue-lint.yml"
 
@@ -240,6 +413,10 @@ json_from_output() {
 	    json_from_output | jq -e '.summary.failed == 0'
 	    run_json "$project_dir/docs/harness/sensors/scripts/audit.sh" --json "$project_dir"
 	    json_from_output | jq -e '.summary.failed == 0'
+	    run bash -c 'find "$1" -type d -name "__pycache__"' _ "$project_dir"
+	    [ -z "$output" ]
+	    run bash -c 'find "$1" -type f -name "*.pyc"' _ "$project_dir"
+	    [ -z "$output" ]
 	}
 
 	@test "legacy language capability aliases remain rejected in e2e path" {
@@ -296,6 +473,44 @@ json_from_output() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "pass"'
     echo "$output" | jq -e '.deployments.zh and .deployments.en'
+}
+
+@test "profiled Dayu Harness smoke test entrypoint exposes local and gated remote profiles" {
+    local profile_script="$REPO_ROOT/tests/smoke/dayu-harness-profile.sh"
+    [ -x "$profile_script" ]
+
+    run bash "$profile_script" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"local-fast"* ]]
+    [[ "$output" == *"remote-smoke"* ]]
+    [[ "$output" == *"remote-release"* ]]
+    [[ "$output" == *"delete_repo"* ]]
+    grep -Fq "dayu-format.mjs" "$profile_script"
+    grep -Fq "require_delete_repo_scope" "$profile_script"
+    grep -Fq "npm_config_cache" "$profile_script"
+    grep -Fq "scaffold_json" "$profile_script"
+    grep -Fq "wait_workflow_failure" "$profile_script"
+    grep -Fq "wait_remote_workflow_file" "$profile_script"
+    grep -Fq "assert_remote_branch_absent" "$profile_script"
+    grep -Fq "Depends on #1" "$profile_script"
+    grep -Fq "Remote smoke closes issue" "$profile_script"
+    ! grep -Fq 'title "fix: remote smoke closes issue"' "$profile_script"
+    grep -Fq "createdAt" "$profile_script"
+    grep -Fq "docs: remote release smoke must not publish" "$profile_script"
+    grep -Fq "chore: remote release smoke must not publish" "$profile_script"
+    grep -Fq "unexpectedly created a Release PR" "$profile_script"
+    grep -Fq "wait_release_version_advance" "$profile_script"
+    grep -Fq "fix: remote release smoke second version" "$profile_script"
+    grep -Fq 'published v$first_version and v$second_version' "$profile_script"
+    grep -Fq 'test-github-helper-scripts.bats' "$profile_script"
+
+    run env RUN_DAYU_REMOTE_SMOKE=0 bash "$profile_script" --profile remote-smoke --json
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "skipped" and .profile == "remote-smoke"'
+
+    run env RUN_DAYU_REMOTE_RELEASE=0 bash "$profile_script" --profile remote-release --json
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "skipped" and .profile == "remote-release"'
 }
 
 @test "conversation replay: messy project merges selected capabilities and fixes progressive docs indexes" {

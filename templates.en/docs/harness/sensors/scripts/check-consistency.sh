@@ -76,12 +76,12 @@ TMP_WORKDIR=""
 if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
     TMP_WORKDIR="$(mktemp -d "${TMPDIR%/}/dayu-harness.XXXXXX" 2>/dev/null || true)"
 fi
+if [ -z "$TMP_WORKDIR" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
+    TMP_WORKDIR="$(mktemp -d "/tmp/dayu-harness.XXXXXX" 2>/dev/null || true)"
+fi
 if [ -z "$TMP_WORKDIR" ]; then
-    TMP_WORKDIR="$PROJECT_ROOT/.dayu-harness-tmp.$$"
-    mkdir -p "$TMP_WORKDIR" || {
-        echo "Error: cannot create temporary directory '$TMP_WORKDIR'" >&2
-        exit 2
-    }
+    echo "Error: unable to create a temporary directory. Set writable TMPDIR, or ensure /tmp is writable; consistency checks do not fall back to writing inside the project directory." >&2
+    exit 2
 fi
 
 C1_ISSUES_FILE="$TMP_WORKDIR/c1-issues.txt"
@@ -738,18 +738,16 @@ output_json() {
     c3_status_json="pass"; [ "$c3_status" != "pass" ] && c3_status_json="fail"
     c4_status_json="pass"; [ "$c4_status" != "pass" ] && c4_status_json="fail"
 
-    cat <<JSONEOF
-{
-  "checks": [
-    {"id":"C1","name":"Link validity","status":"$c1_status_json","issues":[$c1_issues_json],"detail":"$c1_detail"},
-    {"id":"C2","name":"Index count","status":"$c2_status_json","issues":[$c2_issues_json],"detail":"$c2_detail"},
-    {"id":"C3","name":"Orphan detection","status":"$c3_status_json","issues":[$c3_issues_json],"detail":"$c3_detail"},
-    {"id":"C4","name":"Script integrity","status":"$c4_status_json","issues":[$c4_issues_json],"detail":"$c4_detail"}
-  ],
-  "summary": {"total":$total,"passed":$passed,"failed":$failed},
-  "description_nl":"$desc"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "checks": [\n'
+    printf '    {"id":"C1","name":"Link validity","status":"%s","issues":[%s],"detail":"%s"},\n' "$c1_status_json" "$c1_issues_json" "$c1_detail"
+    printf '    {"id":"C2","name":"Index count","status":"%s","issues":[%s],"detail":"%s"},\n' "$c2_status_json" "$c2_issues_json" "$c2_detail"
+    printf '    {"id":"C3","name":"Orphan detection","status":"%s","issues":[%s],"detail":"%s"},\n' "$c3_status_json" "$c3_issues_json" "$c3_detail"
+    printf '    {"id":"C4","name":"Script integrity","status":"%s","issues":[%s],"detail":"%s"}\n' "$c4_status_json" "$c4_issues_json" "$c4_detail"
+    printf '  ],\n'
+    printf '  "summary": {"total":%s,"passed":%s,"failed":%s},\n' "$total" "$passed" "$failed"
+    printf '  "description_nl":"%s"\n' "$desc"
+    printf '}\n'
 }
 
 # ---------------------------------------------------------------------------

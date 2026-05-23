@@ -19,17 +19,20 @@ Deployment files:
 - Use `github.pr` for regular PR checks; allowed release-please PRs skip PR lint, while the release workflow and `release-please-policy` enforce release safety boundaries.
 - Enable `release.versioning` so version and tag protection rules are explicit
 - Enable `github.repository-settings` to complete repository-side policy prerequisites
-- Add `workflow.allowed_actors_variable` under `.github/release-please-policy.json` (default: `RELEASE_PLEASE_ALLOWED_ACTORS`)
-- Configure `secrets.RELEASE_TOKEN` in the repository
+- GitHub Actions workflow permissions must be `default_workflow_permissions=write` with `can_approve_pull_request_reviews=true`
+- The release workflow uses `secrets.GITHUB_TOKEN`; no extra PAT secret is required
 
-Use a PAT (`secrets.RELEASE_TOKEN`) instead of default `GITHUB_TOKEN` because release-please-created PRs often need to trigger downstream CI checks.
+The workflow intentionally uses `GITHUB_TOKEN` so release PRs do not trigger Dayu-managed PR/Issue/TDD CI or token-derived follow-up workflow runs. The release workflow closes the loop by dispatching `workflow_dispatch mode=publish` after the release PR merges.
+
+`VERSION` remains a plain text file. Before auto-merging a release PR, the release workflow reads the root version from that PR's `.release-please-manifest.json`, writes it back to `VERSION`, and then re-runs the release file allowlist check. Do not rely on `release-please-config.json` `extra-files` to update the plain text `VERSION` file.
+
+The release workflow uses a Git credential helper to inject `GITHUB_TOKEN` for release PR clone/push operations; do not restore inline `git -c http.extraheader=...` authentication. When merging release PRs, the workflow must use the PR title as `--subject`, pass `--body ""`, and explicitly delete the release branch after merge confirmation to avoid auth failures, branch leftovers, and duplicate changelog entries.
 
 By default, release-please auto-merge and PR lint skip are allowed for:
 - `github-actions[bot]`
 - `release-please[bot]`
-- Only these default bot accounts, unless additional accounts are explicitly listed in `RELEASE_PLEASE_ALLOWED_ACTORS` (comma-separated usernames).
 
-If a release PR author is a regular PAT owner (non-bot), you must configure `RELEASE_PLEASE_ALLOWED_ACTORS` in repository variables with comma-separated usernames. Without this configuration, release-please auto-merge and PR lint skip are not allowed for that actor.
+Regular PAT owners and extra actor variables are not valid release PR bypasses. The release PR must come from the same repository, target the default branch, match the `release-please--` branch prefix, and only modify release files allowed by `.github/release-please-policy.json`.
 
 `release-please` no longer uses `autorelease` label-based bypassing, and `pull_request_target` + `labeled` label gates are intentionally not supported.
 
@@ -49,6 +52,20 @@ If a release PR author is a regular PAT owner (non-bot), you must configure `REL
 - `chore`
 
 Do not configure these sections as `hidden: true`. `release_please_policy.py` rejects hidden changelog sections so CHANGELOG and GitHub Release notes retain a complete historical record.
+
+## Release Trigger Boundary
+
+After a push trigger, `release-please.yml` first scans commits since the latest `v*` tag. It creates or updates a release PR only when one of these commits is present:
+
+- `feat`
+- `fix`
+- `perf`
+- `revert`
+- Any Conventional Commit with `!`, or `BREAKING CHANGE` / `BREAKING-CHANGE`
+
+`docs`, `style`, `test`, `build`, `ci`, `chore`, and ordinary `refactor` commits do not create a release PR by themselves, even when they match the workflow path filters. They remain in `release-please-config.json` changelog sections; when a later releasable commit appears in the same unreleased range, they are included in the next release PR changelog.
+
+The current template supports only the `packages["."]` root package and requires `include-component-in-tag: false`. The release gate uses the root version from `.release-please-manifest.json` and `v*` tags to calculate the unreleased commit range. If a project needs monorepo packages or component tags, extend the tag resolution logic in `.github/scripts/release_please_policy.py` and `release-please.yml` first.
 
 ## Path Filter Strategy
 

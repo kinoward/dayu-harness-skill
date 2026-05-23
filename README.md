@@ -146,8 +146,9 @@ Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产�
 - `AGENTS.md` 根治理入口，以及必要的子目录索引。
 - `docs/harness/` 下的协作指南、维护说明和检查脚本。
 - Git hooks、CI 工作流、提交规范、PR 指南和质量检查配置。
+- `dayu-format.mjs` 固定格式生成器，用于确定性生成 PR body、Issue body 和 commit message。
 - `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/` 等长期知识目录。
-- 仓库设置策略说明、Issue 依赖治理说明（仅生成策略与说明，不改动远端设置）以及可配置的 TDD 门禁策略文件。
+- 仓库设置策略说明、Issue 依赖治理说明、可配置的 TDD 门禁策略文件，以及用户确认后才执行的 GitHub 远端设置同步。
 - `docs/product-specs/project-status.md` 及项目背景状态短快照入口。
 
 这些文件会留在目标项目中，成为后续协作的权威入口。
@@ -159,6 +160,8 @@ Dayu Harness Skill 以中文为源语言，并推荐默认中文部署；英文�
 运行 `/dayu-harness` 时，交互式问题和选项会中英双语展示，避免英文用户因为看不懂中文而无法选择。部署目标项目时只写入一种语言，默认中文；如果明确选择英文，则写入英文部署产物。
 
 `templates/` 是中文源模板，`templates.en/` 是英文镜像模板，两个目录保持同构；维护者可以用漂移检查脚本确认 README 镜像、模板树、能力映射和双语问答保持一致。
+
+问答流程按阻塞节点分块输出，含版本冲突、远端仓库创建、`.husky`/workflow 合并、已跟踪 `.claude`、受保护分支等场景，均使用固定中英双语选项，不要求用户手工输入命令。
 
 ## 📁 项目结构
 

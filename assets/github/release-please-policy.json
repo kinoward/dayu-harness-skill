@@ -28,9 +28,23 @@
       "VERSION"
     ],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
+    "git_credential_helper_required": true,
+    "forbid_inline_http_extraheader": true,
+    "merge_subject_required": true,
+    "merge_empty_body_required": true,
+    "release_branch_delete_required": true,
     "label_gate_required": false,
-    "allowed_actors_variable": "RELEASE_PLEASE_ALLOWED_ACTORS",
-    "require_allowed_actors_reference": true
+    "github_token_required": true,
+    "publish_mode_required": true,
+    "release_trigger_types": [
+      "feat",
+      "fix",
+      "perf",
+      "revert"
+    ],
+    "release_trigger_breaking_change": true,
+    "plain_version_sync_required": true,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
@@ -58,6 +72,8 @@
   "release_please_config": {
     "file": "release-please-config.json",
     "pull_request_title_pattern": "Release ${version}",
+    "root_package_only": true,
+    "include_component_in_tag": false,
     "require_full_changelog_types": true,
     "required_changelog_types": [
       "feat",
@@ -75,6 +91,9 @@
   },
   "repository_settings": {
     "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
     "allow_auto_merge": true,
     "delete_branch_on_merge": true
   }

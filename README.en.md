@@ -146,8 +146,9 @@ Dayu Harness Skill organizes project collaboration rules into the target reposit
 - A root `AGENTS.md` governance entrypoint and required subdirectory indexes.
 - Collaboration guides, maintenance instructions, and check scripts under `docs/harness/`.
 - Git hooks, CI workflows, commit conventions, PR guidelines, and quality check configs.
+- The `dayu-format.mjs` fixed-format renderer for deterministic PR bodies, issue bodies, and commit messages.
 - Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
-- Repository settings policy docs, Issue dependency guidance (strategy files only), and configurable TDD gate strategy files.
+- Repository settings policy docs, Issue dependency guidance, configurable TDD gate strategy files, and GitHub remote settings sync only after user confirmation.
 - `docs/product-specs/project-status.md` as a short project status snapshot entry point.
 
 These files stay in the target project and become the authority for future collaboration.
@@ -159,6 +160,8 @@ Dayu Harness Skill uses Chinese as the source language and recommends Chinese de
 When running `/dayu-harness`, interactive questions and options are shown bilingually in Chinese and English, so English users can still choose correctly. Deployment writes only one language into the target project, defaults to Chinese, and writes English artifacts only when English is explicitly selected.
 
 `templates/` is the Chinese source template tree, and `templates.en/` is the English mirror template tree. The two directories stay isomorphic; maintainers can use the drift check script to confirm the README mirror, template trees, capability mappings, and bilingual Q&A remain aligned.
+
+The Q&A flow is grouped into blocking decision blocks, including version conflicts, GitHub remote creation, `.husky`/workflow merge, tracked `.claude` handling, and protected-branch scenarios, and always uses fixed bilingual options without requiring manual command input.
 
 ## 📁 Project Structure
 

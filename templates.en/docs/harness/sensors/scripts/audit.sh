@@ -409,13 +409,11 @@ DESC_NL=$(build_description_nl)
 
 # 7. Output
 if [ "$JSON_MODE" = true ]; then
-    cat <<JSONEOF
-{
-  "results": [${RESULTS_JSON}],
-  "summary": {"total": ${TOTAL}, "passed": ${PASSED}, "failed": ${FAILED}, "warnings": ${WARNINGS}},
-  "description_nl": "$(json_escape "$DESC_NL")"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "results": [%s],\n' "$RESULTS_JSON"
+    printf '  "summary": {"total": %s, "passed": %s, "failed": %s, "warnings": %s},\n' "$TOTAL" "$PASSED" "$FAILED" "$WARNINGS"
+    printf '  "description_nl": "%s"\n' "$(json_escape "$DESC_NL")"
+    printf '}\n'
 else
     echo ""
     echo "=== Audit Result ==="

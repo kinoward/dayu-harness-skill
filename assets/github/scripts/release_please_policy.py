@@ -14,7 +14,6 @@ from collections import Counter
 REQUIRED_PRIMARY_WORKFLOW = ".github/workflows/release-please.yml"
 REQUIRED_ADDITIONAL_WORKFLOW = ".github/workflows/pr-lint.yml"
 REQUIRED_MERGE_COMMAND = "gh pr merge --auto --merge --delete-branch"
-REQUIRED_ALLOWED_ACTORS_VARIABLE = "RELEASE_PLEASE_ALLOWED_ACTORS"
 REQUIRED_REPOSITORY_SETTINGS_FILE = ".github/repository/pull-request-settings.json"
 REQUIRED_RELEASE_CONFIG_FILE = "release-please-config.json"
 
@@ -222,24 +221,76 @@ def has_label_bypass_signal(workflow_text: str) -> bool:
     return False
 
 
-def has_allowed_actors_reference(workflow_text: str, variable: str) -> bool:
-    if not variable:
-        return True
-
-    escaped = re.escape(variable)
-    if re.search(rf"(?im)^\s*{escaped}\s*:", workflow_text):
-        return True
-
-    if f"${{{{ vars.{variable}" in workflow_text:
-        return True
-
-    if re.search(rf"\${escaped}\b", workflow_text):
-        return True
-
-    return False
+def has_github_token_reference(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}", workflow_text)
+        or re.search(r"\$\{\{\s*github\.token\s*\}\}", workflow_text)
+    )
 
 
-def has_required_merge_command(workflow_text: str) -> bool:
+def has_publish_only_mode(workflow_text: str) -> bool:
+    lowered = workflow_text.lower()
+    return (
+        "workflow_dispatch" in lowered
+        and re.search(r"(?im)^\s*mode\s*:", workflow_text) is not None
+        and "skip-github-pull-request" in lowered
+        and "publish" in lowered
+    )
+
+
+def has_release_trigger_gate(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "Detect releasable commits",
+            "release_trigger_types",
+            "release_trigger_breaking_change",
+            "github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'",
+            "github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'",
+            "(github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true'",
+            "steps.release-gate.outputs.should_run == 'true'",
+            "No releasable commits found; release-please PR creation is skipped.",
+        )
+    )
+
+
+def has_publish_dispatch_after_merge(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bgh\s+workflow\s+run\s+release-please\.yml\b", workflow_text)
+        and re.search(r"-f\s+mode=publish\b", workflow_text)
+    )
+
+
+def has_plain_version_manifest_sync(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "sync_version_from_manifest",
+            ".release-please-manifest.json",
+            "VERSION is already synchronized",
+            "git -C \"$workdir\" add VERSION",
+            "push origin \"HEAD:$head_ref\"",
+            "assert_release_pr_allowed_files",
+        )
+    )
+
+
+def has_release_git_credential_helper(workflow_text: str) -> bool:
+    return all(
+        marker in workflow_text
+        for marker in (
+            "credential.helper",
+            "username=x-access-token",
+            "password=$GH_TOKEN",
+        )
+    )
+
+
+def has_inline_http_extraheader_auth(workflow_text: str) -> bool:
+    return bool(re.search(r"\bhttp\.extraheader\b", workflow_text, re.IGNORECASE))
+
+
+def iter_real_merge_commands(workflow_text: str):
     for line in workflow_text.splitlines():
         command = line.strip()
         if command.startswith("run:"):
@@ -264,10 +315,54 @@ def has_required_merge_command(workflow_text: str) -> bool:
         if not target or target.startswith("-"):
             continue
 
+        yield tokens
+
+
+def has_actions_write_permission(workflow_text: str) -> bool:
+    return bool(re.search(r"(?m)^\s+actions\s*:\s*write\s*$", workflow_text))
+
+
+def has_legacy_release_auth_reference(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bRELEASE_TOKEN\b", workflow_text)
+        or re.search(r"\bRELEASE_PLEASE_ALLOWED_ACTORS\b", workflow_text)
+    )
+
+
+def has_required_merge_command(workflow_text: str) -> bool:
+    for tokens in iter_real_merge_commands(workflow_text):
         if all(flag in tokens for flag in ("--auto", "--merge", "--delete-branch")):
             return True
 
     return False
+
+
+def has_clean_merge_metadata(workflow_text: str) -> tuple[bool, bool]:
+    has_subject = False
+    has_empty_body = False
+
+    for tokens in iter_real_merge_commands(workflow_text):
+        if not all(flag in tokens for flag in ("--auto", "--merge", "--delete-branch")):
+            continue
+
+        if "--subject" in tokens:
+            index = tokens.index("--subject")
+            if index + 1 < len(tokens) and tokens[index + 1]:
+                has_subject = True
+
+        if "--body" in tokens:
+            index = tokens.index("--body")
+            if index + 1 < len(tokens) and tokens[index + 1] == "":
+                has_empty_body = True
+
+    return has_subject, has_empty_body
+
+
+def has_release_branch_cleanup(workflow_text: str) -> bool:
+    return bool(
+        re.search(r"\bgit\s+push\s+origin\s+--delete\b", workflow_text)
+        and "headRefName" in workflow_text
+    )
 
 
 def validate_release_pr_policy(policy: dict, errors: list[str]) -> None:
@@ -304,6 +399,8 @@ def validate_release_pr_policy(policy: dict, errors: list[str]) -> None:
     ]
     if invalid_items:
         errors.append("release_pr.allowed_paths entries must be non-empty strings.")
+    if "VERSION" not in allowed_paths:
+        errors.append("release_pr.allowed_paths must include VERSION.")
 
 
 def validate_repository_settings(policy: dict, project_root: Path, errors: list[str]) -> None:
@@ -311,6 +408,14 @@ def validate_repository_settings(policy: dict, project_root: Path, errors: list[
     if not isinstance(settings_policy, dict):
         errors.append("repository_settings must be an object.")
         return
+
+    expected_settings = {
+        "allow_merge_commit": True,
+        "allow_squash_merge": False,
+        "allow_rebase_merge": False,
+        "allow_auto_merge": True,
+        "delete_branch_on_merge": True,
+    }
 
     settings_path = settings_policy.get("file", REQUIRED_REPOSITORY_SETTINGS_FILE)
     if not isinstance(settings_path, str) or not settings_path.strip():
@@ -323,11 +428,12 @@ def validate_repository_settings(policy: dict, project_root: Path, errors: list[
     settings_path = project_root / Path(settings_path)
     settings = load_json(settings_path)
 
-    if settings.get("allow_auto_merge") is not True:
-        errors.append(f"{settings_path}: allow_auto_merge must be true.")
-
-    if settings.get("delete_branch_on_merge") is not True:
-        errors.append(f"{settings_path}: delete_branch_on_merge must be true.")
+    for key, expected_value in expected_settings.items():
+        expected_literal = str(expected_value).lower()
+        if settings_policy.get(key) is not expected_value:
+            errors.append(f"repository_settings.{key} must be {expected_literal}.")
+        if settings.get(key) is not expected_value:
+            errors.append(f"{settings_path}: {key} must be {expected_literal}.")
 
 
 def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> None:
@@ -400,25 +506,87 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
             f"{workflow_path}: missing merge command '{REQUIRED_MERGE_COMMAND}'."
         )
 
-    allowed_actors_variable = workflow_policy.get(
-        "allowed_actors_variable",
-        REQUIRED_ALLOWED_ACTORS_VARIABLE,
-    )
-    if not isinstance(allowed_actors_variable, str) or not allowed_actors_variable.strip():
-        errors.append(
-            f"workflow.allowed_actors_variable must be '{REQUIRED_ALLOWED_ACTORS_VARIABLE}'."
-        )
-        allowed_actors_variable = REQUIRED_ALLOWED_ACTORS_VARIABLE
-    elif allowed_actors_variable != REQUIRED_ALLOWED_ACTORS_VARIABLE:
-        errors.append(
-            f"workflow.allowed_actors_variable must be '{REQUIRED_ALLOWED_ACTORS_VARIABLE}'."
-        )
-        allowed_actors_variable = REQUIRED_ALLOWED_ACTORS_VARIABLE
+    if workflow_policy.get("github_token_required") is not True:
+        errors.append("workflow.github_token_required must be true.")
+    if not has_github_token_reference(workflow_text):
+        errors.append(f"{workflow_path}: release workflow must use secrets.GITHUB_TOKEN.")
 
-    require_allowed_actors_reference = workflow_policy.get("require_allowed_actors_reference")
-    if require_allowed_actors_reference is not True:
-        errors.append("workflow.require_allowed_actors_reference must be true.")
-        require_allowed_actors_reference = True
+    if workflow_policy.get("publish_mode_required") is not True:
+        errors.append("workflow.publish_mode_required must be true.")
+    if not has_publish_only_mode(workflow_text):
+        errors.append(
+            f"{workflow_path}: workflow_dispatch mode=publish with skip-github-pull-request is required."
+        )
+
+    release_trigger_types = workflow_policy.get("release_trigger_types")
+    if not isinstance(release_trigger_types, list) or not release_trigger_types:
+        errors.append("workflow.release_trigger_types must be a non-empty array.")
+        release_trigger_types = []
+    elif any(not isinstance(item, str) or not item.strip() for item in release_trigger_types):
+        errors.append("workflow.release_trigger_types entries must be non-empty strings.")
+
+    if workflow_policy.get("release_trigger_breaking_change") is not True:
+        errors.append("workflow.release_trigger_breaking_change must be true.")
+    if not has_release_trigger_gate(workflow_text):
+        errors.append(
+            f"{workflow_path}: push-triggered and workflow_dispatch mode=pr release-please runs must be gated by release_trigger_types and breaking-change detection."
+        )
+
+    if not has_publish_dispatch_after_merge(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must dispatch workflow_dispatch mode=publish."
+        )
+    if workflow_policy.get("plain_version_sync_required") is not True:
+        errors.append("workflow.plain_version_sync_required must be true.")
+    if not has_plain_version_manifest_sync(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must sync plain VERSION from .release-please-manifest.json before merging."
+        )
+
+    if workflow_policy.get("git_credential_helper_required") is not True:
+        errors.append("workflow.git_credential_helper_required must be true.")
+    if not has_release_git_credential_helper(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must configure a git credential helper for clone/push operations."
+        )
+
+    if workflow_policy.get("forbid_inline_http_extraheader") is not True:
+        errors.append("workflow.forbid_inline_http_extraheader must be true.")
+    if has_inline_http_extraheader_auth(workflow_text):
+        errors.append(
+            f"{workflow_path}: inline git http.extraheader authentication is forbidden for release clone/push operations."
+        )
+
+    has_subject, has_empty_body = has_clean_merge_metadata(workflow_text)
+    if workflow_policy.get("merge_subject_required") is not True:
+        errors.append("workflow.merge_subject_required must be true.")
+    if not has_subject:
+        errors.append(
+            f"{workflow_path}: release PR merge command must set an explicit --subject from the release PR title."
+        )
+
+    if workflow_policy.get("merge_empty_body_required") is not True:
+        errors.append("workflow.merge_empty_body_required must be true.")
+    if not has_empty_body:
+        errors.append(
+            f"{workflow_path}: release PR merge command must pass --body \"\" to avoid changelog duplicate parsing."
+        )
+
+    if workflow_policy.get("release_branch_delete_required") is not True:
+        errors.append("workflow.release_branch_delete_required must be true.")
+    if not has_release_branch_cleanup(workflow_text):
+        errors.append(
+            f"{workflow_path}: release PR merge path must explicitly delete the release branch after merge."
+        )
+
+    if not has_actions_write_permission(workflow_text):
+        errors.append(
+            f"{workflow_path}: release workflow must grant actions: write for publish dispatch."
+        )
+
+    forbid_legacy_release_auth = workflow_policy.get("forbid_legacy_release_auth")
+    if forbid_legacy_release_auth is not True:
+        errors.append("workflow.forbid_legacy_release_auth must be true.")
 
     def validate_workflow_text(path: Path, text: str) -> None:
         if has_label_gate(text):
@@ -429,12 +597,9 @@ def validate_workflow(policy: dict, project_root: Path, errors: list[str]) -> No
             errors.append(
                 f"{path}: label-based signal detected, but policy forbids autorelease-label bypass."
             )
-        if not has_allowed_actors_reference(
-            text, allowed_actors_variable
-        ):
+        if forbid_legacy_release_auth is True and has_legacy_release_auth_reference(text):
             errors.append(
-                f"{path}: missing reference to allowed actor variable "
-                f"'{allowed_actors_variable}'."
+                f"{path}: legacy RELEASE_TOKEN or RELEASE_PLEASE_ALLOWED_ACTORS reference is forbidden."
             )
 
     if workflow_policy.get("label_gate_required") is not False:
@@ -506,6 +671,13 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
             f"{config_path}: missing default package configuration at packages['.']."
         )
         return
+    if config_policy.get("root_package_only") is not True:
+        errors.append("release_please_config.root_package_only must be true.")
+    elif set(packages.keys()) != {"."}:
+        extra_packages = sorted(package for package in packages if package != ".")
+        errors.append(
+            f"{config_path}: release-please config must only define the root package '.', found extra packages: {', '.join(extra_packages)}."
+        )
 
     expected_title = config_policy.get("pull_request_title_pattern")
     if isinstance(expected_title, str):
@@ -522,6 +694,25 @@ def validate_release_config(policy: dict, project_root: Path, errors: list[str])
 
     if config_policy.get("require_full_changelog_types") is not True:
         errors.append("release_please_config.require_full_changelog_types must be true.")
+
+    if package_cfg.get("release-type") != "node":
+        errors.append(f"{config_path}: packages['.'].release-type must be 'node'.")
+
+    if config_policy.get("include_component_in_tag") is not False:
+        errors.append("release_please_config.include_component_in_tag must be false.")
+    elif package_cfg.get("include-component-in-tag") is not False:
+        errors.append(
+            f"{config_path}: packages['.'].include-component-in-tag must be false so release gating can use v* tags."
+        )
+
+    extra_files = package_cfg.get("extra-files")
+    if extra_files is not None:
+        if not isinstance(extra_files, list):
+            errors.append(f"{config_path}: packages['.'].extra-files must be an array when present.")
+        elif "VERSION" in extra_files:
+            errors.append(
+                f"{config_path}: plain VERSION must be synchronized by the release workflow, not packages['.'].extra-files."
+            )
 
     seen_types: list[str] = []
     for idx, section in enumerate(sections):

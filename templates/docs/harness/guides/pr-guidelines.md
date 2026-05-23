@@ -9,9 +9,24 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 要求：
 - 长度至少 5 字符
 - 建议使用自然语言描述性标题
-- 如项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目
+- 如项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目；PR Lint 会拒绝 `feat:`、`fix:`、`docs:` 等 conventional commit 标题
 
 ## PR 正文模板
+
+PR body 属于固定格式内容。AI 不应自由生成整段 Markdown；应先收集结构化字段（summary、implementation notes、test commands、issue number、是否 final），再用确定性工具渲染：
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs pr-body \
+  --summary "用户可读的变更摘要" \
+  --implementation "关键实现说明" \
+  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --issue 123 \
+  --final yes > /tmp/pr-body.md
+
+gh pr create --title "自然语言 PR 标题" --body-file /tmp/pr-body.md
+```
+
+如项目团队已有其他固定模板或内部 CLI，也应采用“结构化输入 -> 脚本/模板渲染 -> validator 校验”的流程，模型只负责提供字段值和解释校验结果。
 
 三段结构 + Issue 关联 trailer：
 
@@ -70,21 +85,26 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## 创建后
 
-- Test plan 执行：若启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
-- 合并策略：若启用 `github.branch-protection`，按分支保护规约中的合并策略执行
+- Test plan 执行：项目已启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
+- 合并策略：项目已启用 `github.branch-protection`，按分支保护规约中的合并策略执行
 
 ## PR 合并
 
-使用 `gh pr merge <PR-number> --merge`（merge commit），PR 内所有子 commit 完整保留进入 main 分支。
+使用 merge commit，PR 内所有子 commit 完整保留进入默认分支（`__DAYU_DEFAULT_BRANCH__`）。CLI 合并时建议显式保留 PR 标题并清空 merge body，避免 GitHub 把 PR 标题复制到 merge commit body 后被 release-please 二次解析：
+
+```bash
+pr_title="$(gh pr view <PR-number> --json title --jq '.title')"
+gh pr merge <PR-number> --merge --subject "$pr_title" --body ""
+```
 
 合并后清理：
 ```bash
-git checkout main
-git pull origin main
+git checkout __DAYU_DEFAULT_BRANCH__
+git pull origin __DAYU_DEFAULT_BRANCH__
 ```
 
 合并失败自动重试：
-1. **合并冲突** → 切换到 PR 分支，rebase main 解决冲突后重新推送
+1. **合并冲突** → 切换到 PR 分支，rebase `__DAYU_DEFAULT_BRANCH__` 解决冲突后重新推送
 2. **CI check 未通过** → 等待或修复
 3. **权限不足** → 报告用户
 4. **网络错误** → 重试，连续 3 次失败报告用户

@@ -2,6 +2,7 @@
 
 setup() {
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+    export PYTHONDONTWRITEBYTECODE=1
     TARGET_AGENTS_FILES=(
         "$REPO_ROOT/AGENTS.md"
         "$REPO_ROOT/docs/AGENTS.md"
@@ -30,6 +31,7 @@ setup() {
     done < <(
         find "$REPO_ROOT" \
             -path "$REPO_ROOT/.git" -prune \
+            -o -path "$REPO_ROOT/.tmp" -prune \
             -o -path "$REPO_ROOT/tests/unit/.tmp" -prune \
             -o -name AGENTS.md -type f -print |
             sort
@@ -119,6 +121,13 @@ EOF
 
     cat > "$WRAPPER_DIR/npx" <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--no-install" ] && [ "${2:-}" = "commitlint" ] && [ "${3:-}" = "--edit" ]; then
+  if grep -Fq "bad commit message" "${4:-}"; then
+    echo "ERROR: commit message does not follow Conventional Commits format."
+    exit 1
+  fi
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/npx"
@@ -137,7 +146,7 @@ if [ "${1:-}" = "api" ]; then
     printf '%s\n' "$*" >> "$DAYU_HARNESS_GH_CALL_LOG"
   fi
   if [ "${2:-}" = "-X" ] && [ "${3:-}" = "PATCH" ]; then
-    printf '%s\n' '{"allow_auto_merge":true,"delete_branch_on_merge":true}'
+    printf '%s\n' '{"allow_merge_commit":true,"allow_squash_merge":false,"allow_rebase_merge":false,"allow_auto_merge":true,"delete_branch_on_merge":true}'
   fi
   exit 0
 fi
@@ -424,10 +433,38 @@ expected_agents_h1() {
     done < <(jq -r '.installer?.script // empty' "$REPO_ROOT"/capabilities/*.json)
 }
 
+@test "GitHub capability manifests declare remote actions" {
+    jq -e '.remote_actions[] | select(.kind == "repository_settings" and .settings.allow_auto_merge == true and .settings.delete_branch_on_merge == true)' "$REPO_ROOT/capabilities/github.repository-settings.json"
+    jq -e '.remote_actions[] | select(.kind == "ruleset" and .name == "protect-main" and .target_path == ".github/rulesets/protect-main.json")' "$REPO_ROOT/capabilities/github.branch-protection.json"
+    jq -e '.remote_actions[] | select(.kind == "ruleset" and .name == "protect-tags" and .target_path == ".github/rulesets/protect-tags.json")' "$REPO_ROOT/capabilities/release.versioning.json"
+    jq -e '.remote_actions[] | select(.kind == "workflow_permissions" and .default_workflow_permissions == "write" and .can_approve_pull_request_reviews == true)' "$REPO_ROOT/capabilities/github.release-please.json"
+    ! jq -e '.remote_actions[] | select(.kind == "secret_check" and .name == "RELEASE_TOKEN")' "$REPO_ROOT/capabilities/github.release-please.json" >/dev/null
+    ! jq -e '.remote_actions[] | select(.kind == "variable_check" and .name == "RELEASE_PLEASE_ALLOWED_ACTORS")' "$REPO_ROOT/capabilities/github.release-please.json" >/dev/null
+}
+
+@test "scaffold --github-remote skip does not write repository settings remotely" {
+    local target="$WORK_DIR/github-remote-skip"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" remote add origin "https://github.com/kinoward/dayu-harness-skill-test.git"
+    : > "$DAYU_HARNESS_GH_CALL_LOG"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.repository-settings --github-remote skip --strategy merge
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.github_remote.status == "skipped"'
+    if grep -Eq 'api -X (PATCH|POST|PUT)' "$DAYU_HARNESS_GH_CALL_LOG"; then
+        echo "remote write API should not be called when --github-remote skip is selected"
+        return 1
+    fi
+}
+
 @test "core capability deploys harness indexes and scripts" {
     jq -e '.template_files[] | select(.src == "templates/docs/harness/maintenance.md" and .dst == "docs/harness/maintenance.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/harness/AGENTS.md" and .dst == "docs/harness/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/harness/sensors/scripts/AGENTS.md" and .dst == "docs/harness/sensors/scripts/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
+    jq -e '.template_files[] | select(.src == "templates/docs/harness/sensors/scripts/dayu-format.mjs" and .dst == "docs/harness/sensors/scripts/dayu-format.mjs" and .executable == true)' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/exec-plans/AGENTS.md" and .dst == "docs/exec-plans/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.template_files[] | select(.src == "templates/docs/generated/AGENTS.md" and .dst == "docs/generated/AGENTS.md")' "$REPO_ROOT/capabilities/core.json"
     jq -e '.acceptance | index("Harness indexes exist")' "$REPO_ROOT/capabilities/core.json"
@@ -452,6 +489,7 @@ expected_agents_h1() {
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/check-consistency.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/diff-helper.sh")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/validate.sh")] | length == 1'
+    echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/sensors/scripts/dayu-format.mjs")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/commit-guidelines.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/harness/guides/ai-execution.md")] | length == 1'
     echo "$output" | jq -e '[.capabilities[].items[] | select(.dst == "docs/design-docs/AGENTS.md")] | length == 1'
@@ -500,8 +538,280 @@ expected_agents_h1() {
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.status == "needs_initialization"'
     echo "$output" | jq -e '.items | any(.kind == "tool" and .name == "node")'
-    echo "$output" | jq -e '.items | any(.action == "git init")'
+    echo "$output" | jq -e '.items | any(.action | startswith("git init"))'
     echo "$output" | jq -e '.items | any(.action == "npm init -y")'
+}
+
+@test "environment apply initializes new projects on main and creates baseline version files" {
+    local target="$WORK_DIR/baseline-new-project"
+    mkdir -p "$target"
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "main"'
+    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+    [ "$(git -C "$target" branch --show-current)" = "main" ]
+    [ -f "$target/README.md" ]
+    [ "$(cat "$target/VERSION")" = "0.1.0" ]
+    grep -Fq "## 0.1.0" "$target/CHANGELOG.md"
+    jq -e '.version == "0.1.0"' "$target/package.json"
+}
+
+@test "environment normalizes npm init default 1.0.0 to empty project baseline" {
+    local target="$WORK_DIR/baseline-npm-default-version"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/package.json" '{"name":"baseline-npm-default-version","version":"1.0.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/package-lock.json" '{"name":"baseline-npm-default-version","version":"1.0.0","lockfileVersion":3,"packages":{"":{"name":"baseline-npm-default-version","version":"1.0.0"}}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --check --capabilities "core,git.hooks,git.commit-format"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+    echo "$output" | jq -e '.items | any(.name=="package.version" and (.description_nl | contains("npm init 默认")))'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "0.1.0"'
+    jq -e '.version == "0.1.0"' "$target/package.json"
+    jq -e '.version == "0.1.0" and .packages[""].version == "0.1.0"' "$target/package-lock.json"
+    [ "$(cat "$target/VERSION")" = "0.1.0" ]
+    grep -Fq "## 0.1.0" "$target/CHANGELOG.md"
+}
+
+@test "scaffold finalize-git commits only managed paths and leaves tracked local agent files out" {
+    local target="$WORK_DIR/finalize-managed-paths"
+    local committed_files
+    mkdir -p "$target/.claude"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config user.name "ci"
+    git -C "$target" config user.email "ci@example.com"
+    write_file "$target/package.json" '{"name":"finalize-managed-paths","version":"0.1.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/.claude/settings.json" '{"before":true}'
+    write_file "$target/skills-lock.json" '{"before":true}'
+    git -C "$target" add package.json .claude/settings.json skills-lock.json
+    git -C "$target" commit -q -m "chore: seed local files"
+    write_file "$target/.claude/settings.json" '{"after":true}'
+    write_file "$target/skills-lock.json" '{"after":true}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --strategy merge --finalize-git auto
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.git_finalization.status == "committed"'
+    echo "$output" | jq -e '.git_finalization.staged_paths | index(".claude/settings.json") | not'
+    echo "$output" | jq -e '.git_finalization.staged_paths | index("skills-lock.json") | not'
+    committed_files="$(git -C "$target" show --name-only --format= HEAD)"
+    [[ "$committed_files" == *"AGENTS.md"* ]]
+    [[ "$committed_files" != *".claude/settings.json"* ]]
+    [[ "$committed_files" != *"skills-lock.json"* ]]
+    git -C "$target" diff --name-only | grep -Fx ".claude/settings.json"
+    git -C "$target" diff --name-only | grep -Fx "skills-lock.json"
+    git -C "$target" diff --cached --quiet
+}
+
+@test "environment apply preserves existing package version when creating VERSION" {
+    local target="$WORK_DIR/baseline-existing-version"
+    mkdir -p "$target"
+    git -C "$target" init -b trunk >/dev/null
+    write_file "$target/package.json" '{"name":"baseline-existing-version","version":"2.3.4","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "trunk"'
+    echo "$output" | jq -e '.project_baseline.version == "2.3.4"'
+    [ "$(git -C "$target" branch --show-current)" = "trunk" ]
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+    grep -Fq "## 2.3.4" "$target/CHANGELOG.md"
+    jq -e '.version == "2.3.4"' "$target/package.json"
+}
+
+@test "environment apply uses existing VERSION when package version is absent" {
+    local target="$WORK_DIR/baseline-existing-version-file"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/package.json" '{"name":"baseline-existing-version-file","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "2.3.4"'
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+    grep -Fq "## 2.3.4" "$target/CHANGELOG.md"
+    jq -e '.version == "2.3.4"' "$target/package.json"
+}
+
+@test "environment apply blocks when existing version sources conflict" {
+    local target="$WORK_DIR/baseline-version-conflict"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/package.json" '{"name":"baseline-version-conflict","version":"0.1.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_user_action"'
+    echo "$output" | jq -e '.items | any(.kind=="project_version" and .name=="version_sources" and .status=="needs_user_action")'
+    [ ! -f "$target/CHANGELOG.md" ]
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+    jq -e '.version == "0.1.0"' "$target/package.json"
+}
+
+@test "environment apply accepts formatted changelog version headings" {
+    local target="$WORK_DIR/baseline-formatted-changelog"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/package.json" '{"name":"baseline-formatted-changelog","version":"2.3.4","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [2.3.4](https://github.com/acme/repo/releases/tag/v2.3.4) (2026-05-21)" "" "- Existing release."
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "2.3.4"'
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+    jq -e '.version == "2.3.4"' "$target/package.json"
+}
+
+@test "environment apply skips unreleased changelog heading before version" {
+    local target="$WORK_DIR/baseline-unreleased-changelog"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/package.json" '{"name":"baseline-unreleased-changelog","version":"2.3.4","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased]" "" "- Pending changes." "" "## [2.3.4] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "2.3.4"'
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+    jq -e '.version == "2.3.4"' "$target/package.json"
+}
+
+@test "environment apply skips linked unreleased changelog heading before version" {
+    local target="$WORK_DIR/baseline-linked-unreleased-changelog"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    write_file "$target/VERSION" "2.4.0"
+    write_file "$target/package.json" '{"name":"baseline-linked-unreleased-changelog","version":"2.4.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased](https://github.com/acme/repo/compare/v2.3.4...HEAD)" "" "- Pending changes." "" "## [2.4.0] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.project_baseline.version == "2.4.0"'
+    [ "$(cat "$target/VERSION")" = "2.4.0" ]
+    jq -e '.version == "2.4.0"' "$target/package.json"
+}
+
+@test "scaffold renders existing default branch and project version into release assets" {
+    local target="$WORK_DIR/render-existing-default-branch"
+    mkdir -p "$target"
+    git -C "$target" init -b release >/dev/null
+    git -C "$target" config core.hooksPath .husky
+    write_file "$target/package.json" '{"name":"render-existing-default-branch","version":"2.3.4","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.branch-protection,release.automated --strategy merge
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "release"'
+    echo "$output" | jq -e '.project_baseline.version == "2.3.4"'
+    grep -Fq "      - release" "$target/.github/workflows/release-please.yml"
+    grep -Fq '"refs/heads/release"' "$target/.github/rulesets/protect-main.json"
+    grep -Fq 'release main master' "$target/.husky/pre-push"
+    jq -e '."." == "2.3.4"' "$target/.release-please-manifest.json"
+    [ "$(cat "$target/VERSION")" = "2.3.4" ]
+}
+
+@test "scaffold normalizes detached HEAD before rendering default branch assets" {
+    local target="$WORK_DIR/render-detached-default-branch"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config user.name "ci"
+    git -C "$target" config user.email "ci@example.com"
+    git -C "$target" config core.hooksPath .husky
+    write_file "$target/package.json" '{"name":"render-detached-default-branch","version":"2.3.4","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    write_file "$target/README.md" "# detached default branch"
+    git -C "$target" add package.json README.md
+    git -C "$target" commit -m "chore: seed detached default branch fixture" >/dev/null
+    git -C "$target" checkout --detach HEAD >/dev/null
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --apply --enable github.branch-protection,release.automated --strategy merge
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "main"'
+    grep -Fq "      - main" "$target/.github/workflows/release-please.yml"
+    grep -Fq '"refs/heads/main"' "$target/.github/rulesets/protect-main.json"
+    ! grep -R "refs/heads/HEAD" "$target/.github"
+}
+
+@test "scaffold treats initialization branches as main for default branch assets" {
+    local target="$WORK_DIR/render-init-branch-default"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config core.hooksPath .husky
+    write_file "$target/package.json" '{"name":"render-init-branch-default","version":"0.1.0","devDependencies":{"@commitlint/cli":"0.0.0","@commitlint/config-conventional":"0.0.0"}}'
+    git -C "$target" switch -c dayu-harness/init-20260522 >/dev/null
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run --enable github.branch-protection --strategy merge
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.default_branch == "main"'
+}
+
+@test "environment apply moves initialization branch work back to main before writing" {
+    local target="$WORK_DIR/apply-init-branch-checkout"
+    mkdir -p "$target"
+    git -C "$target" init -b main >/dev/null
+    git -C "$target" config user.name "ci"
+    git -C "$target" config user.email "ci@example.com"
+    write_file "$target/README.md" "# seed"
+    git -C "$target" add README.md
+    git -C "$target" commit -q -m "chore: seed main"
+    git -C "$target" switch -c dayu-harness/init-20260522 >/dev/null
+
+    run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --apply --capabilities "core,git.hooks,git.commit-format"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    echo "$output" | jq -e '.default_branch == "main"'
+    echo "$output" | jq -e '.items | any(.kind=="project" and .name=="git.branch" and .status=="configured")'
+    [ "$(git -C "$target" branch --show-current)" = "main" ]
+    [ "$(cat "$target/VERSION")" = "0.1.0" ]
+}
+
+@test "branch protection hook renders and protects non-main default branch" {
+    local target="$WORK_DIR/non-main-hook"
+    mkdir -p "$target"
+    git -C "$target" init -b trunk >/dev/null
+
+    run_with_wrapper env DAYU_HARNESS_CAPABILITY=github.branch-protection bash "$REPO_ROOT/scripts/install-husky.sh" "$target" --apply merge
+    [ "$status" -eq 0 ]
+    grep -Fq 'trunk main master' "$target/.husky/pre-push"
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 0000000000000000000000000000000000000000 refs/heads/trunk 1111111111111111111111111111111111111111" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "deleting trunk is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 2222222222222222222222222222222222222222 refs/heads/trunk 0000000000000000000000000000000000000000" | .husky/pre-push' _ "$target"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "direct push to trunk is not allowed" ]]
+
+    run bash -c 'cd "$1" && printf "%s\n" "refs/heads/trunk 2222222222222222222222222222222222222222 refs/heads/trunk 0000000000000000000000000000000000000000" | env DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=1 .husky/pre-push' _ "$target"
+    [ "$status" -eq 0 ]
 }
 
 @test "machine-readable reports use relative target paths" {
@@ -523,9 +833,15 @@ expected_agents_h1() {
 @test "environment preflight reports package dependency gaps as install work" {
     local target="$WORK_DIR/package-deps-target"
     mkdir -p "$target"
-    git -C "$target" init >/dev/null
+    git -C "$target" init -b main >/dev/null 2>&1 || {
+        git -C "$target" init >/dev/null
+        git -C "$target" branch -M main
+    }
     git -C "$target" config core.hooksPath .husky
     write_file "$target/package.json" '{"name":"package-deps-target","version":"1.0.0","devDependencies":{}}'
+    write_file "$target/README.md" "# package deps target"
+    write_file "$target/VERSION" "1.0.0"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## 1.0.0"
 
     run_with_wrapper bash "$REPO_ROOT/scripts/ensure-environment.sh" "$target" --check --capabilities "git.commit-format"
 
@@ -570,6 +886,28 @@ expected_agents_h1() {
     grep -q "npm init -y" "$REPO_ROOT/templates/docs/harness/maintenance.md"
 }
 
+@test "Q&A starts with deployment locale and never asks user to classify project language" {
+    local locale_line stack_line local_init_line
+
+    locale_line="$(rg -n '^### 部署语言$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+    stack_line="$(rg -n '^### 技术栈自动判断$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+    local_init_line="$(rg -n '^### 本地初始化与项目基线$' "$REPO_ROOT/Q&A-TEMPLATE.md" | cut -d: -f1)"
+
+    [ -n "$locale_line" ]
+    [ -n "$stack_line" ]
+    [ -n "$local_init_line" ]
+    [ "$locale_line" -lt "$stack_line" ]
+    [ "$stack_line" -lt "$local_init_line" ]
+
+    grep -Fq '第一个阻塞问题必须是部署内容语言' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '不得先询问项目使用哪种编程语言、技术栈或项目类型' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '空项目按 Node.js 治理工具链基线处理' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '初始化第一个阻塞问题必须是部署内容语言' "$REPO_ROOT/SKILL.md"
+    grep -Fq '不得先询问项目编程语言、技术栈或项目类型' "$REPO_ROOT/SKILL.md"
+    ! rg -n '^Q: .*编程语言|^Q: .*项目类型|^Q: .*programming language|^Q: .*project type' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    ! rg -n '目标目录不是 Node 项目' "$REPO_ROOT/scripts/ensure-environment.sh"
+}
+
 @test "scaffold --enable github.release-please resolves dependencies" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.release-please
 
@@ -612,12 +950,14 @@ expected_agents_h1() {
 	    echo "$output" | jq -e '[.capabilities[].items[]? | select(.dst == ".github/workflows/pr-lint.yml")] | length == 0'
 	}
 
-@test "github.repository-settings dry-run plans direct remote settings apply" {
+@test "github.repository-settings dry-run plans github-remote settings apply" {
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$FIXTURE_EMPTY" --dry-run --enable github.repository-settings
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.capabilities | map(.id) | index("github.repository-settings") != null'
-    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="planned" and .allow_auto_merge == true and .delete_branch_on_merge == true)'
+    echo "$output" | jq -e 'has("github_remote") and has("remote_validation")'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .remote_actions | any(.kind=="repository_settings")'
+    echo "$output" | jq -e '.capabilities[] | select(.id=="github.repository-settings") | .items | any(.kind=="remote_settings" and .status=="planned" and .allow_merge_commit == true and .allow_squash_merge == false and .allow_rebase_merge == false and .allow_auto_merge == true and .delete_branch_on_merge == true)'
 }
 
 	@test "quality.tdd deploys policy and checker script" {
@@ -737,6 +1077,71 @@ expected_agents_h1() {
         fi
         ! grep -q '^## 目录结构' "$file"
     done
+}
+
+@test "templates avoid capability-enabled conditional routing phrases" {
+    local file
+    local phrase_file=(
+        "$REPO_ROOT/templates/AGENTS.md"
+        "$REPO_ROOT/templates.en/AGENTS.md"
+        "$REPO_ROOT/templates/docs/harness/guides/branch-protection.md"
+        "$REPO_ROOT/templates/docs/harness/guides/ai-execution.md"
+        "$REPO_ROOT/templates/docs/harness/guides/pr-guidelines.md"
+        "$REPO_ROOT/templates/docs/harness/guides/release-please.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/branch-protection.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/ai-execution.md"
+        "$REPO_ROOT/templates.en/docs/harness/guides/pr-guidelines.md"
+    )
+
+    for file in "${phrase_file[@]}"; do
+        if [ ! -f "$file" ]; then
+            echo "待检查文件不存在: $file"
+            return 1
+        fi
+
+        if rg -n --pcre2 "若启用|如果.*启用|If .* is enabled|if .* is enabled" "$file"; then
+            echo "检测到未替换的条件式能力表达: $file"
+            return 1
+        fi
+    done
+}
+
+@test "version and staging contracts are explicit" {
+    grep -Fq 'PROJECT_VERSION="0.1.0"' "$REPO_ROOT/scripts/ensure-environment.sh"
+    grep -Fq 'PROJECT_VERSION="0.1.0"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'package-lock.json、VERSION、CHANGELOG.md 与 release manifest' "$REPO_ROOT/scripts/ensure-environment.sh"
+    grep -Fq 'package-lock.json' "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh"
+    grep -Fq 'package-lock.json' "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh"
+
+    grep -Fq 'managed_paths' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'git add -- <managed_paths>' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq '.claude/' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'skills-lock.json' "$REPO_ROOT/scripts/scaffold.sh"
+    ! grep -Fq 'GitHub remote/push 完成后，再询问' "$REPO_ROOT/Q&A-TEMPLATE.md"
+}
+
+@test "GitHub E2E waits for deployed workflows on default branch" {
+    grep -Fq 'selected_has_github_e2e_capabilities "${capability_ids[@]}"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'push_init_branch' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'initialization PR is merged into the default branch' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'HEAD:$DEFAULT_BRANCH' "$REPO_ROOT/scripts/github-remote.sh"
+    grep -Fq 'remote_workflow_exists "$repo" "issue-lint.yml"' "$REPO_ROOT/scripts/scaffold.sh"
+    grep -Fq 'remote_workflow_exists "$repo" "pr-lint.yml"' "$REPO_ROOT/scripts/scaffold.sh"
+}
+
+@test "dynamic gitignore assets cover supported language snapshots" {
+    local snapshot
+    for snapshot in Node Python Go Rust Java VisualStudio; do
+        [ -f "$REPO_ROOT/assets/gitignore/github/${snapshot}.gitignore" ] || {
+            echo "缺少 gitignore 快照: $snapshot"
+            return 1
+        }
+    done
+
+    grep -Fq 'github/gitignore' "$REPO_ROOT/scripts/install-gitignore.sh"
+    grep -Fq 'skills-lock.json' "$REPO_ROOT/scripts/install-gitignore.sh"
+    jq -e '.description_nl | contains("github/gitignore") and contains("Go") and contains("Rust") and contains("Dotnet")' "$REPO_ROOT/capabilities/project.gitignore.json"
+    ! jq -e '.description_nl | test("universal, Node\\.js, and Python templates")' "$REPO_ROOT/capabilities/project.gitignore.json" >/dev/null
 }
 
 @test "optional capability ids align with manifest and script allowlist" {
@@ -937,6 +1342,9 @@ expected_agents_h1() {
     mkdir -p "$target/.github/repository"
     cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": true,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": false
 }
@@ -944,7 +1352,7 @@ JSON
 
     run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
     [ "$status" -eq 1 ]
-    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="fail" and (.detail | contains("delete_branch_on_merge=true")))'
+    echo "$output" | jq -e '.checks | any(.item=="repo-config/pull-request-settings-auto" and .status=="fail" and (.detail | contains("allow_squash_merge=false")) and (.detail | contains("delete_branch_on_merge=true")))'
 }
 
 @test "validate passes valid pull-request settings flags" {
@@ -952,6 +1360,9 @@ JSON
     mkdir -p "$target/.github/repository"
     cat > "$target/.github/repository/pull-request-settings.json" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": false,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": true
 }
@@ -989,12 +1400,118 @@ JSON
     echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy" and .status=="fail" and (.detail | contains("unexpected push paths: docs/**")))'
 }
 
+@test "validate reports release-please policy syntax errors and does not create bytecode" {
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip "python3 不可用，无法验证 Python 语法失败路径"
+    fi
+
+    local target="$WORK_DIR/validate-release-policy-syntax-error"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$target/.release-please-manifest.json"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    cat > "$target/.github/scripts/release_please_policy.py" <<'PY'
+def check(
+    print("invalid")
+PY
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy-script" and .status=="fail" and (.detail | contains("Python 语法错误")) )'
+    echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy" and .status=="fail")'
+    run bash -c 'find "$1" -type d -name "__pycache__"' _ "$target"
+    [ -z "$output" ]
+    run bash -c 'find "$1" -type f -name "*.pyc"' _ "$target"
+    [ -z "$output" ]
+}
+
+@test "validate accepts formatted changelog version headings" {
+    local target="$WORK_DIR/validate-formatted-changelog"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.3.4"}'
+    write_file "$target/package.json" '{"name":"validate-formatted-changelog","version":"2.3.4"}'
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [2.3.4](https://github.com/acme/repo/releases/tag/v2.3.4) (2026-05-21)" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.3.4")))'
+}
+
+@test "validate skips unreleased changelog heading before version" {
+    local target="$WORK_DIR/validate-unreleased-changelog"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.3.4"}'
+    write_file "$target/package.json" '{"name":"validate-unreleased-changelog","version":"2.3.4"}'
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased]" "" "- Pending changes." "" "## [2.3.4] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.3.4")))'
+}
+
+@test "validate skips linked unreleased changelog heading before version" {
+    local target="$WORK_DIR/validate-linked-unreleased-changelog"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.4.0"}'
+    write_file "$target/package.json" '{"name":"validate-linked-unreleased-changelog","version":"2.4.0"}'
+    write_file "$target/VERSION" "2.4.0"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased](https://github.com/acme/repo/compare/v2.3.4...HEAD)" "" "- Pending changes." "" "## [2.4.0] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.4.0")))'
+}
+
 @test "release-please policy includes PR lint workflow for release safety scanning" {
     jq -e '.workflow.additional_workflows | type == "array"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.additional_workflows | index(".github/workflows/pr-lint.yml")' "$REPO_ROOT/assets/github/release-please-policy.json"
-    jq -e '.workflow.allowed_actors_variable == "RELEASE_PLEASE_ALLOWED_ACTORS"' "$REPO_ROOT/assets/github/release-please-policy.json"
-    jq -e '.workflow.require_allowed_actors_reference == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.github_token_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.publish_mode_required == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.release_trigger_types == ["feat","fix","perf","revert"]' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.release_trigger_breaking_change == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.workflow.forbid_legacy_release_auth == true' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.workflow.label_gate_required == false' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_please_config.root_package_only == true' "$REPO_ROOT/assets/github/release-please-policy.json"
+    jq -e '.release_please_config.include_component_in_tag == false' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.branch_prefix == "release-please--"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.title_pattern == "Release ${version}"' "$REPO_ROOT/assets/github/release-please-policy.json"
     jq -e '.release_pr.allowed_paths | length > 0' "$REPO_ROOT/assets/github/release-please-policy.json"
@@ -1015,6 +1532,8 @@ JSON
     grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/templates.en/docs/harness/maintenance.md"
     grep -Fq '.github/release-please-policy.json' "$REPO_ROOT/Q&A-TEMPLATE.md"
     grep -Fq '.github/scripts/release_please_policy.py' "$REPO_ROOT/Q&A-TEMPLATE.md"
+    grep -Fq '只支持 `packages["."]` 根包发布' "$REPO_ROOT/templates/docs/harness/guides/release-please.md"
+    grep -Fq 'supports only the `packages["."]` root package' "$REPO_ROOT/templates.en/docs/harness/guides/release-please.md"
 }
 
 @test "maintenance docs align quality.tdd applicability conditions" {
@@ -1274,7 +1793,7 @@ EOF
     grep -q "steps.detect-release-please.outputs.skip != 'true'" "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'HAS_AUTORELEASE_LABEL' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
-    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    ! grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
     ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
@@ -1339,12 +1858,27 @@ PY
     mkdir -p "$target/.github/workflows" "$target/.github/scripts"
 
     cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
     cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
 
     run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="pass")'
+    echo "$output" | jq -e '.checks | any(.item=="repo-template/pull-request" and .status=="pass")'
+}
+
+@test "validate fails when PR template is missing from PR capability assets" {
+    local target="$WORK_DIR/validate-pr-template-missing"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-template/pull-request" and .status=="fail")'
 }
 
 @test "validate en fails when only pr-lint workflow is present" {
@@ -1376,12 +1910,115 @@ PY
     mkdir -p "$target/.github/workflows" "$target/.github/scripts"
 
     cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
     cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
 
     run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.checks | any(.item=="repo-script/pr-body-structure.py" and .status=="pass")'
+    echo "$output" | jq -e '.checks | any(.item=="repo-template/pull-request" and .status=="pass")'
+}
+
+@test "validate en reports release-please policy syntax errors and does not create bytecode" {
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip "python3 不可用，无法验证 Python 语法失败路径"
+    fi
+
+    local target="$WORK_DIR/validate-release-policy-syntax-error-en"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$target/.release-please-manifest.json"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    cat > "$target/.github/scripts/release_please_policy.py" <<'PY'
+def check(
+    print("invalid")
+PY
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy-script" and .status=="fail" and (.detail | contains("Python syntax error")) )'
+    echo "$output" | jq -e '.checks | any(.item=="release/release-please-policy" and .status=="fail")'
+    run bash -c 'find "$1" -type d -name "__pycache__"' _ "$target"
+    [ -z "$output" ]
+    run bash -c 'find "$1" -type f -name "*.pyc"' _ "$target"
+    [ -z "$output" ]
+}
+
+@test "validate en accepts formatted changelog version headings" {
+    local target="$WORK_DIR/validate-formatted-changelog-en"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.3.4"}'
+    write_file "$target/package.json" '{"name":"validate-formatted-changelog-en","version":"2.3.4"}'
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [2.3.4](https://github.com/acme/repo/releases/tag/v2.3.4) (2026-05-21)" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.3.4")))'
+}
+
+@test "validate en skips unreleased changelog heading before version" {
+    local target="$WORK_DIR/validate-unreleased-changelog-en"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.3.4"}'
+    write_file "$target/package.json" '{"name":"validate-unreleased-changelog-en","version":"2.3.4"}'
+    write_file "$target/VERSION" "2.3.4"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased]" "" "- Pending changes." "" "## [2.3.4] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.3.4")))'
+}
+
+@test "validate en skips linked unreleased changelog heading before version" {
+    local target="$WORK_DIR/validate-linked-unreleased-changelog-en"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts" "$target/.github/repository"
+
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$target/.github/workflows/release-please.yml"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$target/.github/workflows/pr-lint.yml"
+    cp "$REPO_ROOT/assets/github/pull_request_template.md" "$target/.github/pull_request_template.md"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$target/.github/release-please-policy.json"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$target/release-please-config.json"
+    cp "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$target/.github/scripts/release_please_policy.py"
+    cp "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" "$target/.github/scripts/pr_body_structure.py"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$target/.github/repository/pull-request-settings.json"
+    write_file "$target/.release-please-manifest.json" '{".":"2.4.0"}'
+    write_file "$target/package.json" '{"name":"validate-linked-unreleased-changelog-en","version":"2.4.0"}'
+    write_file "$target/VERSION" "2.4.0"
+    write_file "$target/CHANGELOG.md" "# Changelog" "" "## [Unreleased](https://github.com/acme/repo/compare/v2.3.4...HEAD)" "" "- Pending changes." "" "## [2.4.0] - 2026-05-21" "" "- Existing release."
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates.en/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="release/version-sync" and .status=="pass")'
+    echo "$output" | jq -e '.checks | all(select(.item=="release/version-sync") | (.detail | contains("2.4.0")))'
 }
 
 @test "validate fails when issue lint script exists without workflow" {
@@ -1394,6 +2031,25 @@ PY
 
     [ "$status" -eq 1 ]
     echo "$output" | jq -e '.checks | any(.item=="repo-workflow/issue-lint" and .status=="fail")'
+}
+
+@test "validate requires Issue template with issue lint assets" {
+    local target="$WORK_DIR/validate-issue-template-required"
+    mkdir -p "$target/.github/workflows" "$target/.github/scripts"
+
+    cp "$REPO_ROOT/assets/github/workflows/issue-lint.yml" "$target/.github/workflows/issue-lint.yml"
+    cp "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$target/.github/scripts/issue_depends_on.py"
+
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+
+    [ "$status" -eq 1 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-template/issue" and .status=="fail")'
+
+    mkdir -p "$target/.github/ISSUE_TEMPLATE"
+    cp "$REPO_ROOT/assets/github/ISSUE_TEMPLATE/dayu-harness-issue.md" "$target/.github/ISSUE_TEMPLATE/dayu-harness-issue.md"
+    run_with_wrapper bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" "$target"
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.checks | any(.item=="repo-template/issue" and .status=="pass")'
 }
 
 @test "validate en fails when issue lint script exists without workflow" {
@@ -1497,8 +2153,22 @@ PY
 
 @test "Release workflow enables merge path + dispatch and enforce merge command" {
     grep -q 'workflow_dispatch:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'paths:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'release-please-config.json' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'Detect releasable commits' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release_trigger_types' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'release_trigger_breaking_change' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' && inputs.mode == 'publish'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "(github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q "github.event_name == 'workflow_dispatch' || steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml" && {
+        echo "workflow_dispatch mode=pr must not bypass release gate"
+        exit 1
+    }
+    grep -q "steps.release-gate.outputs.should_run == 'true'" "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'No releasable commits found; release-please PR creation is skipped.' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -Fq '^[A-Za-z]+(\\([^)]+\\))?!:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'gh pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'pr merge' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q -- '--auto --merge --delete-branch' "$REPO_ROOT/assets/github/workflows/release-please.yml"
@@ -1506,10 +2176,21 @@ PY
     grep -q 'github-actions\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'release-please\[bot\]' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'endswith("\[bot\]")' "$REPO_ROOT/assets/github/workflows/release-please.yml"
-    grep -q 'name: Checkout repository for policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'name: Checkout repository for release gate and policy/config checks' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'uses: actions/checkout@v4' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'persist-credentials: false' "$REPO_ROOT/assets/github/workflows/release-please.yml"
-    grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'secrets.GITHUB_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'actions: write' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'skip-github-pull-request' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'gh workflow run release-please.yml' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '-f mode=publish' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'credential.helper' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'username=x-access-token' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'http.extraheader' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q -- '--subject "${pr_title:-Release}" --body ""' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    grep -q 'git push origin --delete "$head_ref"' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'RELEASE_TOKEN' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+    ! grep -q 'RELEASE_PLEASE_ALLOWED_ACTORS' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'branch_prefix' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'title_pattern' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     grep -q 'allowed_paths' "$REPO_ROOT/assets/github/workflows/release-please.yml"
@@ -1519,6 +2200,40 @@ PY
     grep -q 'for path in touched' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'has_autorelease_label' "$REPO_ROOT/assets/github/workflows/release-please.yml"
     ! grep -q 'autorelease:' "$REPO_ROOT/assets/github/workflows/release-please.yml"
+}
+
+@test "release trigger gate classifies releasable and non-releasable commit messages" {
+    gate_result() {
+        local message="$1"
+        local messages_file="$WORK_DIR/release-gate-message.txt"
+        local release_types="feat|fix|perf|revert"
+        local breaking_change="true"
+        local should_run="false"
+
+        printf '%s\n' "$message" > "$messages_file"
+        if grep -Eq "^(${release_types})(\\([^)]+\\))?!?:[[:space:]]+" "$messages_file"; then
+            should_run="true"
+        elif [ "$breaking_change" = "true" ] && grep -Eq "^[A-Za-z]+(\\([^)]+\\))?!:[[:space:]]+" "$messages_file"; then
+            should_run="true"
+        elif [ "$breaking_change" = "true" ] && grep -Eiq "^BREAKING[ -]CHANGE:" "$messages_file"; then
+            should_run="true"
+        fi
+        printf '%s\n' "$should_run"
+    }
+
+    [ "$(gate_result 'docs: update guide')" = "false" ]
+    [ "$(gate_result 'chore: update tooling')" = "false" ]
+    [ "$(gate_result 'feat: add translation mode')" = "true" ]
+    [ "$(gate_result 'fix(api): handle retries')" = "true" ]
+    [ "$(gate_result 'perf: speed up batching')" = "true" ]
+    [ "$(gate_result 'revert: remove broken change')" = "true" ]
+    [ "$(gate_result 'refactor!: change public API')" = "true" ]
+    [ "$(gate_result $'docs: update guide\n\nBREAKING CHANGE: configuration changed')" = "true" ]
+}
+
+@test "PR lint rejects Conventional Commit PR titles for release-please merge strategy" {
+    grep -q 'PR title must use natural language, not Conventional Commits format' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
+    grep -q 're.match(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)' "$REPO_ROOT/assets/github/workflows/pr-lint.yml"
 }
 
 @test "PR lint troubleshooting sync checks include previous_filename in rename handling" {

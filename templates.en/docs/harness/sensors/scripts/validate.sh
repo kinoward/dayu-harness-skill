@@ -134,6 +134,26 @@ check_json_file() {
     fi
 }
 
+check_plain_file() {
+    local item="$1"
+    local rel_path="$2"
+    local required="${3:-optional}"
+    local file_path="$PROJECT_ROOT/$rel_path"
+
+    if [ -f "$file_path" ]; then
+        record_check "$item" "pass" "${rel_path} deployed"
+        log_text "  ✓ ${rel_path} deployed"
+    else
+        if [ "$required" = "required" ]; then
+            record_check "$item" "fail" "${rel_path} missing (required capability may not be fully deployed)"
+            log_text "  ✗ ${rel_path} missing (required capability may not be fully deployed)"
+        else
+            record_check "$item" "skip" "${rel_path} not deployed (optional capability)"
+            log_text "  - ${rel_path} not deployed (optional capability)"
+        fi
+    fi
+}
+
 check_pull_request_settings_json() {
     local item="$1"
     local rel_path="$2"
@@ -141,21 +161,30 @@ check_pull_request_settings_json() {
     local file_path="$PROJECT_ROOT/$rel_path"
 
     if [ -f "$file_path" ]; then
+        local allow_merge_commit
+        local allow_squash_merge
+        local allow_rebase_merge
         local allow_auto_merge
         local delete_branch_on_merge
         local parse_error=""
 
         if command -v jq >/dev/null 2>&1; then
-            allow_auto_merge="$(jq -r '.allow_auto_merge // empty' "$file_path" 2>/dev/null || true)"
-            delete_branch_on_merge="$(jq -r '.delete_branch_on_merge // empty' "$file_path" 2>/dev/null || true)"
+            allow_merge_commit="$(jq -r 'if has("allow_merge_commit") then .allow_merge_commit else empty end' "$file_path" 2>/dev/null || true)"
+            allow_squash_merge="$(jq -r 'if has("allow_squash_merge") then .allow_squash_merge else empty end' "$file_path" 2>/dev/null || true)"
+            allow_rebase_merge="$(jq -r 'if has("allow_rebase_merge") then .allow_rebase_merge else empty end' "$file_path" 2>/dev/null || true)"
+            allow_auto_merge="$(jq -r 'if has("allow_auto_merge") then .allow_auto_merge else empty end' "$file_path" 2>/dev/null || true)"
+            delete_branch_on_merge="$(jq -r 'if has("delete_branch_on_merge") then .delete_branch_on_merge else empty end' "$file_path" 2>/dev/null || true)"
             if ! jq -e . "$file_path" >/dev/null 2>&1; then
                 parse_error="JSON parse error"
             fi
         elif command -v python3 >/dev/null 2>&1; then
             local settings_json
-            settings_json="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print("%s %s" % (str(data.get("allow_auto_merge")).lower(), str(data.get("delete_branch_on_merge")).lower()))' "$file_path" 2>/dev/null || true)"
-            allow_auto_merge="$(echo "$settings_json" | awk '{print $1}')"
-            delete_branch_on_merge="$(echo "$settings_json" | awk '{print $2}')"
+            settings_json="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print("%s %s %s %s %s" % (str(data.get("allow_merge_commit")).lower(), str(data.get("allow_squash_merge")).lower(), str(data.get("allow_rebase_merge")).lower(), str(data.get("allow_auto_merge")).lower(), str(data.get("delete_branch_on_merge")).lower()))' "$file_path" 2>/dev/null || true)"
+            allow_merge_commit="$(echo "$settings_json" | awk '{print $1}')"
+            allow_squash_merge="$(echo "$settings_json" | awk '{print $2}')"
+            allow_rebase_merge="$(echo "$settings_json" | awk '{print $3}')"
+            allow_auto_merge="$(echo "$settings_json" | awk '{print $4}')"
+            delete_branch_on_merge="$(echo "$settings_json" | awk '{print $5}')"
             if [ -z "$settings_json" ]; then
                 parse_error="JSON parse error"
             fi
@@ -171,17 +200,20 @@ check_pull_request_settings_json() {
             return
         fi
 
-        if [ "$allow_auto_merge" != "true" ] || [ "$delete_branch_on_merge" != "true" ]; then
+        if [ "$allow_merge_commit" != "true" ] || [ "$allow_squash_merge" != "false" ] || [ "$allow_rebase_merge" != "false" ] || [ "$allow_auto_merge" != "true" ] || [ "$delete_branch_on_merge" != "true" ]; then
             local failures=""
-            [ "$allow_auto_merge" != "true" ] && failures="allow_auto_merge=true"
+            [ "$allow_merge_commit" != "true" ] && failures="allow_merge_commit=true"
+            [ "$allow_squash_merge" != "false" ] && failures="${failures:+$failures, }allow_squash_merge=false"
+            [ "$allow_rebase_merge" != "false" ] && failures="${failures:+$failures, }allow_rebase_merge=false"
+            [ "$allow_auto_merge" != "true" ] && failures="${failures:+$failures, }allow_auto_merge=true"
             [ "$delete_branch_on_merge" != "true" ] && failures="${failures:+$failures, }delete_branch_on_merge=true"
             record_check "$item" "fail" "${rel_path} does not satisfy required pull-request settings: ${failures}"
             log_text "  ✗ ${rel_path} does not satisfy required pull-request settings: ${failures}"
             return
         fi
 
-        record_check "$item" "pass" "${rel_path} pull-request settings satisfy required automation flags"
-        log_text "  ✓ ${rel_path} pull-request settings satisfy required automation flags"
+        record_check "$item" "pass" "${rel_path} pull-request settings satisfy merge-only automation flags"
+        log_text "  ✓ ${rel_path} pull-request settings satisfy merge-only automation flags"
     else
         if [ "$required" = "required" ]; then
             record_check "$item" "fail" "${rel_path} missing (required capability may not be fully deployed)"
@@ -193,6 +225,148 @@ check_pull_request_settings_json() {
     fi
 }
 
+read_json_value() {
+    local file_path="$1"
+    local expr="$2"
+    if [ -f "$file_path" ] && command -v jq >/dev/null 2>&1; then
+        jq -r "$expr // empty" "$file_path" 2>/dev/null || true
+    fi
+}
+
+read_package_lock_version() {
+    local file_path="$PROJECT_ROOT/package-lock.json"
+    local lock_version=""
+    if [ -f "$file_path" ] && command -v jq >/dev/null 2>&1; then
+        lock_version="$(jq -r '.packages[""].version // empty' "$file_path" 2>/dev/null || true)"
+        if [ -z "$lock_version" ] || [ "$lock_version" = "null" ]; then
+            lock_version="$(jq -r '.version // empty' "$file_path" 2>/dev/null || true)"
+        fi
+    fi
+    printf '%s' "$lock_version"
+}
+
+extract_semver_token() {
+    local raw="$1"
+    local parsed=""
+    local label=""
+    label="$(printf '%s\n' "$raw" | sed -nE 's/^\[([^]]+)\]\(.*\).*/\1/p; s/^\[([^]]+)\].*/\1/p; s/^([^[:space:]]+).*/\1/p' | sed -n '1p')"
+    case "$label" in
+        [Uu]nreleased) return 0 ;;
+    esac
+    case "$raw" in
+        [Uu]nreleased|[Uu]nreleased[[:space:]]*) return 0 ;;
+    esac
+
+    parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*\[v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)\].*/\1/p' | sed -n '1p')"
+    if [ -z "$parsed" ]; then
+        parsed="$(printf '%s\n' "$raw" | sed -nE 's/.*(^|[^0-9A-Za-z.])v?([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?).*/\2/p' | sed -n '1p')"
+    fi
+    printf '%s' "$parsed"
+}
+
+read_changelog_version() {
+    if [ -f "$PROJECT_ROOT/CHANGELOG.md" ]; then
+        local heading version
+        while IFS= read -r heading; do
+            version="$(extract_semver_token "$heading")"
+            if [ -n "$version" ]; then
+                printf '%s' "$version"
+                return 0
+            fi
+        done < <(sed -n 's/^##[[:space:]]*//p' "$PROJECT_ROOT/CHANGELOG.md")
+    fi
+}
+
+check_release_version_sync() {
+    local package_version package_lock_version version_file manifest_version changelog_heading expected mismatches missing
+    package_version="$(read_json_value "$PROJECT_ROOT/package.json" '.version')"
+    package_lock_version="$(read_package_lock_version)"
+    version_file=""
+    manifest_version="$(read_json_value "$PROJECT_ROOT/.release-please-manifest.json" '."."')"
+    changelog_heading=""
+    expected=""
+    mismatches=""
+    missing=""
+
+    if [ -f "$PROJECT_ROOT/VERSION" ]; then
+        version_file="$(sed -n '1p' "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
+    fi
+    changelog_heading="$(read_changelog_version)"
+
+    [ -n "$package_version" ] || missing="${missing:+$missing, }package.json.version"
+    [ -n "$version_file" ] || missing="${missing:+$missing, }VERSION"
+    [ -n "$manifest_version" ] || missing="${missing:+$missing, }.release-please-manifest.json[.]"
+    [ -n "$changelog_heading" ] || missing="${missing:+$missing, }CHANGELOG.md"
+
+    expected="$package_version"
+    [ -n "$expected" ] || expected="$version_file"
+    [ -n "$expected" ] || expected="$manifest_version"
+    [ -n "$expected" ] || expected="$changelog_heading"
+
+    if [ -n "$expected" ]; then
+        [ -z "$package_version" ] || [ "$package_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package.json=${package_version}"
+        [ -z "$package_lock_version" ] || [ "$package_lock_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package-lock.json=${package_lock_version}"
+        [ -z "$version_file" ] || [ "$version_file" = "$expected" ] || mismatches="${mismatches:+$mismatches, }VERSION=${version_file}"
+        [ -z "$manifest_version" ] || [ "$manifest_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }manifest=${manifest_version}"
+        [ -z "$changelog_heading" ] || [ "$changelog_heading" = "$expected" ] || mismatches="${mismatches:+$mismatches, }CHANGELOG=${changelog_heading}"
+    fi
+
+    if [ -n "$missing" ] || [ -n "$mismatches" ]; then
+        record_check "release/version-sync" "fail" "Release version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+        log_text "  ✗ Release version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+    else
+        record_check "release/version-sync" "pass" "package.json, package-lock.json, VERSION, release manifest, and initial CHANGELOG version match: ${expected}"
+        log_text "  ✓ Release version sources match: ${expected}"
+    fi
+}
+
+check_project_version_sync() {
+    local package_version package_lock_version version_file changelog_heading expected mismatches missing
+    package_version="$(read_json_value "$PROJECT_ROOT/package.json" '.version')"
+    package_lock_version="$(read_package_lock_version)"
+    version_file=""
+    changelog_heading="$(read_changelog_version)"
+    expected=""
+    mismatches=""
+    missing=""
+
+    if [ -f "$PROJECT_ROOT/VERSION" ]; then
+        version_file="$(sed -n '1p' "$PROJECT_ROOT/VERSION" | tr -d '[:space:]')"
+    fi
+
+    if [ ! -f "$PROJECT_ROOT/package.json" ] && [ ! -f "$PROJECT_ROOT/package-lock.json" ] && [ ! -f "$PROJECT_ROOT/VERSION" ] && [ ! -f "$PROJECT_ROOT/CHANGELOG.md" ]; then
+        record_check "project/version-sync" "skip" "No initialization version sources found; skipping version sync check"
+        log_text "  - No initialization version sources found; skipping version sync check"
+        return
+    fi
+
+    if [ -f "$PROJECT_ROOT/package.json" ]; then
+        [ -n "$package_version" ] || missing="${missing:+$missing, }package.json.version"
+    fi
+    [ -n "$version_file" ] || missing="${missing:+$missing, }VERSION"
+    [ -n "$changelog_heading" ] || missing="${missing:+$missing, }CHANGELOG.md"
+
+    expected="$package_version"
+    [ -n "$expected" ] || expected="$package_lock_version"
+    [ -n "$expected" ] || expected="$version_file"
+    [ -n "$expected" ] || expected="$changelog_heading"
+
+    if [ -n "$expected" ]; then
+        [ -z "$package_version" ] || [ "$package_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package.json=${package_version}"
+        [ -z "$package_lock_version" ] || [ "$package_lock_version" = "$expected" ] || mismatches="${mismatches:+$mismatches, }package-lock.json=${package_lock_version}"
+        [ -z "$version_file" ] || [ "$version_file" = "$expected" ] || mismatches="${mismatches:+$mismatches, }VERSION=${version_file}"
+        [ -z "$changelog_heading" ] || [ "$changelog_heading" = "$expected" ] || mismatches="${mismatches:+$mismatches, }CHANGELOG=${changelog_heading}"
+    fi
+
+    if [ -n "$missing" ] || [ -n "$mismatches" ]; then
+        record_check "project/version-sync" "fail" "Initialization version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+        log_text "  ✗ Initialization version sources are not aligned. Missing: ${missing:-none}; mismatched: ${mismatches:-none}."
+    else
+        record_check "project/version-sync" "pass" "Initialization version sources match: ${expected}"
+        log_text "  ✓ Initialization version sources match: ${expected}"
+    fi
+}
+
 check_python_script() {
     local item="$1"
     local rel_path="$2"
@@ -201,12 +375,12 @@ check_python_script() {
 
     if [ -f "$file_path" ]; then
         if command -v python3 >/dev/null 2>&1; then
-            if python3 -m py_compile "$file_path" >/dev/null 2>&1; then
+            if python3 -c 'import sys; compile(open(sys.argv[1], "r", encoding="utf-8").read(), sys.argv[1], "exec")' "$file_path" >/dev/null 2>&1; then
                 record_check "$item" "pass" "${rel_path} Python syntax is valid"
                 log_text "  ✓ ${rel_path} Python syntax is valid"
             else
                 local err
-                err="$(python3 -m py_compile "$file_path" 2>&1 | sed -n '1,1p' || true)"
+                err="$(python3 -c 'import sys; compile(open(sys.argv[1], "r", encoding="utf-8").read(), sys.argv[1], "exec")' "$file_path" 2>&1 | sed -n '1,1p' || true)"
                 record_check "$item" "fail" "${rel_path} Python syntax error: ${err:-unknown}"
                 log_text "  ✗ ${rel_path} Python syntax error: ${err:-unknown}"
             fi
@@ -270,6 +444,9 @@ if [ "$JSON_MODE" = false ]; then
     echo "Project path: $PROJECT_ROOT"
     echo ""
 fi
+
+log_text "--- project version ---"
+check_project_version_sync
 
 # 1. Validate husky hooks are executable + parseable
 log_text "--- husky hooks ---"
@@ -368,20 +545,24 @@ fi
 
 # 4. Validate GitHub assets (JSON + script)
 log_text "--- GitHub assets ---"
-if [ -f "$PROJECT_ROOT/.github/workflows/issue-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/issue_depends_on.py" ]; then
+if [ -f "$PROJECT_ROOT/.github/workflows/issue-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/issue_depends_on.py" ] || [ -f "$PROJECT_ROOT/.github/ISSUE_TEMPLATE/dayu-harness-issue.md" ]; then
     check_workflow_file "repo-workflow/issue-lint" ".github/workflows/issue-lint.yml" required
+    check_plain_file "repo-template/issue" ".github/ISSUE_TEMPLATE/dayu-harness-issue.md" required
     check_python_script "repo-script/issue_depends_on.py" ".github/scripts/issue_depends_on.py" required
 else
     record_check "repo-workflow/issue-lint" "skip" "issue-lint workflow not deployed (optional capability skipped)"
+    record_check "repo-template/issue" "skip" "Issue template not deployed (optional capability skipped)"
     record_check "repo-script/issue_depends_on.py" "skip" "issue depends-on script not deployed (optional capability skipped)"
     log_text "  - issue-lint workflow and script are not deployed (optional capabilities)"
 fi
 
-if [ -f "$PROJECT_ROOT/.github/workflows/pr-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_body_structure.py" ]; then
+if [ -f "$PROJECT_ROOT/.github/workflows/pr-lint.yml" ] || [ -f "$PROJECT_ROOT/.github/scripts/pr_body_structure.py" ] || [ -f "$PROJECT_ROOT/.github/pull_request_template.md" ]; then
     check_workflow_file "repo-workflow/pr-lint" ".github/workflows/pr-lint.yml" required
+    check_plain_file "repo-template/pull-request" ".github/pull_request_template.md" required
     check_python_script "repo-script/pr-body-structure.py" ".github/scripts/pr_body_structure.py" required
 else
     record_check "repo-workflow/pr-lint" "skip" "pr-lint workflow not deployed (optional capability skipped)"
+    record_check "repo-template/pull-request" "skip" "PR template not deployed (optional capability skipped)"
     record_check "repo-script/pr-body-structure.py" "skip" "PR body structure script not deployed (optional capability skipped)"
     log_text "  - pr-lint workflow and PR body structure script are not deployed (optional capabilities)"
 fi
@@ -393,15 +574,16 @@ if [ -f "$PROJECT_ROOT/.github/workflows/release-please.yml" ] || [ -f "$PROJECT
     check_json_file "release/repository-settings-policy" ".github/release-please-policy.json" required
     check_json_file "release/release-please-config" "release-please-config.json" required
     check_json_file "release/release-please-manifest" ".release-please-manifest.json" required
+    check_release_version_sync
     check_workflow_file "release/workflow" ".github/workflows/release-please.yml" required
     check_python_script "release/release-please-policy-script" ".github/scripts/release_please_policy.py" required
     if [ -f "$PROJECT_ROOT/.github/scripts/release_please_policy.py" ] && [ -f "$PROJECT_ROOT/.github/release-please-policy.json" ]; then
         if command -v python3 >/dev/null 2>&1; then
-            if (cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" ".") >/dev/null 2>&1; then
+            if (cd "$PROJECT_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" ".") >/dev/null 2>&1; then
                 record_check "release/release-please-policy" "pass" "release-please policy validation passed"
                 log_text "  ✓ release-please policy validation passed"
             else
-                policy_err="$(cd "$PROJECT_ROOT" && python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" "." 2>&1 | sed -n '1,3p' | tr '\n' ' ' || true)"
+                policy_err="$(cd "$PROJECT_ROOT" && PYTHONDONTWRITEBYTECODE=1 python3 ".github/scripts/release_please_policy.py" ".github/release-please-policy.json" "." 2>&1 | sed -n '1,3p' | tr '\n' ' ' || true)"
                 record_check "release/release-please-policy" "fail" "release-please policy validation failed: ${policy_err:-unknown}"
                 log_text "  ✗ release-please policy validation failed: ${policy_err:-unknown}"
             fi
@@ -495,13 +677,11 @@ DESC_NL=$(build_description_nl)
 
 # 8. Output results
 if [ "$JSON_MODE" = true ]; then
-    cat <<JSONEOF
-{
-  "checks": [${CHECKS_JSON}],
-  "summary": {"passed": ${PASSED}, "failed": ${FAILED}},
-  "description_nl": "$(json_escape "$DESC_NL")"
-}
-JSONEOF
+    printf '{\n'
+    printf '  "checks": [%s],\n' "$CHECKS_JSON"
+    printf '  "summary": {"passed": %s, "failed": %s},\n' "$PASSED" "$FAILED"
+    printf '  "description_nl": "%s"\n' "$(json_escape "$DESC_NL")"
+    printf '}\n'
 else
     echo ""
     echo "=== Validation Summary ==="

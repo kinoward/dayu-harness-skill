@@ -116,6 +116,52 @@ knowledge.research, project.context, knowledge.archive
 - 验证原子能力边界：未启用的 hook、workflow、ruleset 或 release-please 文件不会被误部署。
 - 验证默认中文部署与英文部署的治理产物等价性：文件树一致、Git 约束存在、GitHub 约束不存在、部署后检查结果一致，非语言机器文件保持一致。
 
+## GitHub 远端能力边界验证基线（2026-05-23）
+
+该基线来自真实测试会话和后续修复，不属于目标项目部署模板。测试输入包括：
+
+- 测试会话历史：`/Users/wangda/.claude/projects/-Users-wangda-github-kino-test-skill-tmp-9/ad6964c7-aa1a-47a5-b4b8-baf8ac395178.jsonl`
+- 测试项目：`/Users/wangda/github-kino/test-skill-tmp-9`
+- 标杆项目：`/Users/wangda/github-kino/youtube-translate-tools`
+
+修复后应满足的行为：
+
+- `scaffold.sh --apply --github-remote apply` 在无法解析 GitHub repository，或远端 preflight 需要用户处理时，必须在写入治理文件前返回 `needs_user_action`，避免本地 partial apply 后误报远端 E2E 成功。
+- `capability-smoke` 覆盖正反两类路径：commit-msg hook、pre-push 默认分支保护、pre-push release tag 保护、PR body validator、Issue dependency validator、TDD policy validator、release-please policy validator。
+- `remote-smoke` 在 disposable GitHub repo 中先验证错误 Issue/PR 会被 workflow 拒绝，再验证合规 Issue/PR 通过、合并后 Issue 自动关闭，并确认测试分支被清理。
+- `remote-release` 在 disposable GitHub repo 中验证 `docs:`/`chore:` 不发版，再用两次 releasable commit 推进版本，确认 tag、GitHub Release、Release PR 和 `release-please--*` 分支状态符合预期。
+- 远端 profile 默认必须具备 `delete_repo` scope 才能创建 disposable repo；缺少该权限时应在创建仓库前停止。若显式设置 `DAYU_KEEP_REMOTE_REPO=1`，调用者需要承担后续清理责任。
+
+当前测试项目状态核对：
+
+- `/Users/wangda/github-kino/test-skill-tmp-9` 本地工作区为 `main...origin/main`，无未提交变更。
+- 远端 heads 只保留 `refs/heads/main`。
+- GitHub open PR 列表为空，open Issue 列表为空。
+- GitHub 历史中的 closed PR、closed Issue 和失败 workflow run 属于审计历史；若需要完全空白的测试仓库，只能删除并重建仓库。
+
+已知一次性远端残留：
+
+- `kinoward/dayu-harness-remote-smoke-1779503157`
+- `kinoward/dayu-harness-remote-release-1779503157`
+
+这两个仓库由修复前的真实远端 profile 尝试创建。最后核对时两者仍存在，但 open PR 和 open Issue 均为空；未删除的原因是当前 GitHub CLI token 缺少 `delete_repo` scope。对应本地 `mktemp` 项目目录格式为 `${TMPDIR:-/tmp}/dayu-remote-smoke.XXXXXX/project` 和 `${TMPDIR:-/tmp}/dayu-remote-release.XXXXXX/project`，最后核对时 `/var/folders` 与 `/tmp` 下未发现残留目录。
+
+本轮修复后的本地验证命令：
+
+```bash
+git diff --check
+bash -n scripts/scaffold.sh
+bash -n scripts/github-remote.sh
+bash -n scripts/ensure-environment.sh
+bash -n tests/smoke/dayu-harness-profile.sh
+python3 -m py_compile assets/github/scripts/issue_depends_on.py
+bats tests/unit/test-github-helper-scripts.bats
+bats tests/unit/test-skill-interaction-e2e.bats
+bats tests/unit/test-audit.bats
+bash scripts/check-i18n-drift.sh --json
+bash tests/smoke/dayu-harness-profile.sh --profile local-fast --json
+```
+
 ## Claude CLI 双语部署 Smoke 基线
 
 该基线来自真实 Claude Code CLI 交互测试，已沉淀为 [claude-i18n-deploy-smoke.sh](../smoke/claude-i18n-deploy-smoke.sh) 和 [compare-i18n-deployments.sh](../helpers/compare-i18n-deployments.sh)。

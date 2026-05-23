@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
+    export PYTHONDONTWRITEBYTECODE=1
     TEST_ROOT="${BATS_TEST_DIRNAME}/.tmp"
     mkdir -p "$TEST_ROOT"
     TEST_DIR="$(mktemp -d "$TEST_ROOT/github-helper-scripts.XXXXXX")"
@@ -58,6 +59,18 @@ JSON
     cat > "$payload" <<'JSON'
 {
   "issue": {
+    "body": "# Proposal\n\nDepends on: #0"
+  }
+}
+JSON
+
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid issue dependency format"* ]]
+
+    cat > "$payload" <<'JSON'
+{
+  "issue": {
     "body": "# Proposal\nDepends on: #12\nDepends on: #34"
   }
 }
@@ -91,6 +104,17 @@ JSON
     cat > "$payload" <<'JSON'
 {
   "issue": {
+    "body": "# Proposal\ndepends on 12"
+  }
+}
+JSON
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid issue dependency format"* ]]
+
+    cat > "$payload" <<'JSON'
+{
+  "issue": {
     "body": "# Proposal\nDepends on: 12"
   }
 }
@@ -109,6 +133,113 @@ JSON
     run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Invalid issue dependency format"* ]]
+}
+
+@test "pr_body_structure.py supports issue-first final and non-final trailers" {
+    local body_file="$TEST_DIR/pr-body.md"
+    write_file "$body_file" \
+      "## Summary" \
+      "- split issue work" \
+      "" \
+      "## Implementation notes" \
+      "- first slice" \
+      "" \
+      "## Test plan" \
+      "- [x] \`printf ok\`" \
+      "" \
+      "Final PR: no" \
+      "Refs #42"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+
+    write_file "$body_file" \
+      "## Summary" \
+      "- finish issue work" \
+      "" \
+      "## Implementation notes" \
+      "- final slice" \
+      "" \
+      "## Test plan" \
+      "- [x] \`printf ok\`" \
+      "" \
+      "Final PR: yes" \
+      "Closes #42"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dayu-format.mjs renders PR body accepted by validator" {
+    local body_file="$TEST_DIR/rendered-pr-body.md"
+
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" pr-body \
+      --summary "verify deterministic renderer" \
+      --implementation "render a strict Dayu PR body" \
+      --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+      --issue 42 \
+      --final yes
+    [ "$status" -eq 0 ]
+    printf '%s\n' "$output" > "$body_file"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" < "$body_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dayu-format.mjs renders issue body accepted by dependency validator" {
+    local payload="$TEST_DIR/rendered-issue-payload.json"
+    local body
+
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" issue-body \
+      --summary "verify deterministic issue renderer" \
+      --background "local unit test" \
+      --depends-on 12
+    [ "$status" -eq 0 ]
+    body="$output"
+
+    jq -n --arg body "$body" '{issue:{body:$body}}' > "$payload"
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OK: Issue depends-on line is valid."* ]]
+}
+
+@test "dayu-format.mjs renders conventional commit messages" {
+    run node "$REPO_ROOT/templates/docs/harness/sensors/scripts/dayu-format.mjs" commit-message \
+      --type test \
+      --scope harness \
+      --subject "verify deterministic formatting"
+    [ "$status" -eq 0 ]
+    [ "$output" = "test(harness): verify deterministic formatting" ]
+}
+
+@test "pr_body_structure.py blocks closing keyword while sibling PR remains open" {
+    local body_file="$TEST_DIR/pr-body-final.md"
+    local open_prs="$TEST_DIR/open-prs.json"
+    write_file "$body_file" \
+      "## Summary" \
+      "- finish issue work" \
+      "" \
+      "## Implementation notes" \
+      "- final slice" \
+      "" \
+      "## Test plan" \
+      "- [x] \`printf ok\`" \
+      "" \
+      "Final PR: yes" \
+      "Closes #42"
+
+    cat > "$open_prs" <<'JSON'
+{
+  "pulls": [
+    {"number": 10, "body": "Final PR: no\nRefs #42"},
+    {"number": 11, "body": "Final PR: yes\nCloses #42"}
+  ]
+}
+JSON
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_body_structure.py" --pr-number 11 --open-prs-json "$open_prs" < "$body_file"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"other open PRs reference the same issue #42: #10"* ]]
 }
 
 @test "release_please_policy.py reports config validation failures" {
@@ -152,6 +283,7 @@ JSON
   "pull-request-title-pattern": "release ${version}",
   "packages": {
     ".": {
+      "extra-files": ["VERSION"],
       "changelog-sections": [
         {
           "type": "feat",
@@ -171,12 +303,13 @@ JSON
     "dispatch_enabled": true,
     "push_paths": ["src/**", "release-please-config.json"],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
-    "label_gate_required": false
+    "label_gate_required": false,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -185,7 +318,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -203,6 +341,7 @@ JSON
     [[ "$output" == *"allow_auto_merge must be true"* ]]
     [[ "$output" == *"pull-request-title-pattern must be 'Release \${version}'"* ]]
     [[ "$output" == *"missing types: fix"* ]]
+    [[ "$output" == *"plain VERSION must be synchronized by the release workflow"* ]]
 }
 
 @test "release_please_policy.py requires exact release push allowlist" {
@@ -272,12 +411,13 @@ JSON
     "dispatch_enabled": true,
     "push_paths": ["src/**", "release-please-config.json"],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
-    "label_gate_required": false
+    "label_gate_required": false,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -286,7 +426,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -376,7 +521,7 @@ JSON
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
@@ -385,7 +530,12 @@ JSON
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
@@ -402,7 +552,7 @@ JSON
     [[ "$output" == *"label-based gate detected"* ]]
 }
 
-@test "release_please_policy.py requires allowed actor variable reference" {
+@test "release_please_policy.py requires GITHUB_TOKEN and publish-only mode" {
     local policy_file="$TEST_DIR/release-please-policy.json"
     local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
     local config_file="$TEST_DIR/release-please-config.json"
@@ -488,10 +638,11 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing reference to allowed actor variable 'RELEASE_PLEASE_ALLOWED_ACTORS'"* ]]
+    [[ "$output" == *"release workflow must use secrets.GITHUB_TOKEN"* ]]
+    [[ "$output" == *"workflow_dispatch mode=publish with skip-github-pull-request is required"* ]]
 }
 
-@test "release_please_policy.py rejects require_allowed_actors_reference=false" {
+@test "release_please_policy.py rejects missing new release workflow policy flags" {
     local policy_file="$TEST_DIR/release-please-policy.json"
     local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
     local config_file="$TEST_DIR/release-please-config.json"
@@ -585,10 +736,18 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"workflow.require_allowed_actors_reference must be true."* ]]
+    [[ "$output" == *"workflow.github_token_required must be true."* ]]
+    [[ "$output" == *"workflow.publish_mode_required must be true."* ]]
+    [[ "$output" == *"workflow.plain_version_sync_required must be true."* ]]
+    [[ "$output" == *"workflow.git_credential_helper_required must be true."* ]]
+    [[ "$output" == *"workflow.forbid_inline_http_extraheader must be true."* ]]
+    [[ "$output" == *"workflow.merge_subject_required must be true."* ]]
+    [[ "$output" == *"workflow.merge_empty_body_required must be true."* ]]
+    [[ "$output" == *"workflow.release_branch_delete_required must be true."* ]]
+    [[ "$output" == *"workflow.forbid_legacy_release_auth must be true."* ]]
 }
 
-@test "release_please_policy.py scans additional workflows for allowed actor variable" {
+@test "release_please_policy.py rejects legacy actor variables in additional workflows" {
     local policy_file="$TEST_DIR/release-please-policy.json"
     local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
     local extra_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
@@ -671,7 +830,8 @@ JSON
     ],
     "push_paths": ["src/**", "release-please-config.json"],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
-    "label_gate_required": false
+    "label_gate_required": false,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
@@ -699,10 +859,10 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing reference to allowed actor variable 'RELEASE_PLEASE_ALLOWED_ACTORS'"* ]]
+    [[ "$output" == *"legacy RELEASE_TOKEN or RELEASE_PLEASE_ALLOWED_ACTORS reference is forbidden"* ]]
 }
 
-@test "release_please_policy.py passes when allowed actor variable is referenced" {
+@test "release_please_policy.py passes with GITHUB_TOKEN, plain VERSION sync, and publish-only mode" {
     local policy_file="$TEST_DIR/release-please-policy.json"
     local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
     local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
@@ -723,15 +883,60 @@ JSON
       "      - \"src/**\"" \
       "      - \"release-please-config.json\"" \
       "  workflow_dispatch:" \
+      "    inputs:" \
+      "      mode:" \
+      "        type: choice" \
+      "        options:" \
+      "          - pr" \
+      "          - publish" \
+      "" \
+      "permissions:" \
+      "  contents: write" \
+      "  pull-requests: write" \
+      "  actions: write" \
       "" \
       "jobs:" \
       "  release-please:" \
       "    runs-on: ubuntu-latest" \
       "    steps:" \
+      "      - name: Checkout repository for release gate and policy/config checks" \
+      "        if: \${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}" \
+      "        uses: actions/checkout@v4" \
+      "        with:" \
+      "          fetch-depth: 0" \
+      "          persist-credentials: false" \
+      "      - name: Detect releasable commits" \
+      "        id: release-gate" \
+      "        if: \${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr') }}" \
+      "        run: |" \
+      "          release_trigger_types" \
+      "          release_trigger_breaking_change" \
+      "          echo \"No releasable commits found; release-please PR creation is skipped.\"" \
+      "      - uses: googleapis/release-please-action@v4" \
+      "        if: \${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'publish') || steps.release-gate.outputs.should_run == 'true' }}" \
+      "        with:" \
+      '          token: ${{ secrets.GITHUB_TOKEN }}' \
+      "          skip-github-pull-request: \${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' }}" \
+      "      - name: Sync VERSION in release PR" \
+      "        run: |" \
+      "          sync_version_from_manifest() {" \
+      "            jq -r '.\".\" // empty' .release-please-manifest.json" \
+      "            echo \"VERSION is already synchronized\"" \
+      "            git -C \"\$workdir\" add VERSION" \
+      "            git -C \"\$workdir\" push origin \"HEAD:\$head_ref\"" \
+      "          }" \
+      "          assert_release_pr_allowed_files 1" \
       "      - name: Merge release-please PR" \
       "        env:" \
-      '          RELEASE_PLEASE_ALLOWED_ACTORS: ${{ vars.RELEASE_PLEASE_ALLOWED_ACTORS }}' \
-      "        run: gh pr merge 1 --auto --merge --delete-branch"
+      '          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}' \
+      "        run: |" \
+      "          git config --global credential.helper '!f() { echo \"username=x-access-token\"; echo \"password=\$GH_TOKEN\"; }; f'" \
+      "          pr_title=\"Release 1.2.3\"" \
+      "          gh pr view 1 --json headRefName --jq '.headRefName'" \
+      "          head_ref=\"release-please--branches--main\"" \
+      "          gh pr merge 1 --auto --merge --delete-branch --repo \"\$REPO\" --subject \"\${pr_title:-Release}\" --body \"\"" \
+      "          git push origin --delete \"\$head_ref\"" \
+      "      - run: gh workflow run release-please.yml --ref main -f mode=publish"
 
     cat > "$lint_workflow_file" <<'YAML'
 name: PR Lint
@@ -739,8 +944,6 @@ name: PR Lint
 jobs:
   pr-lint:
     runs-on: ubuntu-latest
-    env:
-      RELEASE_PLEASE_ALLOWED_ACTORS: ${{ vars.RELEASE_PLEASE_ALLOWED_ACTORS }}
     steps:
       - run: echo ok
 YAML
@@ -756,6 +959,8 @@ JSON
   "pull-request-title-pattern": "Release ${version}",
   "packages": {
     ".": {
+      "release-type": "node",
+      "include-component-in-tag": false,
       "changelog-sections": [
         {
           "type": "feat",
@@ -782,27 +987,47 @@ JSON
     "push_paths": ["src/**", "release-please-config.json"],
     "merge_command": "gh pr merge --auto --merge --delete-branch",
     "label_gate_required": false,
-    "require_allowed_actors_reference": true
+    "github_token_required": true,
+    "publish_mode_required": true,
+    "release_trigger_types": ["feat", "fix", "perf", "revert"],
+    "release_trigger_breaking_change": true,
+    "plain_version_sync_required": true,
+    "git_credential_helper_required": true,
+    "forbid_inline_http_extraheader": true,
+    "merge_subject_required": true,
+    "merge_empty_body_required": true,
+    "release_branch_delete_required": true,
+    "forbid_legacy_release_auth": true
   },
   "release_pr": {
     "branch_prefix": "release-please--",
     "title_pattern": "Release ${version}",
-    "allowed_paths": ["CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
+    "allowed_paths": ["VERSION", "CHANGELOG.md", "**/CHANGELOG.md", ".release-please-manifest.json"]
   },
   "release_please_config": {
     "file": "release-please-config.json",
     "pull_request_title_pattern": "Release ${version}",
+    "root_package_only": true,
+    "include_component_in_tag": false,
     "require_full_changelog_types": true,
     "required_changelog_types": ["feat", "fix"]
   },
   "repository_settings": {
-    "file": ".github/repository/pull-request-settings.json"
+    "file": ".github/repository/pull-request-settings.json",
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
   }
 }
 JSON
 
     cat > "$settings_file" <<'JSON'
 {
+  "allow_merge_commit": true,
+  "allow_squash_merge": false,
+  "allow_rebase_merge": false,
   "allow_auto_merge": true,
   "delete_branch_on_merge": true
 }
@@ -810,6 +1035,67 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 0 ]
+}
+
+@test "release_please_policy.py rejects workflow_dispatch pr bypassing release gate" {
+    local policy_file="$TEST_DIR/.github/release-please-policy.json"
+    local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
+    local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
+    local config_file="$TEST_DIR/release-please-config.json"
+    local manifest_file="$TEST_DIR/.release-please-manifest.json"
+    local settings_file="$TEST_DIR/.github/repository/pull-request-settings.json"
+
+    mkdir -p "$TEST_DIR/.github/workflows" "$TEST_DIR/.github/repository"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$policy_file"
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$workflow_file"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$lint_workflow_file"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$config_file"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$manifest_file"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$settings_file"
+
+    perl -0pi -e "s#\\(github\\.event_name == 'workflow_dispatch' && inputs\\.mode == 'publish'\\) \\|\\| steps\\.release-gate\\.outputs\\.should_run == 'true'#github.event_name == 'workflow_dispatch' || steps.release-gate.outputs.should_run == 'true'#" "$workflow_file"
+
+    run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"workflow_dispatch mode=pr release-please runs must be gated"* ]]
+}
+
+@test "release_please_policy.py rejects component-tag release config" {
+    local policy_file="$TEST_DIR/.github/release-please-policy.json"
+    local workflow_file="$TEST_DIR/.github/workflows/release-please.yml"
+    local lint_workflow_file="$TEST_DIR/.github/workflows/pr-lint.yml"
+    local config_file="$TEST_DIR/release-please-config.json"
+    local manifest_file="$TEST_DIR/.release-please-manifest.json"
+    local settings_file="$TEST_DIR/.github/repository/pull-request-settings.json"
+
+    mkdir -p "$TEST_DIR/.github/workflows" "$TEST_DIR/.github/repository"
+    cp "$REPO_ROOT/assets/github/release-please-policy.json" "$policy_file"
+    cp "$REPO_ROOT/assets/github/workflows/release-please.yml" "$workflow_file"
+    cp "$REPO_ROOT/assets/github/workflows/pr-lint.yml" "$lint_workflow_file"
+    cp "$REPO_ROOT/assets/github/release-please-config.json" "$config_file"
+    cp "$REPO_ROOT/assets/github/.release-please-manifest.json" "$manifest_file"
+    cp "$REPO_ROOT/assets/github/repository/pull-request-settings.json" "$settings_file"
+
+    python3 - "$config_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8"))
+config["packages"]["."]["include-component-in-tag"] = True
+config["packages"]["packages/extra"] = {
+    "release-type": "node",
+    "include-component-in-tag": True,
+    "changelog-sections": [{"type": "feat", "section": "Features"}],
+}
+path.write_text(json.dumps(config), encoding="utf-8")
+PY
+
+    run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must only define the root package"* ]]
+    [[ "$output" == *"include-component-in-tag must be false"* ]]
 }
 
 @test "release_please_policy.py rejects policy redirecting workflow.file to non-release workflow" {
@@ -1162,7 +1448,6 @@ JSON
 
     run python3 "$REPO_ROOT/assets/github/scripts/release_please_policy.py" "$policy_file" "$TEST_DIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"workflow.allowed_actors_variable must be 'RELEASE_PLEASE_ALLOWED_ACTORS'."* ]]
     [[ "$output" == *"repository_settings.file must be '.github/repository/pull-request-settings.json'."* ]]
     [[ "$output" == *"release_please_config.file must be 'release-please-config.json'."* ]]
     [[ "$output" == *"missing merge command 'gh pr merge --auto --merge --delete-branch'"* ]]
@@ -1391,44 +1676,32 @@ JSON
     [[ "$output" == *"release_please_config.required_changelog_types must be a non-empty array."* ]]
 }
 
-@test "release_please actor allowlist accepts configured PAT owners and rejects unconfigured ones" {
+@test "release_please fixed actor guard accepts only release bots" {
     run python3 - <<'PY'
-def is_allowed_actor(author: str, allowed_actors: str) -> bool:
+def is_release_actor(author: str) -> bool:
     actor = (author or "").strip().lower()
-    if not actor:
-        return False
-    if actor in {"github-actions[bot]", "release-please[bot]"}:
-        return True
-    parsed_allowed = {
-        item.strip().lower()
-        for item in allowed_actors.split(",")
-        if item.strip()
-    }
-    return actor in parsed_allowed
+    return actor in {"github-actions[bot]", "release-please[bot]"}
 
 
-if is_allowed_actor("release-owner", ""):
-    raise SystemExit("unconfigured PAT owner should be denied")
+if is_release_actor("release-owner"):
+    raise SystemExit("PAT owner should be denied")
 
-if not is_allowed_actor("alice", "alice,bob"):
-    raise SystemExit("configured PAT owner should be allowed")
+if is_release_actor("alice"):
+    raise SystemExit("configured human owners are no longer allowed")
 
-if not is_allowed_actor("github-actions[bot]", ""):
+if not is_release_actor("github-actions[bot]"):
     raise SystemExit("default github-actions bot should be allowed")
 
-if not is_allowed_actor("release-please[bot]", ""):
+if not is_release_actor("release-please[bot]"):
     raise SystemExit("default release-please bot should be allowed")
 
-if is_allowed_actor("dependabot[bot]", ""):
-    raise SystemExit("other bot should not be allowed without explicit configuration")
+if is_release_actor("dependabot[bot]"):
+    raise SystemExit("other bot should not be allowed")
 
-if is_allowed_actor("charlie", "alice,bob"):
-    raise SystemExit("non-configured PAT owner should be denied")
-
-print("release-please actor allowlist validated")
+print("release-please fixed actor guard validated")
 PY
     [ "$status" -eq 0 ]
-    [[ "$output" == *"release-please actor allowlist validated"* ]]
+    [[ "$output" == *"release-please fixed actor guard validated"* ]]
 }
 
 @test "release_please_policy.py validates release_pr shape fields" {
@@ -1993,6 +2266,16 @@ JSON
     write_file "$files_json" '["src/app.py"]'
 
     run python3 "$REPO_ROOT/assets/github/scripts/pr_tdd_check.py" "$policy_file" --files-json "$files_json" --repo-root "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"implementation-path files were changed but no test-pattern files were changed"* ]]
+}
+
+@test "default PR TDD policy is enforceable for implementation-only changes" {
+    local files_json="$TEST_DIR/default-policy-files.json"
+
+    write_file "$files_json" '["src/app.js"]'
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_tdd_check.py" "$REPO_ROOT/assets/github/dayu-harness/pr-tdd-policy.json" --files-json "$files_json" --repo-root "$TEST_DIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"implementation-path files were changed but no test-pattern files were changed"* ]]
 }

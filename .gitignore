@@ -1,3 +1,7 @@
 # Test runtime artifacts
+.tmp/*
+!.tmp/.gitignore
 tests/unit/.tmp/*
 !tests/unit/.tmp/.gitignore
+__pycache__/
+*.pyc

@@ -59,6 +59,10 @@ teardown() {
     rm -rf "$TEST_DIR"
 }
 
+json_from_output() {
+    printf '%s\n' "$output" | awk 'BEGIN {emit=0} /^[[:space:]]*\{/ {emit=1} emit {print}'
+}
+
 @test "audit.sh detects missing CLAUDE.md" {
     run bash "${BATS_TEST_DIRNAME}/../../templates/docs/harness/sensors/scripts/audit.sh" "$TEST_DIR"
     [ "$status" -eq 1 ]
@@ -123,6 +127,21 @@ teardown() {
 
     run bash -c '"$1" --json "$2" 2>/dev/null' _ "$REPO_ROOT/templates/docs/harness/sensors/scripts/audit.sh" "$project_dir"
     [ "$status" -eq 0 ]
+}
+
+@test "validate.sh fails hard when initialized version sources drift" {
+    local project_dir="$TEST_DIR/version-drift"
+    mkdir -p "$project_dir"
+    run bash "$REPO_ROOT/scripts/scaffold.sh" "$project_dir" --apply --strategy merge
+    [ "$status" -eq 0 ]
+
+    jq '.version = "9.9.9" | .packages[""].version = "9.9.9"' "$project_dir/package-lock.json" > "$project_dir/package-lock.tmp"
+    mv "$project_dir/package-lock.tmp" "$project_dir/package-lock.json"
+
+    run bash "$REPO_ROOT/templates/docs/harness/sensors/scripts/validate.sh" --json "$project_dir"
+    [ "$status" -eq 1 ]
+    json_from_output | jq -e '.summary.failed >= 1'
+    json_from_output | jq -e '.checks | any(.item == "project/version-sync" and .status == "fail" and (.detail | contains("package-lock.json=9.9.9")))'
 }
 
 @test "check-consistency fails on non-optional broken AGENTS link" {

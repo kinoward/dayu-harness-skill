@@ -1,5 +1,5 @@
 {
-  "name": "Protect release tags",
+  "name": "protect-tags",
   "target": "tag",
   "enforcement": "active",
   "bypass_actors": [],

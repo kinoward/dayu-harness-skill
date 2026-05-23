@@ -244,8 +244,10 @@ check_template_trees() {
 
     local zh_tmp
     local en_tmp
-    zh_tmp="$(mktemp)"
-    en_tmp="$(mktemp)"
+    local tmp_root="${TMPDIR:-/tmp}"
+    mkdir -p "$tmp_root"
+    zh_tmp="$(mktemp "$tmp_root/dayu-i18n-zh.XXXXXX")"
+    en_tmp="$(mktemp "$tmp_root/dayu-i18n-en.XXXXXX")"
     local mirror_failed=0
     local heading_failed=0
     local format_failed=0

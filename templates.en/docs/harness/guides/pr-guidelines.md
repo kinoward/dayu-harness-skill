@@ -9,9 +9,24 @@ PR titles are readable summaries for humans and tools. Use Chinese, English, or 
 Requirements:
 - At least 5 characters
 - Use a natural-language descriptive title
-- If release-please is enabled with merge commit strategy, avoid Conventional Commits format in PR titles to prevent duplicate changelog entries.
+- This project has enabled release-please with merge commit strategy; avoid Conventional Commits format in PR titles to prevent duplicate changelog entries. PR Lint rejects titles such as `feat:`, `fix:`, and `docs:`.
 
 ## PR Body Template
+
+PR bodies are fixed-format content. AI should not freely compose the full Markdown document. Collect structured fields first (summary, implementation notes, test commands, issue number, final/non-final status), then render them with deterministic tooling:
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs pr-body \
+  --summary "Readable change summary" \
+  --implementation "Key implementation note" \
+  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --issue 123 \
+  --final yes > /tmp/pr-body.md
+
+gh pr create --title "Natural language PR title" --body-file /tmp/pr-body.md
+```
+
+If the team already has another fixed template or internal CLI, use the same flow: structured input -> script/template rendering -> validator check. The model should provide field values and explain validation results, not free-form the final format.
 
 Three sections + issue trailer:
 
@@ -70,21 +85,26 @@ When `gh pr create` fails:
 
 ## After Creation
 
-- Execute Test plan: if `ai.execution` is enabled, validate each Test plan item per AI execution rules.
-- Merge strategy: if `github.branch-protection` is enabled, follow merge strategy in branch protection protocol.
+- Execute Test plan: this project has enabled `ai.execution`; validate each Test plan item per AI execution rules.
+- Merge strategy: this project has enabled `github.branch-protection`; follow merge strategy in branch protection protocol.
 
 ## PR Merge
 
-Use `gh pr merge <PR-number> --merge` (merge commit) to keep all child commits intact in main.
+Use merge commit to keep all child commits intact in `__DAYU_DEFAULT_BRANCH__`. When merging through the CLI, preserve the PR title explicitly and clear the merge body so GitHub does not copy the PR title into the merge commit body for release-please to parse again:
+
+```bash
+pr_title="$(gh pr view <PR-number> --json title --jq '.title')"
+gh pr merge <PR-number> --merge --subject "$pr_title" --body ""
+```
 
 Post-merge cleanup:
 ```bash
-git checkout main
-git pull origin main
+git checkout __DAYU_DEFAULT_BRANCH__
+git pull origin __DAYU_DEFAULT_BRANCH__
 ```
 
 Auto-retry on merge failures:
-1. **Merge conflict** → switch to PR branch, rebase main, resolve conflict, and re-push
+1. **Merge conflict** → switch to PR branch, rebase `__DAYU_DEFAULT_BRANCH__`, resolve conflict, and re-push
 2. **CI check failed** → wait or fix
 3. **Permission denied** → report to user
 4. **Network error** → retry; report to user after 3 failed attempts

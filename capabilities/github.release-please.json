@@ -38,6 +38,19 @@
       "dst": ".github/scripts/release_please_policy.py"
     }
   ],
+  "remote_actions": [
+    {
+      "kind": "workflow_permissions",
+      "name": "actions-workflow-write",
+      "api": "GET/PUT /repos/{owner}/{repo}/actions/permissions/workflow",
+      "requires": [
+        "gh_auth",
+        "repo_admin"
+      ],
+      "default_workflow_permissions": "write",
+      "can_approve_pull_request_reviews": true
+    }
+  ],
   "installer": null,
   "acceptance": [
     "release-please workflow exists",

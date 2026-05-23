@@ -20,11 +20,24 @@ Examples:
 - `docs: update API usage instructions`
 - `chore: add gitignore`
 
+## Fixed-Format Generation
+
+Commit messages are fixed-format content. AI should not rely on free-form text for the final message; prefer deterministic generation or validation:
+
+```bash
+docs/harness/sensors/scripts/dayu-format.mjs commit-message \
+  --type test \
+  --scope harness \
+  --subject "verify deployment smoke checks"
+```
+
+You can also use mature CLIs such as Commitizen/cz-git to interactively generate Conventional Commits, then validate them with commitlint. The model should choose suitable type/scope/subject semantics, not bypass the format tooling.
+
 ## Commit Principles
 
 - Split commits by logical change; each commit should have a single purpose
-- Do not commit directly to main branch
-- Route all changes via feature branches + PR merge into main
+- Do not commit directly to the default branch (`__DAYU_DEFAULT_BRANCH__`)
+- Route all changes via feature branches + PR merge into the default branch (`__DAYU_DEFAULT_BRANCH__`)
 
 ## Automated Checks
 

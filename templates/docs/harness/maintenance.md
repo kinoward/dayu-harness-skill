@@ -38,6 +38,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 - **子目录必有 AGENTS.md**：docs/ 下每个子目录必须有自己的 AGENTS.md 作为入口
 - **纯索引不展开**：AGENTS.md 只放标题 + 触发条件 + 链接，具体内容在独立文档中
 - **目录索引同步**：目录索引、链接和 `## 目录索引` 区块必须同时维护，避免 AGENTS 索引与实际文件或已启用能力脱节
+- **固定格式用脚本生成**：PR body、Issue body、commit message 等固定格式内容优先使用 `docs/harness/sensors/scripts/dayu-format.mjs`、GitHub CLI、Commitizen/cz-git、commitlint 等确定性工具生成和校验。AI 负责提供结构化字段、解释错误和推动修复，不直接自由拼接最终格式。
 
 ### 触发条件格式
 
@@ -129,6 +130,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 3. **联动约束完整性**
    - 联动组件是否已按能力清单部署且可执行
    - 联动规则表中的约束是否都有对应文档和联动组件
+   - 部署完成报告中的 `capability-smoke` 是否覆盖了本次已部署能力；若缺少脚本入口，则手动抽查对应 hook、linter、PR/Issue/TDD/release helper 是否可运行
 
 4. **命名规范**
    - 文件名是否使用英文小写 + 连字符
@@ -193,9 +195,10 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `github.issue` | issue-lint.yml + issue_depends_on.py | Issue depends-on 校验 |
 | `quality.tdd` | `.github/dayu-harness/pr-tdd-policy.json` + `pr_tdd_check.py` | PR TDD 检查 |
 | `quality.node-tooling` | ESLint + Prettier + lint-staged + pre-commit snippet | 复杂配置默认人工确认 |
-| `project.gitignore` | .gitignore installer | 按项目类型合并 universal/node/python 模板 |
-| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；需要 PAT |
-| 诊断 | audit.sh + check-consistency.sh | 文档完整性自动检查 |
+| `project.gitignore` | .gitignore installer | 从 `github/gitignore` 快照按项目内容选择 Node/Python/Go/Rust/Java/Dotnet 等模板，并追加 Dayu 本地排除段 |
+| `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；使用 `GITHUB_TOKEN` 与 workflow permissions |
+| 固定格式内容 | `dayu-format.mjs` | 确定性生成 PR body、Issue body 和 commit message；配合 GitHub CLI、commitlint、PR/Issue validators 使用 |
+| 诊断 | audit.sh + check-consistency.sh + validate.sh | 文档完整性与部署后状态自动检查 |
 
 > 默认纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）由 `default=true` manifest 强制部署，不通过用户问答决定；可选能力仍由 manifest 控制。
 
@@ -225,6 +228,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 如果前置检查提示缺失依赖或缺少 Git：
 - 告知用户需先执行 `git init`；
+- 技术栈和项目类型由 AI 根据文件自动判断，不询问用户“当前项目使用哪种编程语言”；空项目按 Node.js 治理工具链基线处理；
 - 需要 Node 运行时以支持治理工具链时（如 husky/commitlint/lint-staged）引导用户先执行 `npm init -y`；
 - 缺少该治理工具链必需依赖时，引导用户执行脚本给出的 `npm install --save-dev ...`；
 - 明确告知这些依赖是治理约束运行需求，不代表项目必须是 Node.js 应用；并且不能通过写 `package.json` 模板文件替代初始化。

@@ -1,7 +1,7 @@
 {
   "id": "github.branch-protection",
   "description": "Branch protection assets and local push guard",
-  "description_nl": "Deploy branch protection guidance, main/master ruleset, and local pre-push branch guard.",
+  "description_nl": "Deploy branch protection guidance, default-branch ruleset, and local pre-push branch guard.",
   "default": false,
   "dependencies": [
     "core",
@@ -19,17 +19,31 @@
       "dst": ".github/rulesets/protect-main.json"
     }
   ],
+  "remote_actions": [
+    {
+      "kind": "ruleset",
+      "name": "protect-main",
+      "api": "POST|PUT /repos/{owner}/{repo}/rulesets",
+      "target_path": ".github/rulesets/protect-main.json",
+      "target": "branch",
+      "default_branch": "__DAYU_DEFAULT_BRANCH__",
+      "requires": [
+        "gh_auth",
+        "admin"
+      ]
+    }
+  ],
   "installer": {
     "script": "install-husky.sh",
     "safe_strategies": [
       "merge",
       "skip"
     ],
-    "notes": "Installs only the pre-push main/master branch protection snippet."
+    "notes": "Installs only the pre-push default/main/master branch protection snippet."
   },
   "acceptance": [
-    "Main-branch ruleset exists",
-    "Pre-push hook protects main/master branches",
+    "Default-branch ruleset exists",
+    "Pre-push hook protects the detected default branch plus main/master compatibility branches",
     "No existing hooks replaced by default"
   ],
   "suggested_when": "Enable when branch protection is required.",
