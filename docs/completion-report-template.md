@@ -24,7 +24,8 @@
 5. 如果启用了 GitHub/release 能力，先回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。
 6. 如果启用了 GitHub Issue/PR 能力并完成远端同步，创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支，避免目标仓库残留测试产物。只有 disposable `remote-smoke` profile 才验证合并后自动关闭 Issue。
 7. PR body、Issue body、commit message 等固定格式内容，优先用 `docs/harness/sensors/scripts/dayu-format.mjs`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；模型只提供结构化字段和错误解释。
-8. 如果某项检查失败，先自行修复可确定的问题，再重新检查；只有需要用户取舍时才把问题交给用户确认。
+8. 负向测试只能说明门禁会拦截错误输入，不能替代合规 Issue/PR/release 流程通过；如果只观察到失败 workflow，不能汇报为远端 E2E 成功。
+9. 如果某项检查失败，先自行修复可确定的问题，再重新检查；只有需要用户取舍时才把问题交给用户确认。
 
 ## 汇报原则
 

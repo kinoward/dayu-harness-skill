@@ -65,14 +65,16 @@ RUN_CLAUDE_I18N_SMOKE=1 bats tests/unit/test-skill-interaction-e2e.bats
 该入口把空项目测试拆成三个 profile，减少每次都跑完整远端链路的成本：
 
 - `local-fast`：只跑本地生成、模板渲染、validate 只读性和 fake-gh 单元检查。
-- `remote-smoke`：显式开启后使用 disposable GitHub repo 验证 Issue -> PR：创建 Issue，PR body 使用 `Closes #N`，验证 issue lint、PR lint 和自动关闭链路。
-- `remote-release`：显式开启后验证 release-please 真实 push 触发；不得把 `workflow_dispatch` 作为成功标准。
+- `remote-smoke`：显式开启后使用 disposable GitHub repo 验证 Issue -> PR：先创建格式错误的 Issue 和 PR，确认 issue-lint / pr-lint 会拒绝；再用 `dayu-format.mjs` 生成合规 Issue / PR，验证 PR Lint 通过、合并后自动关闭 Issue，并清理测试分支。
+- `remote-release`：显式开启后验证 release-please 真实 push 触发；`docs:` / `chore:` 必须不发版，随后连续两次使用 releasable commit 推进版本、发布 tag / GitHub Release，并确认 release-please 分支和 Release PR 不残留。
 
 ```bash
 tests/smoke/dayu-harness-profile.sh --profile local-fast
 RUN_DAYU_REMOTE_SMOKE=1 tests/smoke/dayu-harness-profile.sh --profile remote-smoke
 RUN_DAYU_REMOTE_RELEASE=1 tests/smoke/dayu-harness-profile.sh --profile remote-release
 ```
+
+远端 profile 默认会在结束时删除 disposable 仓库，因此 GitHub CLI token 需要 `delete_repo` scope；缺少该 scope 时脚本会在创建仓库前停止。若需要保留临时仓库排查，可显式设置 `DAYU_KEEP_REMOTE_REPO=1`。
 
 ## 运行方式
 

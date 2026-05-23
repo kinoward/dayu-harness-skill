@@ -118,6 +118,8 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 以上本地检查属于结构/配置/关键行为验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
 
+负向测试只能证明门禁会拦截错误输入，不能替代合规路径通过。若只观察到失败的 PR Lint、Issue Lint 或 release-please workflow，不得汇报为远端 E2E 成功；必须同时完成合规 Issue/PR/release 正向验证。
+
 如果脚本不存在或暂时不可执行，按目标项目中的 `docs/harness/maintenance.md` 手动检查关键路径。
 
 验证后处理规则：
