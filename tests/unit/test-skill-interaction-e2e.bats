@@ -470,6 +470,8 @@ json_from_output() {
     [[ "$output" == *"remote-smoke"* ]]
     [[ "$output" == *"remote-release"* ]]
     grep -Fq "Depends on: #" "$profile_script"
+    grep -Fq "Remote smoke closes issue" "$profile_script"
+    ! grep -Fq 'title "fix: remote smoke closes issue"' "$profile_script"
     grep -Fq "createdAt" "$profile_script"
     grep -Fq "docs: remote release smoke must not publish" "$profile_script"
     grep -Fq "chore: remote release smoke must not publish" "$profile_script"

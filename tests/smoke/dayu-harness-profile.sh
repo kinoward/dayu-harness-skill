@@ -193,7 +193,7 @@ run_remote_smoke() {
 
 Closes #$issue_number
 EOF
-    pr_url="$(gh pr create --repo "$repo" --base main --head "$branch" --title "fix: remote smoke closes issue" --body-file "$tmp/pr-body.md")"
+    pr_url="$(gh pr create --repo "$repo" --base main --head "$branch" --title "Remote smoke closes issue" --body-file "$tmp/pr-body.md")"
     pr_number="${pr_url##*/}"
     gh pr checks "$pr_number" --repo "$repo" --watch --fail-fast
     gh pr merge "$pr_number" --repo "$repo" --merge --delete-branch
