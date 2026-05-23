@@ -121,6 +121,13 @@ EOF
 
     cat > "$WRAPPER_DIR/npx" <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--no-install" ] && [ "${2:-}" = "commitlint" ] && [ "${3:-}" = "--edit" ]; then
+  if grep -Fq "bad commit message" "${4:-}"; then
+    echo "ERROR: commit message does not follow Conventional Commits format."
+    exit 1
+  fi
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/npx"

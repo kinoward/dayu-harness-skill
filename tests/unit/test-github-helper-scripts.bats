@@ -59,6 +59,18 @@ JSON
     cat > "$payload" <<'JSON'
 {
   "issue": {
+    "body": "# Proposal\n\nDepends on: #0"
+  }
+}
+JSON
+
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid issue dependency format"* ]]
+
+    cat > "$payload" <<'JSON'
+{
+  "issue": {
     "body": "# Proposal\nDepends on: #12\nDepends on: #34"
   }
 }
@@ -2254,6 +2266,16 @@ JSON
     write_file "$files_json" '["src/app.py"]'
 
     run python3 "$REPO_ROOT/assets/github/scripts/pr_tdd_check.py" "$policy_file" --files-json "$files_json" --repo-root "$TEST_DIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"implementation-path files were changed but no test-pattern files were changed"* ]]
+}
+
+@test "default PR TDD policy is enforceable for implementation-only changes" {
+    local files_json="$TEST_DIR/default-policy-files.json"
+
+    write_file "$files_json" '["src/app.js"]'
+
+    run python3 "$REPO_ROOT/assets/github/scripts/pr_tdd_check.py" "$REPO_ROOT/assets/github/dayu-harness/pr-tdd-policy.json" --files-json "$files_json" --repo-root "$TEST_DIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"implementation-path files were changed but no test-pattern files were changed"* ]]
 }

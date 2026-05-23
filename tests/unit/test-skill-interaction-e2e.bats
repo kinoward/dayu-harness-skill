@@ -39,6 +39,13 @@ EOF
 
     cat > "$WRAPPER_DIR/npx" <<'EOF'
 #!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--no-install" ] && [ "${2:-}" = "commitlint" ] && [ "${3:-}" = "--edit" ]; then
+  if grep -Fq "bad commit message" "${4:-}"; then
+    echo "ERROR: commit message does not follow Conventional Commits format."
+    exit 1
+  fi
+fi
 exit 0
 EOF
     chmod +x "$WRAPPER_DIR/npx"
@@ -275,6 +282,14 @@ json_from_output() {
 	    echo "$output" | jq -e '.status == "ok"'
 	    echo "$output" | jq -e '.github_e2e.status == "skipped"'
 	    echo "$output" | jq -e '.github_e2e.description_nl | contains("--github-remote apply or --github-remote verify")'
+
+	    local unresolved_dir="$TEST_DIR/github-remote-unresolved-apply"
+	    mkdir -p "$unresolved_dir"
+	    run_json bash "$REPO_ROOT/scripts/scaffold.sh" "$unresolved_dir" --apply --enable github.issue,github.pr --strategy merge --github-remote apply
+	    echo "$output" | jq -e '.status == "needs_user_action"'
+	    echo "$output" | jq -e '.capabilities == []'
+	    echo "$output" | jq -e '.description_nl | contains("--github-repository owner/repo")'
+	    [ ! -f "$unresolved_dir/AGENTS.md" ]
 	}
 
 	@test "conversation replay: GitHub target E2E is issue-first and creates lint-ready PR body" {
@@ -469,14 +484,25 @@ json_from_output() {
     [[ "$output" == *"local-fast"* ]]
     [[ "$output" == *"remote-smoke"* ]]
     [[ "$output" == *"remote-release"* ]]
-    grep -Fq "Depends on: #" "$profile_script"
+    [[ "$output" == *"delete_repo"* ]]
+    grep -Fq "dayu-format.mjs" "$profile_script"
+    grep -Fq "require_delete_repo_scope" "$profile_script"
+    grep -Fq "npm_config_cache" "$profile_script"
+    grep -Fq "scaffold_json" "$profile_script"
+    grep -Fq "wait_workflow_failure" "$profile_script"
+    grep -Fq "wait_remote_workflow_file" "$profile_script"
+    grep -Fq "assert_remote_branch_absent" "$profile_script"
+    grep -Fq "Depends on #1" "$profile_script"
     grep -Fq "Remote smoke closes issue" "$profile_script"
     ! grep -Fq 'title "fix: remote smoke closes issue"' "$profile_script"
     grep -Fq "createdAt" "$profile_script"
     grep -Fq "docs: remote release smoke must not publish" "$profile_script"
     grep -Fq "chore: remote release smoke must not publish" "$profile_script"
     grep -Fq "unexpectedly created a Release PR" "$profile_script"
-    grep -Fq "docs/chore commits did not create Release PRs, and feat did" "$profile_script"
+    grep -Fq "wait_release_version_advance" "$profile_script"
+    grep -Fq "fix: remote release smoke second version" "$profile_script"
+    grep -Fq 'published v$first_version and v$second_version' "$profile_script"
+    grep -Fq 'test-github-helper-scripts.bats' "$profile_script"
 
     run env RUN_DAYU_REMOTE_SMOKE=0 bash "$profile_script" --profile remote-smoke --json
     [ "$status" -eq 0 ]
