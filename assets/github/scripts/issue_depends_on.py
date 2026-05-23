@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 DEPENDS_ON_RE = re.compile(r"^Depends on: #\d+(?:, #\d+)*\s*$")
-DEPENDS_ON_LIKE_RE = re.compile(r"^(?:[-*]\s*)?Depends on\b")
+DEPENDS_ON_LIKE_RE = re.compile(r"^(?:[-*]\s*)?Depends on\b", re.IGNORECASE)
 
 
 def die(msg: str) -> None:

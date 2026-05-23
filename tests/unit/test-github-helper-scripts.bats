@@ -92,6 +92,17 @@ JSON
     cat > "$payload" <<'JSON'
 {
   "issue": {
+    "body": "# Proposal\ndepends on 12"
+  }
+}
+JSON
+    run python3 "$REPO_ROOT/assets/github/scripts/issue_depends_on.py" "$payload"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid issue dependency format"* ]]
+
+    cat > "$payload" <<'JSON'
+{
+  "issue": {
     "body": "# Proposal\nDepends on: 12"
   }
 }
