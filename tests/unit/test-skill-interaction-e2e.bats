@@ -294,8 +294,10 @@ json_from_output() {
 	    grep -Fq 'gh pr close "$pr_number"' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq -- '--delete-branch' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'gh issue close "$issue_number"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'cleanup_github_e2e_remote_branch_ref "$branch"' "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq 'fetch --prune origin' "$REPO_ROOT/scripts/scaffold.sh"
 	    grep -Fq 'branch -D "$branch"' "$REPO_ROOT/scripts/scaffold.sh"
-	    grep -Fq "test PR, test issue and test branch were closed or deleted without merging" "$REPO_ROOT/scripts/scaffold.sh"
+	    grep -Fq "local remote-tracking refs were closed, deleted or pruned without merging" "$REPO_ROOT/scripts/scaffold.sh"
 	}
 
 	@test "conversation replay: release settlement waits for init PR and validates origin default branch" {

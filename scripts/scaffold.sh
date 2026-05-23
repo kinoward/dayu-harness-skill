@@ -2087,6 +2087,18 @@ run_github_target_e2e() {
         restore_github_e2e_branch
         github_e2e_result_json "failed" "$desc" "$issue" "$pr" "$smoke_branch"
     }
+    cleanup_github_e2e_remote_branch_ref() {
+        local smoke_branch="$1"
+        [ -n "$smoke_branch" ] || return 0
+
+        git -C "$TARGET" fetch --prune origin >/dev/null 2>&1 || true
+        if git -C "$TARGET" ls-remote --exit-code --heads origin "$smoke_branch" >/dev/null 2>&1; then
+            git -C "$TARGET" push origin --delete "$smoke_branch" >/dev/null 2>&1 || return 1
+            git -C "$TARGET" fetch --prune origin >/dev/null 2>&1 || true
+        fi
+        git -C "$TARGET" branch -dr "origin/$smoke_branch" >/dev/null 2>&1 || true
+        return 0
+    }
 
     issue_after="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     main_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
@@ -2159,6 +2171,10 @@ run_github_target_e2e() {
         fail_github_e2e "GitHub Issue/PR E2E validation passed lint checks and closed the test PR, but failed to close the test issue." "$issue_url" "$pr_url" "$branch"
         return 0
     fi
+    if ! cleanup_github_e2e_remote_branch_ref "$branch"; then
+        fail_github_e2e "GitHub Issue/PR E2E validation passed lint checks, but failed to delete or prune the remote test branch ref." "$issue_url" "$pr_url" "$branch"
+        return 0
+    fi
 
     restore_github_e2e_branch
     if ! git -C "$TARGET" branch -D "$branch" >/dev/null 2>&1; then
@@ -2166,7 +2182,7 @@ run_github_target_e2e() {
         return 0
     fi
 
-    github_e2e_result_json "passed" "GitHub Issue/PR E2E validation passed; test PR, test issue and test branch were closed or deleted without merging." "$issue_url" "$pr_url" "$branch"
+    github_e2e_result_json "passed" "GitHub Issue/PR E2E validation passed; test PR, test issue, test branch and local remote-tracking refs were closed, deleted or pruned without merging." "$issue_url" "$pr_url" "$branch"
 }
 
 do_dry_run() {
