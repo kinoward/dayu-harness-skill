@@ -1472,6 +1472,19 @@ run_capability_smoke_checks() {
             else
                 add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未接受有效 Conventional Commit 消息。"
             fi
+
+            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-commit-msg-bad.XXXXXX")"
+            printf '%s\n' "bad commit message" > "$tmp_file"
+            set +e
+            command_output="$(cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" 2>&1)"
+            command_rc=$?
+            set -e
+            rm -f "$tmp_file"
+            if [ "$command_rc" -ne 0 ] && printf '%s' "$command_output" | grep -Fq "Conventional Commits"; then
+                add_smoke_item "git.commit-format" "commit-msg-hook-rejects-invalid" "passed" "commit-msg hook 会拒绝非 Conventional Commit 消息。"
+            else
+                add_smoke_item "git.commit-format" "commit-msg-hook-rejects-invalid" "failed" "commit-msg hook 未按预期拒绝无效提交消息。"
+            fi
         fi
     fi
 
@@ -1517,6 +1530,19 @@ run_capability_smoke_checks() {
             else
                 add_smoke_item "github.branch-protection" "pre-push-default-branch" "failed" "pre-push hook 未按预期拒绝默认分支直接推送。"
             fi
+
+            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-feature.XXXXXX")"
+            printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/dayu-smoke 0000000000000000000000000000000000000000" > "$input_file"
+            set +e
+            command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
+            command_rc=$?
+            set -e
+            rm -f "$input_file"
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "github.branch-protection" "pre-push-feature-branch" "passed" "pre-push hook 允许推送普通功能分支。"
+            else
+                add_smoke_item "github.branch-protection" "pre-push-feature-branch" "failed" "pre-push hook 错误拦截了普通功能分支推送。"
+            fi
         fi
     fi
 
@@ -1536,6 +1562,19 @@ run_capability_smoke_checks() {
             else
                 add_smoke_item "release.versioning" "pre-push-release-tag" "failed" "pre-push hook 未按预期拒绝覆盖 release tag。"
             fi
+
+            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-new-tag.XXXXXX")"
+            printf '%s\n' "refs/tags/v9.9.9 1111111111111111111111111111111111111111 refs/tags/v9.9.9 0000000000000000000000000000000000000000" > "$input_file"
+            set +e
+            command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
+            command_rc=$?
+            set -e
+            rm -f "$input_file"
+            if [ "$command_rc" -eq 0 ]; then
+                add_smoke_item "release.versioning" "pre-push-new-release-tag" "passed" "pre-push hook 允许创建新的 release tag。"
+            else
+                add_smoke_item "release.versioning" "pre-push-new-release-tag" "failed" "pre-push hook 错误拦截了新的 release tag。"
+            fi
         fi
     fi
 
@@ -1554,6 +1593,19 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.pr" "pr-body-validator" "passed" "确定性生成的 PR body 可通过 PR 结构校验。"
             else
                 add_smoke_item "github.pr" "pr-body-validator" "failed" "确定性生成的 PR body 未通过 PR 结构校验。"
+            fi
+
+            body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pr-body-bad.XXXXXX")"
+            printf '%s\n\n%s\n' "## Summary" "- Missing required sections and issue trailer." > "$body_file"
+            set +e
+            python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$body_file"
+            if [ "$command_rc" -ne 0 ]; then
+                add_smoke_item "github.pr" "pr-body-validator-rejects-invalid" "passed" "PR body validator 会拒绝缺少必需结构的正文。"
+            else
+                add_smoke_item "github.pr" "pr-body-validator-rejects-invalid" "failed" "PR body validator 未拒绝无效 PR 正文。"
             fi
         fi
     fi
@@ -1575,6 +1627,20 @@ run_capability_smoke_checks() {
             else
                 add_smoke_item "github.issue" "issue-body-validator" "failed" "确定性生成的 Issue body 未通过 Issue 依赖格式校验。"
             fi
+
+            body="$(printf '## Summary\n\n- Invalid depends-on trailer.\n\nDepends on #1\n')"
+            event_file="$(mktemp "${TMPDIR:-/tmp}/dayu-issue-event-bad.XXXXXX")"
+            jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
+            set +e
+            python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$event_file"
+            if [ "$command_rc" -ne 0 ]; then
+                add_smoke_item "github.issue" "issue-body-validator-rejects-invalid" "passed" "Issue depends-on validator 会拒绝格式错误的依赖行。"
+            else
+                add_smoke_item "github.issue" "issue-body-validator-rejects-invalid" "failed" "Issue depends-on validator 未拒绝格式错误的依赖行。"
+            fi
         fi
     fi
 
@@ -1588,6 +1654,19 @@ run_capability_smoke_checks() {
                 add_smoke_item "quality.tdd" "policy-validator" "passed" "TDD policy 文件可被 checker 解析。"
             else
                 add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD policy 文件未通过 checker 解析。"
+            fi
+
+            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-tdd-policy-bad.XXXXXX")"
+            printf '%s\n' '{"impl_patterns":"src/.*"}' > "$tmp_file"
+            set +e
+            python3 "$TARGET/.github/scripts/pr_tdd_check.py" "$tmp_file" --validate-policy-only >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$tmp_file"
+            if [ "$command_rc" -ne 0 ]; then
+                add_smoke_item "quality.tdd" "policy-validator-rejects-invalid" "passed" "TDD policy checker 会拒绝类型错误的策略文件。"
+            else
+                add_smoke_item "quality.tdd" "policy-validator-rejects-invalid" "failed" "TDD policy checker 未拒绝类型错误的策略文件。"
             fi
         else
             add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD checker 或 policy 文件缺失。"
@@ -1604,6 +1683,19 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.release-please" "release-policy-validator" "passed" "release-please policy 与目标项目文件通过本地校验。"
             else
                 add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 本地校验失败。"
+            fi
+
+            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-release-policy-bad.XXXXXX")"
+            printf '%s\n' '{}' > "$tmp_file"
+            set +e
+            python3 "$TARGET/.github/scripts/release_please_policy.py" "$tmp_file" "$TARGET" >/dev/null 2>&1
+            command_rc=$?
+            set -e
+            rm -f "$tmp_file"
+            if [ "$command_rc" -ne 0 ]; then
+                add_smoke_item "github.release-please" "release-policy-validator-rejects-invalid" "passed" "release-please policy checker 会拒绝缺少必需字段的策略文件。"
+            else
+                add_smoke_item "github.release-please" "release-policy-validator-rejects-invalid" "failed" "release-please policy checker 未拒绝缺少必需字段的策略文件。"
             fi
         else
             add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 脚本或策略文件缺失。"
@@ -2347,6 +2439,64 @@ do_apply() {
     fi
     if [ "$has_remote_sync" = "true" ]; then
         GITHUB_REMOTE_JSON="$(run_github_remote check "${capability_ids[@]}")"
+    fi
+    if [ "$GITHUB_REMOTE_MODE" = "apply" ]; then
+        remote_repository="$(echo "$GITHUB_REMOTE_JSON" | jq -r '.repository // empty' 2>/dev/null || true)"
+        remote_check_status="$(echo "$GITHUB_REMOTE_JSON" | jq -r '.status // "error"' 2>/dev/null || echo "error")"
+        if [ "$has_remote_sync" = "true" ] && [ -z "$remote_repository" ]; then
+            cat <<JSONEOF
+{
+  "mode":"apply",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
+  "status":"needs_user_action",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":$(project_baseline_json),
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
+  "environment":${environment_json},
+  "capabilities":[],
+  "summary":"GitHub remote repository was not resolved.",
+  "description_nl":"启用 --github-remote apply 前必须先设置 --github-repository owner/repo、DAYU_HARNESS_GITHUB_REPOSITORY，或配置可解析的 GitHub origin；本次未写入治理文件，避免出现本地已部署但远端 E2E 被跳过的 partial 状态。",
+  "applied_count":0,
+  "skipped_count":0,
+  "files_total":0,
+  "files_new":0,
+  "files_existing":0,
+  "validation":"skipped",
+  "validation_description_nl":"GitHub remote repository is unresolved."
+}
+JSONEOF
+            return 0
+        fi
+        if [ "$has_remote_sync" = "true" ] && [ "$remote_check_status" = "needs_user_action" ] && echo "$GITHUB_REMOTE_JSON" | jq -e '.items[]? | select(.kind == "auth" or .status == "needs_user_action")' >/dev/null 2>&1; then
+            cat <<JSONEOF
+{
+  "mode":"apply",
+  "target":"$(json_escape "$TARGET_DISPLAY")",
+  "status":"needs_user_action",
+  "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
+  "project_baseline":$(project_baseline_json),
+  "github_remote":${GITHUB_REMOTE_JSON},
+  "remote_validation":${REMOTE_VALIDATION_JSON},
+  "github_e2e":${GITHUB_E2E_JSON},
+  "release_settlement":${RELEASE_SETTLEMENT_JSON},
+  "environment":${environment_json},
+  "capabilities":[],
+  "summary":"GitHub remote preflight requires user action.",
+  "description_nl":"GitHub 远端预检需要用户处理后才能执行 --github-remote apply；本次未写入治理文件，避免远端验证被跳过后误报成功。",
+  "applied_count":0,
+  "skipped_count":0,
+  "files_total":0,
+  "files_new":0,
+  "files_existing":0,
+  "validation":"skipped",
+  "validation_description_nl":"GitHub remote preflight requires user action."
+}
+JSONEOF
+            return 0
+        fi
     fi
     if [ "$environment_status" != "ok" ]; then
         cat <<JSONEOF

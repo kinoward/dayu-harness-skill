@@ -1294,13 +1294,22 @@ verify_mode() {
           "检测分支列表，当前默认分支：${DEFAULT_BRANCH:-unknown}。"
     fi
 
+    local rulesets_desc
+    if [ "${#REQUIRED_RULESETS[@]}" -eq 0 ]; then
+        rulesets_desc="当前能力集合未要求远端 rulesets；此项无需校验。"
+    elif [ -n "$missing_rulesets" ]; then
+        rulesets_desc="检测到的 rulesets 未匹配全部预期，protect-main 还会校验具体默认分支 ref。"
+    else
+        rulesets_desc="检测到的 rulesets 已匹配预期，protect-main 已校验具体默认分支 ref。"
+    fi
+
     add_resource_item \
       "rulesets" \
       "$( [ -n "$missing_rulesets" ] && echo missing || echo ok )" \
       "$required_rulesets_json" \
       "$(to_json_array_from_lines "$rulesets_lines")" \
       "$(to_json_array_from_lines "$missing_rulesets")" \
-      "检测到的 rulesets 未匹配全部预期，protect-main 还会校验具体默认分支 ref。"
+      "$rulesets_desc"
 
     add_resource_item \
       "secrets" \

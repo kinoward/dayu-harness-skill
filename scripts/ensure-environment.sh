@@ -553,8 +553,24 @@ need_tool() {
     fi
 }
 
+need_python_module() {
+    local module="$1"
+    local package="$2"
+    local reason="$3"
+    if ! command -v python3 >/dev/null 2>&1; then
+        return 0
+    fi
+    if python3 -c "import ${module}" >/dev/null 2>&1; then
+        add_item "python_module" "$module" "ok" "true" "none" "$reason 已可用。"
+    else
+        MISSING_TOOLS=$((MISSING_TOOLS + 1))
+        add_item "python_module" "$module" "missing" "true" "install" "$reason 缺失，不能继续部署。" "安装 Python 包：python3 -m pip install ${package}。"
+    fi
+}
+
 requires_node=false
 requires_python3=false
+requires_pyyaml=false
 requires_gh=false
 requires_hook_path=false
 
@@ -571,9 +587,17 @@ if contains_capability "github.branch-protection" || contains_capability "releas
 fi
 if contains_capability "github.pr"; then
     requires_python3=true
+    requires_pyyaml=true
 fi
 if contains_capability "github.issue" || contains_capability "quality.tdd"; then
     requires_python3=true
+fi
+if contains_capability "github.issue"; then
+    requires_pyyaml=true
+fi
+if contains_capability "github.release-please"; then
+    requires_python3=true
+    requires_pyyaml=true
 fi
 if has_capability_prefix "github." || contains_capability "release.versioning"; then
     requires_gh=true
@@ -588,6 +612,9 @@ if [ "$requires_node" = true ]; then
 fi
 if [ "$requires_python3" = true ]; then
     need_tool "python3" "PR body 结构校验脚本需要 Python 3"
+fi
+if [ "$requires_pyyaml" = true ]; then
+    need_python_module "yaml" "PyYAML" "GitHub workflow YAML 语法校验需要 PyYAML"
 fi
 if [ "$requires_gh" = true ]; then
     need_tool "gh" "GitHub 能力要求 GitHub CLI"

@@ -1,5 +1,19 @@
 {
-  "impl_patterns": [],
-  "test_patterns": [],
-  "exempt_patterns": []
+  "impl_patterns": [
+    "^(src|app|apps|lib|packages|server|extension)/.*"
+  ],
+  "test_patterns": [
+    "(^|/)(__tests__|tests?|spec)/.*",
+    ".*\\.(test|spec)\\.[A-Za-z0-9]+$"
+  ],
+  "exempt_patterns": [
+    "^docs/.*",
+    "^README(\\.[A-Za-z0-9_-]+)?\\.md$",
+    "^CHANGELOG\\.md$",
+    "^VERSION$",
+    "^package(-lock)?\\.json$",
+    "^release-please-config\\.json$",
+    "^\\.release-please-manifest\\.json$",
+    "^\\.github/.*"
+  ]
 }

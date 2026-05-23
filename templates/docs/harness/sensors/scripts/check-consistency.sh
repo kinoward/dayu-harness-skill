@@ -80,11 +80,8 @@ if [ -z "$TMP_WORKDIR" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
     TMP_WORKDIR="$(mktemp -d "/tmp/dayu-harness.XXXXXX" 2>/dev/null || true)"
 fi
 if [ -z "$TMP_WORKDIR" ]; then
-    TMP_WORKDIR="$PROJECT_ROOT/.dayu-harness-tmp.$$"
-    mkdir -p "$TMP_WORKDIR" || {
-        echo "错误: 无法创建临时目录。请设置可写 TMPDIR，或确保 /tmp 可写。最后尝试位置: '$TMP_WORKDIR'" >&2
-        exit 2
-    }
+    echo "错误: 无法创建临时目录。请设置可写 TMPDIR，或确保 /tmp 可写；一致性检查不会回退写入项目目录。" >&2
+    exit 2
 fi
 
 C1_ISSUES_FILE="$TMP_WORKDIR/c1-issues.txt"

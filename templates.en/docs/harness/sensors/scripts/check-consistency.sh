@@ -80,11 +80,8 @@ if [ -z "$TMP_WORKDIR" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
     TMP_WORKDIR="$(mktemp -d "/tmp/dayu-harness.XXXXXX" 2>/dev/null || true)"
 fi
 if [ -z "$TMP_WORKDIR" ]; then
-    TMP_WORKDIR="$PROJECT_ROOT/.dayu-harness-tmp.$$"
-    mkdir -p "$TMP_WORKDIR" || {
-        echo "Error: unable to create a temporary directory. Set writable TMPDIR, or ensure /tmp is writable. Last attempted path: '$TMP_WORKDIR'" >&2
-        exit 2
-    }
+    echo "Error: unable to create a temporary directory. Set writable TMPDIR, or ensure /tmp is writable; consistency checks do not fall back to writing inside the project directory." >&2
+    exit 2
 fi
 
 C1_ISSUES_FILE="$TMP_WORKDIR/c1-issues.txt"
