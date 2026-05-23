@@ -113,7 +113,7 @@ test("Phase 1d init roundtrip creates config that apply can consume", (t) => {
   assert.equal(dryRun.apply.status, "planned");
   assert.equal(existsSync(join(target, "dayu.config.yaml")), false);
 
-  const applied = initDayuConfig({ targetRoot: target, locale: "en" });
+  const applied = initDayuConfig({ targetRoot: target, locale: "en", dryRun: false });
   assert.equal(applied.status, "applied");
   assert.equal(existsSync(join(target, "dayu.config.yaml")), true);
 
@@ -209,13 +209,13 @@ test("Phase 1d generate previews requested capability content", (t) => {
   assert.match(report.files[0]?.content ?? "", /AI 执行规约/);
 });
 
-test("Phase 1d CLI JSON entrypoints cover diagnose, merge, validate, and generate", (t) => {
+test("Phase 1d CLI JSON entrypoints cover public diagnose and validate commands", (t) => {
   const target = makeTarget(t);
   const configPath = writeDefaultConfig(target);
   const apply = applyDayuConfig({ configPath, targetRoot: target });
   assert.equal(apply.status, "applied");
 
-  for (const command of ["diagnose", "merge", "validate", "generate"] as const) {
+  for (const command of ["diagnose", "validate"] as const) {
     const result = runCli([command, "--config", configPath, "--target", target, "--json"]);
     assert.equal(result.status, 0, `${command}: ${result.stderr}`);
     const report = JSON.parse(result.stdout) as { command: string };

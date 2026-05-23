@@ -12,7 +12,8 @@
     "test:unit": "TMPDIR=.tmp node --import tsx --test tests/unit/*.test.ts",
     "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts",
     "test:phase1c": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1c-architecture.test.ts",
-    "test:phase1d": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1d-cli.test.ts"
+    "test:phase1d": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1d-cli.test.ts",
+    "test:phase1e": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1e-cli-scope.test.ts"
   },
   "dependencies": {
     "commander": "^14.0.3",

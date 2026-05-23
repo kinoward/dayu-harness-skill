@@ -30,17 +30,17 @@ function readTrialManifests(): ManifestV2[] {
   return phase1cCapabilityIds.map((id) => readManifest(id));
 }
 
-test("Phase 1c CLI command tree defines the six non-interactive tool commands", () => {
+test("Phase 1c/1e CLI command tree defines the four Phase 1 public tool commands", () => {
   assert.deepEqual(
     CLI_COMMAND_TREE.map((command) => command.name),
-    ["init", "apply", "diagnose", "merge", "validate", "generate"]
+    ["init", "apply", "diagnose", "validate"]
   );
 
   for (const command of CLI_COMMAND_TREE) {
     assert.equal(command.layer, "tool", command.name);
     assert.equal(command.interactive, false, command.name);
     assert.equal(command.supportsJson, true, command.name);
-    assert.equal(command.phase1dSlice, true, command.name);
+    assert.equal(command.phase1Slice, true, command.name);
   }
 
   assert.deepEqual(getCliCommandSpec("init").delegatesTo, ["apply"]);
