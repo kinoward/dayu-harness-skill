@@ -14,6 +14,7 @@
 - `test-audit.bats`：验证 `audit.sh`、`validate.sh`、`check-consistency.sh` 的核心诊断行为。
 - `test-diff-helper.bats`：验证 diff/merge 描述辅助脚本。
 - `phase1b-schema.test.ts`：验证 manifest v2、`dayu.config.yaml` schema、key-based i18n catalog、路径安全和 Phase 1 兼容契约。
+- `phase1c-architecture.test.ts`：验证 CLI 命令树、部署 DAG、概念依赖图和 Frontend/Tool/Product 三层分离契约。
 
 其中新增环境依赖前置断言，覆盖：
 - `scripts/ensure-environment.sh --check` 的标准 JSON 字段契约；
@@ -104,6 +105,18 @@ bash scripts/check-i18n-drift.sh --json
 
 ```bash
 npm run test:phase1b -- --test-reporter=spec
+```
+
+单独运行 Phase 1c 架构契约检查：
+
+```bash
+npm run test:phase1c -- --test-reporter=spec
+```
+
+运行全部 TypeScript 单元契约：
+
+```bash
+npm run test:unit -- --test-reporter=spec
 npx tsc --noEmit
 ```
 
@@ -124,6 +137,7 @@ bats tests/unit
 
 - 修改 Skill 问答策略、capability 依赖、脚手架行为、安装脚本或部署后校验逻辑时，必须更新并运行 `test-skill-interaction-e2e.bats`。
 - 修改 manifest v2 字段、`dayu.config.yaml` schema、locale key 或 TypeScript schema 时，必须更新并运行 `phase1b-schema.test.ts`。
+- 修改 CLI 命令树、部署/概念依赖图、三层分离约束或 TypeScript 架构契约时，必须更新并运行 `phase1c-architecture.test.ts`。
 - 修改执行测试模板或测试流程时，同步更新 `tests/fixtures/skill-usage-test-results.md`。
 - 只有当目标项目实际部署内容发生产品层变化时，才修改 `templates/`、`assets/`、`capabilities/`；不要为了测试记录改动部署内容。
 - TypeScript/tsx 运行缓存写入根 `.tmp/`；Bats fixture 和临时项目运行实例写入 `tests/unit/.tmp/`。两个目录均通过 `.gitignore` 忽略运行产物，只保留忽略规则本身。
