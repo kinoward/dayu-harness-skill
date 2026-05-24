@@ -132,11 +132,31 @@ test("Phase 1e husky installer preserves existing hook symlinks and modes", (t) 
   writeFileSync(actualHook, "#!/usr/bin/env bash\necho existing\n", "utf8");
   chmodSync(actualHook, 0o755);
   symlinkSync("actual-commit-msg", symlinkedHook);
+  const fakeBin = join(target, "bin");
+  const fakeStat = join(fakeBin, "stat");
+  mkdirSync(fakeBin, { recursive: true });
+  writeFileSync(
+    fakeStat,
+    `#!/usr/bin/env bash
+if [ "$1" = "-L" ] && [ "$2" = "-f" ]; then
+  printf '255p\\n'
+  exit 0
+fi
+if [ "$1" = "-L" ] && [ "$2" = "-c" ]; then
+  printf '755\\n'
+  exit 0
+fi
+exit 1
+`,
+    "utf8"
+  );
+  chmodSync(fakeStat, 0o755);
 
   const result = spawnSync("bash", [huskyInstallerPath, target, "--apply", "merge"], {
     env: {
       ...process.env,
-      DAYU_HARNESS_CAPABILITY: "git.commit-format"
+      DAYU_HARNESS_CAPABILITY: "git.commit-format",
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`
     },
     encoding: "utf8"
   });
