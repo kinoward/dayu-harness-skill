@@ -1,5 +1,5 @@
 import { buildApplyPlan } from "./apply.js";
-import { loadPhase1dManifestRegistry } from "./manifest-registry.js";
+import { loadManifestRegistry } from "./manifest-registry.js";
 import { summarizeRse } from "./rse.js";
 import type {
   ApplyOptions,
@@ -12,7 +12,7 @@ import type {
 
 export function diagnoseDayuProject(options: ApplyOptions = {}): DiagnoseReport {
   const plan = buildApplyPlan({ ...options, dryRun: true });
-  const registry = loadPhase1dManifestRegistry();
+  const registry = loadManifestRegistry();
   const items: DiagnosticItem[] = [
     ...plan.fileOperations.map(fileOperationToDiagnostic),
     ...plan.installerOperations.map(installerOperationToDiagnostic)
@@ -104,6 +104,14 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
         reason: operation.reason
       };
     case "conflict":
+    case "overwrite":
+      return {
+        capabilityId: operation.capabilityId,
+        path: operation.dst,
+        status: "drift",
+        reason: operation.reason
+      };
+    case "delete":
       return {
         capabilityId: operation.capabilityId,
         path: operation.dst,

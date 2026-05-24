@@ -8,5 +8,7 @@ export * from "./main.js";
 export * from "./manifest-registry.js";
 export * from "./merge.js";
 export * from "./output.js";
+export * from "./repair.js";
+export * from "./status.js";
 export * from "./types.js";
 export * from "./validate.js";

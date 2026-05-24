@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { resolveDeploymentOrder } from "../architecture/index.js";
@@ -7,7 +7,20 @@ import type { CapabilityId, DayuConfig, FileMapping, ManifestV2 } from "../schem
 import { createDefaultDayuConfig, enabledCapabilityIds, readDayuConfig, writeDayuConfig } from "./config.js";
 import { CliError } from "./errors.js";
 import { writeFileAtomically } from "./filesystem.js";
-import { assertConfigCapabilitiesKnown, loadPhase1dManifestRegistry } from "./manifest-registry.js";
+import {
+  acquireApplyLock,
+  appendJournalEntry,
+  capturePreimage,
+  createTransactionId,
+  journalPath,
+  managedPathsFile,
+  readManagedPaths,
+  recoverInterruptedTransactions,
+  rollbackPaths,
+  writeManagedPaths,
+  type JournalEntry
+} from "./journal.js";
+import { assertConfigCapabilitiesKnown, loadManifestRegistry } from "./manifest-registry.js";
 import {
   DEFAULT_CONFIG_FILE,
   fileExists,
@@ -31,7 +44,12 @@ import type {
 } from "./types.js";
 
 const DAYU_LOG_FILE = ".dayu-log.jsonl";
-const COMMIT_FORMAT_HOOK_MARKER = "# >>> dayu-harness:git.commit-format >>>";
+const HUSKY_HOOK_BY_CAPABILITY: Readonly<Record<string, string>> = {
+  "git.commit-format": "commit-msg",
+  "quality.node-tooling": "pre-commit",
+  "github.branch-protection": "pre-push",
+  "release.versioning": "pre-push"
+};
 
 interface ResolvedApplyInputs {
   targetRoot: string;
@@ -56,16 +74,35 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
 
   for (const manifest of manifestsInOrder(inputs.registry, deploymentOrder)) {
     for (const item of manifestFileMappings(manifest, context)) {
-      fileOperations.push(planFileOperation(item));
+      fileOperations.push(planFileOperation(item, options.force ?? false));
     }
   }
 
   const installerOperations = manifestsInOrder(inputs.registry, deploymentOrder).flatMap((manifest) =>
-    planInstallerOperation(manifest, inputs.registry, inputs.targetRoot)
+    planInstallerOperation(manifest, inputs.registry, inputs.targetRoot, options.force ?? false)
   );
-  const managedPaths = uniqueSorted([
+  const desiredManagedPaths = uniqueSorted([
     ...fileOperations.map((operation) => operation.dst),
-    ...installerOperations.map((operation) => operation.dst),
+    ...installerOperations.map((operation) => operation.dst)
+  ]);
+  const orphanPaths = readManagedPaths(inputs.targetRoot).filter((managedPath) => !desiredManagedPaths.includes(managedPath));
+
+  if (options.pruneOrphans) {
+    for (const orphanPath of orphanPaths) {
+      fileOperations.push({
+        capabilityId: "core",
+        kind: "asset",
+        src: "",
+        dst: orphanPath,
+        status: "delete",
+        executable: false,
+        reason: "previously managed path is no longer in the active deployment plan"
+      });
+    }
+  }
+
+  const managedPaths = uniqueSorted([
+    ...desiredManagedPaths,
     DAYU_LOG_FILE
   ]);
 
@@ -81,15 +118,30 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
     fileOperations,
     installerOperations,
     managedPaths,
+    orphanPaths,
     summary: summarizePlan(fileOperations, installerOperations)
   };
 }
 
 export function applyDayuConfig(options: ApplyOptions = {}): ApplyReport {
-  const plan = buildApplyPlan(options);
+  let lock: ReturnType<typeof acquireApplyLock> | undefined;
+  if (!options.dryRun) {
+    const inputs = resolveApplyInputs(options);
+    lock = acquireApplyLock(inputs.targetRoot);
+    recoverInterruptedTransactions(inputs.targetRoot);
+  }
+
+  let plan: ApplyPlan;
+  try {
+    plan = buildApplyPlan(options);
+  } catch (error) {
+    lock?.release();
+    throw error;
+  }
   const blockingStatus = blockingApplyStatus(plan);
 
   if (plan.dryRun || blockingStatus) {
+    lock?.release();
     return {
       ...plan,
       status: blockingStatus ?? "planned",
@@ -97,49 +149,102 @@ export function applyDayuConfig(options: ApplyOptions = {}): ApplyReport {
     };
   }
 
+  const transactionId = createTransactionId();
   const changedPaths: string[] = [];
+  const preimages = new Map<string, JournalEntry>();
 
-  for (const operation of plan.fileOperations) {
-    if (operation.status !== "create" && operation.status !== "chmod") {
-      continue;
-    }
-
-    const targetPath = resolveInsideRoot(plan.targetRoot, operation.dst);
-    if (operation.status === "create") {
-      const rendered = renderFileByPlan(plan, operation);
-      mkdirSync(dirname(targetPath), { recursive: true });
-      writeFileAtomically(targetPath, rendered.content);
-    }
-    if (operation.executable) {
-      chmodSync(targetPath, 0o755);
-    }
-    changedPaths.push(operation.dst);
-  }
-
-  for (const operation of plan.installerOperations) {
-    if (operation.status !== "create" && operation.status !== "merge") {
-      continue;
-    }
-
-    applyInstallerOperation(plan.targetRoot, operation);
-    changedPaths.push(operation.dst);
-  }
-
-  if (changedPaths.length > 0) {
-    appendDayuLog(plan.targetRoot, {
+  try {
+    appendJournalEntry(plan.targetRoot, {
+      id: transactionId,
       command: "apply",
-      status: "applied",
-      changedPaths,
-      deploymentOrder: plan.deploymentOrder,
-      timestamp: new Date().toISOString()
+      phase: "begin",
+      detail: {
+        deploymentOrder: plan.deploymentOrder,
+        force: options.force ?? false,
+        pruneOrphans: options.pruneOrphans ?? false
+      }
     });
-  }
 
-  return {
-    ...plan,
-    status: changedPaths.length > 0 ? "applied" : "no-op",
-    changedPaths: uniqueSorted(changedPaths)
-  };
+    for (const operation of plan.fileOperations) {
+      if (!["create", "overwrite", "chmod", "delete"].includes(operation.status)) {
+        continue;
+      }
+
+      const targetPath = resolveInsideRoot(plan.targetRoot, operation.dst);
+      rememberPreimage(plan.targetRoot, transactionId, operation.dst, preimages);
+      if (operation.status === "delete") {
+        if (existsSync(targetPath)) {
+          unlinkSync(targetPath);
+        }
+      } else {
+        if (operation.status === "create" || operation.status === "overwrite") {
+          const rendered = renderFileByPlan(plan, operation);
+          mkdirSync(dirname(targetPath), { recursive: true });
+          writeFileAtomically(targetPath, rendered.content);
+        }
+        if (operation.executable) {
+          chmodSync(targetPath, 0o755);
+        }
+      }
+      changedPaths.push(operation.dst);
+      appendJournalEntry(plan.targetRoot, {
+        id: transactionId,
+        command: "apply",
+        phase: "write",
+        path: operation.dst,
+        checksum: capturePreimage(plan.targetRoot, operation.dst).checksum
+      });
+    }
+
+    for (const operation of plan.installerOperations) {
+      if (operation.status !== "create" && operation.status !== "merge") {
+        continue;
+      }
+
+      rememberPreimage(plan.targetRoot, transactionId, operation.dst, preimages);
+      applyInstallerOperation(plan.targetRoot, operation);
+      changedPaths.push(operation.dst);
+      appendJournalEntry(plan.targetRoot, {
+        id: transactionId,
+        command: "apply",
+        phase: "write",
+        path: operation.dst,
+        checksum: capturePreimage(plan.targetRoot, operation.dst).checksum
+      });
+    }
+
+    writeManagedPaths(plan.targetRoot, plan.managedPaths.filter((managedPath) => managedPath !== DAYU_LOG_FILE));
+
+    if (changedPaths.length > 0) {
+      appendDayuLog(plan.targetRoot, {
+        command: "apply",
+        status: "applied",
+        changedPaths,
+        deploymentOrder: plan.deploymentOrder,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    appendJournalEntry(plan.targetRoot, {
+      id: transactionId,
+      command: "apply",
+      phase: "commit",
+      detail: {
+        changedPaths
+      }
+    });
+
+    return {
+      ...plan,
+      status: changedPaths.length > 0 ? "applied" : "no-op",
+      changedPaths: uniqueSorted(changedPaths)
+    };
+  } catch (error) {
+    rollbackPaths(plan.targetRoot, transactionId, preimages);
+    throw error;
+  } finally {
+    lock?.release();
+  }
 }
 
 export function initDayuConfig(options: InitOptions = {}): InitReport {
@@ -166,7 +271,9 @@ export function initDayuConfig(options: InitOptions = {}): InitReport {
     targetRoot: options.targetRoot ? targetRoot : undefined,
     configPath,
     config,
-    dryRun
+    dryRun,
+    force: options.force,
+    pruneOrphans: options.pruneOrphans
   });
 
   return {
@@ -192,7 +299,7 @@ export function resolveApplyInputs(options: ApplyOptions = {}): ResolvedApplyInp
   const configuredRoot = options.targetRoot ? undefined : resolveProjectRootFromConfig(initialConfigPath, config.project?.root);
   const targetRoot = configuredRoot ?? initialTargetRoot;
   const configPath = initialConfigPath;
-  const registry = loadPhase1dManifestRegistry();
+  const registry = loadManifestRegistry();
 
   return { targetRoot, configPath, config, registry };
 }
@@ -274,7 +381,7 @@ function manifestFileMappings(manifest: ManifestV2, context: RenderContext): Ren
   });
 }
 
-function planFileOperation(item: RenderedFileMapping): FileOperation {
+function planFileOperation(item: RenderedFileMapping, force: boolean): FileOperation {
   const executable = item.mapping.executable ?? false;
 
   if (!existsSync(item.sourcePath)) {
@@ -328,6 +435,19 @@ function planFileOperation(item: RenderedFileMapping): FileOperation {
     };
   }
 
+  if (force) {
+    return {
+      capabilityId: item.capabilityId,
+      kind: item.kind,
+      src: item.mapping.src,
+      dst: item.mapping.dst,
+      status: "overwrite",
+      executable,
+      reason: "target exists with different content; --force will overwrite it",
+      bytes: item.content.byteLength
+    };
+  }
+
   return {
     capabilityId: item.capabilityId,
     kind: item.kind,
@@ -335,65 +455,83 @@ function planFileOperation(item: RenderedFileMapping): FileOperation {
     dst: item.mapping.dst,
     status: "conflict",
     executable,
-    reason: "target exists with different content; Phase 1d does not overwrite"
+    reason: "target exists with different content; use --force or merge --apply --strategy replace to overwrite"
   };
 }
 
 function planInstallerOperation(
   manifest: ManifestV2,
   registry: ManifestRegistry,
-  targetRoot: string
+  targetRoot: string,
+  force: boolean
 ): InstallerOperation[] {
   if (!manifest.installer) {
     return [];
   }
 
-  if (manifest.installer.script !== "install-husky.sh") {
+  if (!["install-husky.sh", "install-gitignore.sh"].includes(manifest.installer.script)) {
     return [
       {
         capabilityId: manifest.id,
         script: manifest.installer.script,
         dst: ".dayu-installer",
         status: "unsupported",
-        reason: `unsupported Phase 1d installer '${manifest.installer.script}'`
+        reason: `unsupported installer '${manifest.installer.script}'`
       }
     ];
   }
 
   const scriptPath = join(registry.skillRoot, "scripts", manifest.installer.script);
+  const dst = installerDestination(manifest);
   if (!existsSync(scriptPath)) {
     return [
       {
         capabilityId: manifest.id,
         script: manifest.installer.script,
-        dst: ".husky/commit-msg",
+        dst,
         status: "missing-source",
         reason: `installer script '${manifest.installer.script}' does not exist`
       }
     ];
   }
 
-  const hookPath = join(targetRoot, ".husky", "commit-msg");
-  if (!existsSync(hookPath)) {
+  const targetPath = join(targetRoot, dst);
+  if (!existsSync(targetPath)) {
     return [
       {
         capabilityId: manifest.id,
         script: manifest.installer.script,
-        dst: ".husky/commit-msg",
-        status: "create"
+        dst,
+        status: "create",
+        strategy: installerStrategy(manifest, force)
       }
     ];
   }
 
-  const hook = readFileSync(hookPath, "utf8");
-  if (hook.includes(COMMIT_FORMAT_HOOK_MARKER)) {
+  if (
+    manifest.installer.script === "install-gitignore.sh" &&
+    !force &&
+    readFileSync(targetPath, "utf8").includes("Dayu Harness local exclusions")
+  ) {
     return [
       {
         capabilityId: manifest.id,
         script: manifest.installer.script,
-        dst: ".husky/commit-msg",
+        dst,
         status: "skip",
-        reason: "commit-msg hook already contains the dayu-harness commit-format snippet"
+        reason: ".gitignore already contains the dayu-harness local exclusions"
+      }
+    ];
+  }
+
+  if (manifest.installer.script === "install-husky.sh" && readFileSync(targetPath, "utf8").includes(huskyMarker(manifest.id))) {
+    return [
+      {
+        capabilityId: manifest.id,
+        script: manifest.installer.script,
+        dst,
+        status: "skip",
+        reason: `${dst} already contains the dayu-harness ${manifest.id} snippet`
       }
     ];
   }
@@ -402,9 +540,12 @@ function planInstallerOperation(
     {
       capabilityId: manifest.id,
       script: manifest.installer.script,
-      dst: ".husky/commit-msg",
+      dst,
       status: "merge",
-      reason: "existing hook will be preserved and the dayu-harness snippet appended"
+      strategy: installerStrategy(manifest, force),
+      reason: force
+        ? `existing ${dst} will be replaced or force-merged according to installer support`
+        : `existing ${dst} will be preserved and the dayu-harness snippet appended`
     }
   ];
 }
@@ -429,12 +570,12 @@ function renderFileByPlan(plan: ApplyPlan, operation: FileOperation): RenderedFi
 }
 
 function applyInstallerOperation(targetRoot: string, operation: InstallerOperation): void {
-  if (operation.script !== "install-husky.sh") {
+  if (!["install-husky.sh", "install-gitignore.sh"].includes(operation.script)) {
     throw new CliError("unsupported-installer", `unsupported installer '${operation.script}'`);
   }
 
-  const scriptPath = join(loadPhase1dManifestRegistry().skillRoot, "scripts", operation.script);
-  execFileSync("bash", [scriptPath, targetRoot, "--apply", "merge"], {
+  const scriptPath = join(loadManifestRegistry().skillRoot, "scripts", operation.script);
+  execFileSync("bash", [scriptPath, targetRoot, "--apply", operation.strategy ?? "merge"], {
     env: {
       ...process.env,
       DAYU_HARNESS_CAPABILITY: operation.capabilityId
@@ -443,9 +584,37 @@ function applyInstallerOperation(targetRoot: string, operation: InstallerOperati
   });
 
   const hookPath = join(targetRoot, operation.dst);
-  if (!existsSync(hookPath) || !readFileSync(hookPath, "utf8").includes(COMMIT_FORMAT_HOOK_MARKER)) {
+  if (!existsSync(hookPath)) {
     throw new CliError("installer-failed", `installer '${operation.script}' did not create ${operation.dst}`);
   }
+  if (operation.script === "install-husky.sh" && !readFileSync(hookPath, "utf8").includes(huskyMarker(operation.capabilityId))) {
+    throw new CliError("installer-failed", `installer '${operation.script}' did not create ${operation.dst}`);
+  }
+}
+
+function installerStrategy(manifest: ManifestV2, force: boolean): "merge" | "replace" {
+  if (force && manifest.installer?.safe_strategies.includes("replace")) {
+    return "replace";
+  }
+
+  return "merge";
+}
+
+function installerDestination(manifest: ManifestV2): string {
+  if (manifest.installer?.script === "install-gitignore.sh") {
+    return ".gitignore";
+  }
+
+  if (manifest.installer?.script === "install-husky.sh") {
+    const hook = HUSKY_HOOK_BY_CAPABILITY[manifest.id];
+    return hook ? `.husky/${hook}` : ".husky";
+  }
+
+  return ".dayu-installer";
+}
+
+function huskyMarker(capabilityId: string): string {
+  return `# >>> dayu-harness:${capabilityId} >>>`;
 }
 
 function blockingApplyStatus(plan: ApplyPlan): "conflict" | "error" | undefined {
@@ -460,11 +629,37 @@ function blockingApplyStatus(plan: ApplyPlan): "conflict" | "error" | undefined 
   return undefined;
 }
 
+function rememberPreimage(
+  targetRoot: string,
+  transactionId: string,
+  relativePath: string,
+  preimages: Map<string, JournalEntry>
+): void {
+  if (preimages.has(relativePath)) {
+    return;
+  }
+
+  const preimage = {
+    id: transactionId,
+    command: "apply",
+    phase: "preimage" as const,
+    path: relativePath,
+    ...capturePreimage(targetRoot, relativePath)
+  };
+  preimages.set(relativePath, {
+    ...preimage,
+    timestamp: new Date().toISOString()
+  });
+  appendJournalEntry(targetRoot, preimage);
+}
+
 function summarizePlan(fileOperations: readonly FileOperation[], installerOperations: readonly InstallerOperation[]) {
   return {
     create:
       fileOperations.filter((operation) => operation.status === "create").length +
       installerOperations.filter((operation) => operation.status === "create").length,
+    overwrite: fileOperations.filter((operation) => operation.status === "overwrite").length,
+    delete: fileOperations.filter((operation) => operation.status === "delete").length,
     chmod: fileOperations.filter((operation) => operation.status === "chmod").length,
     merge: installerOperations.filter((operation) => operation.status === "merge").length,
     skip:

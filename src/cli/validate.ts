@@ -2,7 +2,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { buildApplyPlan } from "./apply.js";
 import { isCliError } from "./errors.js";
-import { loadPhase1dManifestRegistry } from "./manifest-registry.js";
+import { loadManifestRegistry } from "./manifest-registry.js";
 import { DEFAULT_CONFIG_FILE, resolveTargetRoot } from "./paths.js";
 import type { ApplyOptions, ValidationReport } from "./types.js";
 
@@ -18,7 +18,7 @@ export function validateDayuProject(options: ApplyOptions = {}): ValidationRepor
   let registryCapabilityCount = 0;
 
   try {
-    registryCapabilityCount = loadPhase1dManifestRegistry().manifests.length;
+    registryCapabilityCount = loadManifestRegistry().manifests.length;
   } catch (error) {
     issues.push(...messagesFromError(error));
   }

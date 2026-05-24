@@ -1,10 +1,10 @@
 import type { DayuConfig, FileMapping, LocaleCode, ManifestV2 } from "../schemas/index.js";
 
-export type CliCommandName = "init" | "apply" | "diagnose" | "validate";
+export type CliCommandName = "init" | "apply" | "diagnose" | "validate" | "merge" | "generate" | "status" | "repair";
 
-export type ApplyStatus = "planned" | "applied" | "no-op" | "conflict" | "error";
+export type ApplyStatus = "planned" | "applied" | "no-op" | "conflict" | "error" | "repaired";
 
-export type FileOperationStatus = "create" | "chmod" | "skip" | "conflict" | "missing-source";
+export type FileOperationStatus = "create" | "overwrite" | "delete" | "chmod" | "skip" | "conflict" | "missing-source";
 
 export type InstallerOperationStatus = "create" | "merge" | "skip" | "missing-source" | "unsupported";
 
@@ -48,6 +48,7 @@ export interface InstallerOperation {
   script: string;
   dst: string;
   status: InstallerOperationStatus;
+  strategy?: InstallerStrategy;
   reason?: string;
 }
 
@@ -63,8 +64,11 @@ export interface ApplyPlan {
   fileOperations: readonly FileOperation[];
   installerOperations: readonly InstallerOperation[];
   managedPaths: readonly string[];
+  orphanPaths: readonly string[];
   summary: {
     create: number;
+    overwrite: number;
+    delete: number;
     chmod: number;
     merge: number;
     skip: number;
@@ -150,6 +154,7 @@ export interface DiagnoseReport {
 }
 
 export type MergeStrategy = "keep" | "replace" | "skip";
+export type InstallerStrategy = "merge" | "replace" | "skip";
 
 export interface MergeCapabilityPlan {
   capabilityId: string;
@@ -162,6 +167,8 @@ export interface MergeCapabilityPlan {
   rse: RseSummary;
   summary: {
     create: number;
+    overwrite: number;
+    delete: number;
     chmod: number;
     merge: number;
     skip: number;
@@ -174,13 +181,33 @@ export interface MergeCapabilityPlan {
 
 export interface MergeReport {
   command: "merge";
-  status: "planned" | "conflict" | "error";
+  status: "planned" | "merged" | "conflict" | "error";
   dryRun: boolean;
   decisionGranularity: "capability";
   strategyOptions: readonly MergeStrategy[];
   targetRoot: string;
   configPath: string;
   capabilities: readonly MergeCapabilityPlan[];
+}
+
+export interface StatusCapabilityGroup {
+  kind: ManifestV2["kind"];
+  capabilities: readonly CapabilityDiagnosticSummary[];
+}
+
+export interface StatusReport {
+  command: "status";
+  status: "healthy" | "unhealthy";
+  targetRoot: string;
+  configPath: string;
+  groups: readonly StatusCapabilityGroup[];
+  summary: {
+    healthy: number;
+    unhealthy: number;
+    hard: number;
+    soft: number;
+    infra: number;
+  };
 }
 
 export interface ValidationReport {
@@ -226,6 +253,8 @@ export interface ApplyOptions {
   dryRun?: boolean;
   config?: DayuConfig;
   onlyCapabilityId?: string;
+  force?: boolean;
+  pruneOrphans?: boolean;
 }
 
 export interface InitOptions {
@@ -233,10 +262,20 @@ export interface InitOptions {
   targetRoot?: string;
   dryRun?: boolean;
   locale?: LocaleCode;
+  force?: boolean;
+  pruneOrphans?: boolean;
 }
 
 export interface GenerateOptions {
   configPath?: string;
   targetRoot?: string;
+  capabilityId?: string;
+}
+
+export interface MergeOptions extends ApplyOptions {
+  strategy?: MergeStrategy;
+}
+
+export interface RepairOptions extends ApplyOptions {
   capabilityId?: string;
 }
