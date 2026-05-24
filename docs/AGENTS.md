@@ -10,6 +10,8 @@ Skill 自身文档索引。
 - [troubleshooting.md](troubleshooting.md) - CLI 常见问题与排查方式
 - [phase2-product.md](phase2-product.md) - Phase 2 CLI 状态机、目标目录树和产品化口径
 - [plan.md](plan.md) - 完整设计计划和架构文档
+- [phase1-progress.md](phase1-progress.md) - Phase 1 当前进度、维护者计划和 QA 经验沉淀
+- [phase1b-schema.md](phase1b-schema.md) - Phase 1b schema、manifest v2、config、i18n 和路径安全契约
 - [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
 - [phase1d-cli.md](phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
@@ -24,6 +26,8 @@ Skill 自身文档索引。
 > 触发时机：需要理解 Skill 架构决策、设计原理时读取
 
 - [plan.md](plan.md)：完整设计计划和架构文档
+- [phase1-progress.md](phase1-progress.md)：Phase 1b-1e 当前进度、后续计划、验证基线和临时目录回退 QA 经验
+- [phase1b-schema.md](phase1b-schema.md)：Phase 1b schema、manifest v2、`dayu.config.yaml`、locale catalog 和路径安全契约
 - [getting-started.md](getting-started.md)：Phase 2 CLI 安装、初始化、部署、检查和修复流程
 - [configuration.md](configuration.md)：`dayu.config.yaml` 字段、能力数量口径、依赖和全能力示例
 - [troubleshooting.md](troubleshooting.md)：npm cache、conflict、wrong-mode、lock、orphan、merge 等常见问题

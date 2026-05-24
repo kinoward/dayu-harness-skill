@@ -182,7 +182,7 @@ The README only shows a high-level structure; the complete directory tree and ow
 
 - Entry points & indexes: `README.md`, `README.en.md`, `AGENTS.md` (including subdirectory indexes)
 - Capabilities, schema, architecture contracts & deployment engine: `capabilities/`, `src/`, `locales/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
-- Local validation toolchain: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`, `tests/unit/phase2-cli.test.ts`
+- Maintainer-local validation toolchain: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`, `tests/unit/phase2-cli.test.ts`
 - Outputs & maintenance materials: `docs/`, `marketing/`, `tests/`
 - Publishing & repository automation: `.github/workflows/ci.yml`, `.github/workflows/release-please.yml`, `.github/workflows/npm-publish.yml`, `.github/workflows/update-contributors.yml`; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
 
@@ -193,6 +193,7 @@ Full repository tree is in [AGENTS.md](AGENTS.md).
 - To understand the Skill behavior definition: read [SKILL.md](SKILL.md).
 - To use the CLI directly: read [docs/getting-started.md](docs/getting-started.md) and [docs/configuration.md](docs/configuration.md).
 - To understand repository maintenance rules, capability lists, script flow, and test baseline: read [AGENTS.md](AGENTS.md).
+- To understand the current Phase 1b-1e plan, progress, and QA lessons: read [docs/phase1-progress.md](docs/phase1-progress.md).
 - To understand compatibility across Agent clients: read [references/agent-compatibility.md](references/agent-compatibility.md).
 
 ## 📚 References

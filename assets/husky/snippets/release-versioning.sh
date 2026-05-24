@@ -1,14 +1,21 @@
 # Protect v* release tags from deletion and overwrite.
 if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
-    dayu_tmp_dir="${TMPDIR:-${PWD:-.}/.dayu/tmp}"
-    if ! mkdir -p "$dayu_tmp_dir" 2>/dev/null || [ ! -w "$dayu_tmp_dir" ]; then
-        dayu_tmp_dir="${PWD:-.}/.dayu/tmp"
-        mkdir -p "$dayu_tmp_dir"
+    for DAYU_HARNESS_TMP_CANDIDATE in "${DAYU_HARNESS_TMPDIR:-}" "${TMPDIR:-}" ".git/dayu-harness-tmp" ".dayu-harness-tmp" "/tmp"; do
+        [ -n "$DAYU_HARNESS_TMP_CANDIDATE" ] || continue
+        mkdir -p "$DAYU_HARNESS_TMP_CANDIDATE" 2>/dev/null || true
+        DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "${DAYU_HARNESS_TMP_CANDIDATE%/}/dayu-harness-pre-push.XXXXXX" 2>/dev/null || true)"
+        if [ -n "$DAYU_HARNESS_PRE_PUSH_INPUT" ]; then
+            break
+        fi
+    done
+    if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
+        echo "ERROR: unable to create temporary pre-push input file." >&2
+        exit 1
     fi
-    DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "$dayu_tmp_dir/dayu-harness-pre-push.XXXXXX")"
     cat > "$DAYU_HARNESS_PRE_PUSH_INPUT"
     export DAYU_HARNESS_PRE_PUSH_INPUT
     trap 'rm -f "$DAYU_HARNESS_PRE_PUSH_INPUT"' EXIT
+    unset DAYU_HARNESS_TMP_CANDIDATE
 fi
 
 while read -r local_ref local_sha remote_ref remote_sha; do

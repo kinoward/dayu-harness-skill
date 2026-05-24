@@ -33,12 +33,16 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [scripts/check-i18n-drift.sh](scripts/check-i18n-drift.sh) - README 与部署模板镜像漂移检查
 - [scripts/github-remote.sh](scripts/github-remote.sh) - GitHub 远端检查、创建/绑定、推送与远端能力验证脚本
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
+- [docs/phase1b-schema.md](docs/phase1b-schema.md) - Phase 1b schema、manifest v2、config、i18n 和路径安全契约
+- [docs/phase1c-architecture.md](docs/phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
+- [docs/phase1-progress.md](docs/phase1-progress.md) - Phase 1 当前进度、维护者计划和 QA 经验沉淀
 - [docs/getting-started.md](docs/getting-started.md) - Phase 2 CLI 快速开始与常用命令
 - [docs/configuration.md](docs/configuration.md) - `dayu.config.yaml` 配置契约与能力口径
 - [docs/troubleshooting.md](docs/troubleshooting.md) - CLI 常见问题与排查方式
 - [docs/phase2-product.md](docs/phase2-product.md) - Phase 2 CLI 状态机、目标目录树和产品化口径
 - [docs/phase1d-cli.md](docs/phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
 - [docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md) - Phase 1e CLI 公开范围收口、init/apply 行为和验证方式
+- [docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md) - `scaffold.sh` 内部逻辑 spike 与 TypeScript port 风险记录
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
 - [tests/unit/phase2-cli.test.ts](tests/unit/phase2-cli.test.ts) - Phase 2 全量 manifest、apply、status、repair 和 orphan 清理测试
@@ -71,7 +75,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为可测试 schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。
 
 4. **机械化检查优先于文字承诺**
 
@@ -270,8 +274,11 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 > 触发时机：修改 Skill 自身设计或实现时读取
 
 - 设计计划：[docs/plan.md](docs/plan.md)
+- Phase 1 进度与经验：[docs/phase1-progress.md](docs/phase1-progress.md)
+- Phase 1b schema 契约：[docs/phase1b-schema.md](docs/phase1b-schema.md)
 - Phase 1c 架构契约：[docs/phase1c-architecture.md](docs/phase1c-architecture.md)
 - Phase 1d CLI 垂直切片：[docs/phase1d-cli.md](docs/phase1d-cli.md)
+- Phase 1e CLI 公开范围：[docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md)
 - scaffold.sh 内部逻辑 spike：[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)
 - Q&A 参考模板：[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)
 - 执行完成报告模板：[docs/completion-report-template.md](docs/completion-report-template.md)

@@ -200,8 +200,10 @@ Skill 目录中的其他文件按需加载：
 - **[scripts/](scripts/)**：Skill 内部初始化脚本（`scaffold.sh`、`install-husky.sh`、`install-gitignore.sh`；其余能力按 manifest 指定 `installer.script` 调用），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
 - **[package.json](package.json)** 与 **[tsconfig.json](tsconfig.json)**：本地 TypeScript schema 验证工具链入口。
 - **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
+- **[docs/phase1b-schema.md](docs/phase1b-schema.md)**：Phase 1b schema、manifest v2、`dayu.config.yaml`、locale catalog 和路径安全契约。
 - **[docs/phase1c-architecture.md](docs/phase1c-architecture.md)**：Phase 1c CLI 命令树、DAG 与三层分离架构契约，仅供 Skill 维护者和 Phase 1d 实现参考。
 - **[docs/phase1d-cli.md](docs/phase1d-cli.md)**：Phase 1d TypeScript CLI 垂直切片命令语义、阶段边界和验证方式。
 - **[docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md)**：Phase 1e CLI 公开范围收口、默认 dry-run、`apply --only` 和原子写入契约。
+- **[docs/phase1-progress.md](docs/phase1-progress.md)**：Phase 1b-1e 当前进度、维护者计划、验证基线和 QA 经验沉淀。
 - **[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)**：`scaffold.sh` 内部逻辑 spike，记录 TypeScript port 前必须保留的 Bash 行为和风险。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。

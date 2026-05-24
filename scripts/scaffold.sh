@@ -644,6 +644,30 @@ selected_has_capability() {
     return 1
 }
 
+dayu_tmp_candidates() {
+    [ -n "${DAYU_HARNESS_TMPDIR:-}" ] && printf '%s\n' "$DAYU_HARNESS_TMPDIR"
+    [ -n "${TMPDIR:-}" ] && printf '%s\n' "$TMPDIR"
+    [ -n "${TARGET:-}" ] && printf '%s\n' "$TARGET/.tmp"
+    [ -n "${OUTPUT_BASE:-}" ] && printf '%s\n' "$OUTPUT_BASE/.tmp"
+    printf '%s\n' "/tmp"
+}
+
+make_writable_tmpfile() {
+    local prefix="$1"
+    local candidate candidate_abs tmp_file
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        mkdir -p "$candidate" 2>/dev/null || true
+        candidate_abs="$(cd "$candidate" 2>/dev/null && pwd)" || continue
+        tmp_file="$(mktemp "${candidate_abs%/}/${prefix}.XXXXXX" 2>/dev/null || true)"
+        if [ -n "$tmp_file" ]; then
+            printf '%s\n' "$tmp_file"
+            return 0
+        fi
+    done < <(dayu_tmp_candidates)
+    return 1
+}
+
 run_github_remote() {
     local mode="$1"
     shift || true
@@ -657,12 +681,7 @@ run_github_remote() {
     fi
 
     remote_stderr_file=""
-    if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
-        remote_stderr_file="$(dayu_mktemp "dayu-github-remote-stderr" 2>/dev/null || true)"
-    fi
-    if [ -z "$remote_stderr_file" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
-        remote_stderr_file="$(mktemp "/tmp/dayu-github-remote-stderr.XXXXXX" 2>/dev/null || true)"
-    fi
+    remote_stderr_file="$(make_writable_tmpfile "dayu-github-remote-stderr" 2>/dev/null || true)"
     set +e
     if [ -n "$remote_stderr_file" ]; then
         remote_output="$(DAYU_HARNESS_DEFAULT_BRANCH="$DEFAULT_BRANCH" DAYU_HARNESS_GITHUB_REPOSITORY="$GITHUB_REPOSITORY" DAYU_HARNESS_GITHUB_VISIBILITY="$GITHUB_VISIBILITY" DAYU_HARNESS_REMOTE_ACTIONS_JSON="$remote_actions_json" bash "$GITHUB_REMOTE_SCRIPT" "$TARGET" "--$mode" 2>"$remote_stderr_file")"
@@ -1485,7 +1504,7 @@ run_capability_smoke_checks() {
         elif ! grep -Fq "commitlint" "$TARGET/.husky/commit-msg" 2>/dev/null; then
             add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未包含 commitlint 校验片段。"
         else
-            tmp_file="$(dayu_mktemp "dayu-commit-msg")"
+            tmp_file="$(make_writable_tmpfile "dayu-commit-msg")"
             printf '%s\n' "test: verify dayu harness commit hook" > "$tmp_file"
             set +e
             (cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" >/dev/null 2>&1)
@@ -1498,7 +1517,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未接受有效 Conventional Commit 消息。"
             fi
 
-            tmp_file="$(dayu_mktemp "dayu-commit-msg-bad")"
+            tmp_file="$(make_writable_tmpfile "dayu-commit-msg-bad")"
             printf '%s\n' "bad commit message" > "$tmp_file"
             set +e
             command_output="$(cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" 2>&1)"
@@ -1543,7 +1562,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.husky/pre-push" ]; then
             add_smoke_item "github.branch-protection" "pre-push-default-branch" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
         else
-            input_file="$(dayu_mktemp "dayu-pre-push-branch")"
+            input_file="$(make_writable_tmpfile "dayu-pre-push-branch")"
             printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/$DEFAULT_BRANCH 2222222222222222222222222222222222222222" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1556,7 +1575,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.branch-protection" "pre-push-default-branch" "failed" "pre-push hook 未按预期拒绝默认分支直接推送。"
             fi
 
-            input_file="$(dayu_mktemp "dayu-pre-push-feature")"
+            input_file="$(make_writable_tmpfile "dayu-pre-push-feature")"
             printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/dayu-smoke 0000000000000000000000000000000000000000" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1575,7 +1594,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.husky/pre-push" ]; then
             add_smoke_item "release.versioning" "pre-push-release-tag" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
         else
-            input_file="$(dayu_mktemp "dayu-pre-push-tag")"
+            input_file="$(make_writable_tmpfile "dayu-pre-push-tag")"
             printf '%s\n' "refs/tags/v0.1.0 1111111111111111111111111111111111111111 refs/tags/v0.1.0 2222222222222222222222222222222222222222" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1588,7 +1607,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "release.versioning" "pre-push-release-tag" "failed" "pre-push hook 未按预期拒绝覆盖 release tag。"
             fi
 
-            input_file="$(dayu_mktemp "dayu-pre-push-new-tag")"
+            input_file="$(make_writable_tmpfile "dayu-pre-push-new-tag")"
             printf '%s\n' "refs/tags/v9.9.9 1111111111111111111111111111111111111111 refs/tags/v9.9.9 0000000000000000000000000000000000000000" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1607,7 +1626,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.github/scripts/pr_body_structure.py" ]; then
             add_smoke_item "github.pr" "pr-body-validator" "failed" "PR body validator 缺失。"
         else
-            body_file="$(dayu_mktemp "dayu-pr-body")"
+            body_file="$(make_writable_tmpfile "dayu-pr-body")"
             render_dayu_pr_body "1" "Verify deterministic PR body rendering." "Render and validate a Dayu Harness PR body without model free-form text." "docs/harness/sensors/scripts/validate.sh --json ." > "$body_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
@@ -1620,7 +1639,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.pr" "pr-body-validator" "failed" "确定性生成的 PR body 未通过 PR 结构校验。"
             fi
 
-            body_file="$(dayu_mktemp "dayu-pr-body-bad")"
+            body_file="$(make_writable_tmpfile "dayu-pr-body-bad")"
             printf '%s\n\n%s\n' "## Summary" "- Missing required sections and issue trailer." > "$body_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
@@ -1640,7 +1659,7 @@ run_capability_smoke_checks() {
             add_smoke_item "github.issue" "issue-body-validator" "failed" "Issue depends-on validator 缺失。"
         else
             body="$(render_dayu_issue_body "Verify deterministic issue body rendering." "Render and validate a Dayu Harness issue body without model free-form text.")"
-            event_file="$(dayu_mktemp "dayu-issue-event")"
+            event_file="$(make_writable_tmpfile "dayu-issue-event")"
             jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
             set +e
             python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
@@ -1654,7 +1673,7 @@ run_capability_smoke_checks() {
             fi
 
             body="$(printf '## Summary\n\n- Invalid depends-on trailer.\n\nDepends on #1\n')"
-            event_file="$(dayu_mktemp "dayu-issue-event-bad")"
+            event_file="$(make_writable_tmpfile "dayu-issue-event-bad")"
             jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
             set +e
             python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
@@ -1681,7 +1700,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD policy 文件未通过 checker 解析。"
             fi
 
-            tmp_file="$(dayu_mktemp "dayu-tdd-policy-bad")"
+            tmp_file="$(make_writable_tmpfile "dayu-tdd-policy-bad")"
             printf '%s\n' '{"impl_patterns":"src/.*"}' > "$tmp_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_tdd_check.py" "$tmp_file" --validate-policy-only >/dev/null 2>&1
@@ -1710,7 +1729,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 本地校验失败。"
             fi
 
-            tmp_file="$(dayu_mktemp "dayu-release-policy-bad")"
+            tmp_file="$(make_writable_tmpfile "dayu-release-policy-bad")"
             printf '%s\n' '{}' > "$tmp_file"
             set +e
             python3 "$TARGET/.github/scripts/release_please_policy.py" "$tmp_file" "$TARGET" >/dev/null 2>&1
@@ -1972,9 +1991,18 @@ run_post_apply_checks_at_root() {
 
 make_writable_tmpdir() {
     local prefix="$1"
-    local tmpdir=""
-    tmpdir="$(mktemp -d "$(dayu_tmp_dir)/${prefix}.XXXXXX" 2>/dev/null || true)"
-    printf '%s' "$tmpdir"
+    local candidate candidate_abs tmpdir
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        mkdir -p "$candidate" 2>/dev/null || true
+        candidate_abs="$(cd "$candidate" 2>/dev/null && pwd)" || continue
+        tmpdir="$(mktemp -d "${candidate_abs%/}/${prefix}.XXXXXX" 2>/dev/null || true)"
+        if [ -n "$tmpdir" ]; then
+            printf '%s' "$tmpdir"
+            return 0
+        fi
+    done < <(dayu_tmp_candidates)
+    return 1
 }
 
 prepare_release_validation_root() {
@@ -2256,7 +2284,7 @@ run_github_target_e2e() {
     fi
     head_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
 
-    body_file="$(dayu_mktemp "dayu-e2e-pr-body")"
+    body_file="$(make_writable_tmpfile "dayu-e2e-pr-body")"
     render_dayu_pr_body "$issue_number" \
       "Verify Dayu Harness GitHub Issue to PR governance after initialization." \
       "Adds a smoke marker on an isolated validation branch." \

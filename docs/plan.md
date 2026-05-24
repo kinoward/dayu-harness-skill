@@ -1,5 +1,7 @@
 # 计划：构建渐进式披露的 AI 管理和约束文档体系
 
+> 当前说明：本文保留早期设计追溯和历史语境，不再承担当前进度看板职责。Phase 1b-1e 的实际落地状态、验证结果和后续计划见 [phase1-progress.md](phase1-progress.md)。
+
 ## Context
 
 从内部参考项目提炼经验，构建一个完整的项目治理 Skill `dayu-harness-skill`。在当前项目中实现并验证，未来独立成 git 仓库分发。
