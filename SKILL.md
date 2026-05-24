@@ -42,7 +42,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - Phase 2 起，`/dayu-harness` 的本地主执行路径是 TypeScript CLI：Skill 负责分析现状、提问和生成/维护 `dayu.config.yaml`；CLI 负责 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate` 的确定性执行。源码检出场景先在 Skill 根目录运行 `npm run build`，再用 `node dist/cli/main.js ...`；已发布包场景可用 `npx dayu-harness ...`。`scaffold.sh` 仅作为 legacy 兼容和远端 E2E 辅助入口，不作为本地部署、融合、维护的默认路径。
 - 任何涉及已有配置的操作，按能力清单中的可管理项/联动组件逐项处理：installer-backed 组件（如 husky hook 片段、`.gitignore`）先走 manifest installer 的 `--check`；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置文件、`.github/workflows`、ruleset JSON）优先用 CLI `merge --json` 输出融合预览，或用 `generate --json` 输出待写内容预览；若可提供现有文件与目标文件对，优先调用 `diff-helper.sh merge-plan <existing> <incoming>`；否则基于 CLI 预览结果做人工确认。只有当前 CLI 无法覆盖的 legacy 或远端 E2E 场景，才说明原因后调用 `scaffold.sh`
 - **不覆盖已有配置**，必须经用户确认
-- CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，必须立即进入 `finalize` 收尾阶段。`finalize` 负责本地验证、精确 stage/commit、远端创建或同步、Issue/PR E2E、release-please 真实验证、测试产物清理和一次性 Skill 安装目录清理询问；不得把这些命令留作“后续建议”。
+- CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，必须立即进入 `finalize` 收尾阶段。`finalize` 负责本地验证、精确 stage/commit、远端创建或同步、Issue/PR E2E、release-please 真实验证、测试产物清理和一次性 Skill 安装目录清理询问；不得把这些命令留作“后续建议”。只要已启用 GitHub 远端能力、rulesets、仓库设置或 release-please workflow permissions，就必须执行 `dayu-harness finalize --github-remote apply` 或等价的 `scripts/github-remote.sh --apply`；未执行远端 apply 时，报告必须是 `partial`/`needs_user_action`，不能汇报远端成功。
 - 目标项目运行状态目录统一为 `.dayu-harness/`。`.dayu-harness/managed-paths.json` 是长期托管路径状态，必须纳入本次提交；`.dayu-harness/apply.lock`、`.dayu-harness/journal.jsonl` 和 `.dayu-harness/tmp/` 只用于临时锁、恢复和运行缓存，必须被忽略，不作为长期治理资产。
 
 ### 结构化提问约束（全流程）
@@ -50,7 +50,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 以下阻塞场景必须以单问题块输出，一轮只问一个问题，且不得要求用户手输命令：
 
 - 版本冲突（`package.json`/`package-lock.json`/`VERSION`/`CHANGELOG.md`/`.release-please-manifest.json` 版本不一致）：提示冲突类型并给出 `[1]` 回到 `0.1.0`、`[2]` 采用某个现有版本源、`[3]` 暂停本次流程三类选项。
-- GitHub 远端创建：仅在用户选择开启时执行 `gh auth status`、`scripts/github-remote.sh --check/--apply`；若未登录或可见性冲突，先给出 `[1]` 重试登录、`[2]` 暂不创建远端、`[3]` 跳过 GitHub 相关能力。
+- GitHub 远端创建：仅在用户选择开启时执行 `gh auth status`、`scripts/github-remote.sh --check/--apply`；若未登录或可见性冲突，先给出 `[1]` 重试登录、`[2]` 暂不创建远端、`[3]` 跳过 GitHub 相关能力。不得使用或推荐 `gh repo create --push`、手写 `git push origin main` 或 API 手工创建 `main` ref；空远端首次默认分支只能走 `github-remote.sh --apply` 的受控路径，由脚本带 `DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=1` 通过本地 pre-push。
 - hooks/workflows merge：当 `.husky`、`.github/workflows` 已存在且 `manual_required` 时，必须提供 `[1] 保留现有`、`[2]` 合并策略、`[3]` 替换、`[4]` 跳过该项的选择。
 - 已跟踪 `.claude` 或 `CLAUDE.md`：若仓库已跟踪本地 Agent 路由目录/文件，必须先确认 `[1]` 保留本地配置、`[2]` 使用 Skill 模板合并后继续、`[3]` 从 Git 索引移除但保留本地文件后继续、`[4]` 跳过该能力。
 - 受保护分支：启用 `github.branch-protection` 且检测到既有保护策略时，必须先确认策略继承关系与合并策略（合并/替换/仅保留现有），不允许自动默认覆盖。
@@ -67,7 +67,7 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 的交互门禁询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
 4. 展示确认汇总
 5. 用户确认后：用 CLI 预览和应用本地部署。缺少配置时先执行 `dayu-harness init --target <project-root> --locale <zh|en> --json` 预览，再执行 `dayu-harness init --target <project-root> --locale <zh|en> --apply --json`；已有配置时先更新 `dayu.config.yaml` 中的能力选择，再执行 `dayu-harness apply --target <project-root> --config <config-path> --dry-run --json` 预览，确认后执行 `dayu-harness apply --target <project-root> --config <config-path> --json`。如遇漂移，必须先说明影响并取得用户确认，才可追加 `--force`；只在用户明确要求清理托管孤儿文件时追加 `--prune-orphans`。
-6. CLI 写入完成后必须立即调用 `finalize` 收尾。`finalize` 先执行 `validate`、`diagnose`、`status` 以及目标项目内的 `validate/audit/check-consistency` 检查，再基于 `.dayu-harness/managed-paths.json` 精确 stage 托管路径并创建提交；如用户已选择 GitHub 远端同步或启用远端能力，继续完成远端创建/绑定、push 或初始化 PR、远端配置回读、Issue/PR E2E 和 release-please 真实验证。验证通过后必须清理测试 Issue、测试 PR、测试分支和一次性临时产物，不得把这些命令作为后续建议留给用户。
+6. CLI 写入完成后必须立即调用 `finalize` 收尾。`finalize` 先执行 `validate`、`diagnose`、`status` 以及目标项目内的 `validate/audit/check-consistency` 检查，再基于 `.dayu-harness/managed-paths.json` 精确 stage 托管路径并创建提交；如用户已选择 GitHub 远端同步或启用远端能力，继续以 `dayu-harness finalize --github-remote apply` 完成远端创建/绑定、push 或初始化 PR、远端配置回读、Issue/PR E2E 和 release-please 真实验证。验证通过后必须清理测试 Issue、测试 PR、测试分支和一次性临时产物，不得把这些命令作为后续建议留给用户。
 
 ### 2. 诊断
 
@@ -120,7 +120,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 3. `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`：检查文档链接、索引和孤儿文档。
 4. `dayu-harness diagnose --target <project-root> --json`、`dayu-harness validate --target <project-root> --json` 和 `dayu-harness status --target <project-root> --json`：必须覆盖本次所有已部署能力的 manifest 文件存在性、漂移、执行位、依赖图和关键行为。对 `.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy 和 release-please policy 等硬能力，若 CLI 或传感器报告没有直接覆盖，必须手动抽查对应命令或脚本。不能只测试 GitHub 相关能力。
 5. 基于 `.dayu-harness/managed-paths.json` 精确 stage 托管路径和长期状态文件，创建初始化或维护提交。只 stage 托管路径、`dayu.config.yaml` 及必要的长期状态，不 stage 用户本地 Agent 配置、临时日志、锁文件或未托管改动。
-6. 若本次确认了 GitHub 远端同步，必须完成远端创建/绑定、push 或初始化 PR，并回读 repo settings、workflow permissions、rulesets 与默认分支状态。远端领先或分叉时不得 force push。
+6. 若本次确认了 GitHub 远端同步，或本次启用了包含远端动作的能力，必须完成远端创建/绑定、push 或初始化 PR，并回读 repo settings、workflow permissions、rulesets 与默认分支状态。`.github/rulesets/*.json` 只是本地 API payload，必须由 GitHub Rulesets API 写入并回读确认；workflow 文件存在、ruleset JSON 存在或语法检查通过都不能描述为远端规则已生效。远端领先、分叉或默认分支受保护时不得 force push，必须走初始化分支和 PR。
 
 以上本地检查属于结构/配置/关键行为验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
 

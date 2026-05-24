@@ -40,6 +40,14 @@ node dist/cli/main.js --help
    npx dayu-harness finalize --target . --json
    ```
 
+   如果启用了 GitHub 远端能力、仓库设置、rulesets 或 release-please workflow permissions，必须使用远端 apply 模式：
+
+   ```bash
+   npx dayu-harness finalize --target . --github-remote apply --json
+   ```
+
+   远端 apply 会把已启用能力 manifest 中的 `remote_actions` 传给受控脚本。不要用 `gh repo create --push`、手写 `git push origin main` 或 API 手工创建默认分支替代它；本地 `.github/rulesets/*.json` 只有经过 GitHub Rulesets API 写入并回读后才算远端规则生效。若跳过远端 apply，报告必须保持 partial，不能宣称远端 E2E 成功。
+
    如果当前本地构建尚未暴露 `finalize` 子命令，`/dayu-harness` Skill 必须按完成报告模板调用等价脚本和 Git/GitHub 流程完成同等收尾。
 
 5. 查看治理地图：
@@ -74,6 +82,7 @@ node dist/cli/main.js --help
 - `init` 默认 dry-run。
 - `apply` 检测到漂移时默认返回 `conflict`，不会覆盖用户修改。
 - `apply` 只代表本地写入完成，不代表流程完成；运行时必须继续执行 `finalize`，不能把验证、提交、远端同步或 E2E 留给用户稍后手动处理。
+- 启用 GitHub 远端动作后，`finalize --github-remote skip` 只允许作为明确的 partial 收尾；不能把本地 ruleset JSON、workflow 文件或语法检查说成远端配置已经应用。
 - `--force` 只在显式传入时覆盖漂移文件。
 - `--prune-orphans` 只删除 `.dayu-harness/managed-paths.json` 中记录过、且不再属于当前配置的托管路径。
 - 每次写入前会记录 `.dayu-harness/journal.jsonl` preimage，并用 `.dayu-harness/apply.lock` 阻止并发 apply。

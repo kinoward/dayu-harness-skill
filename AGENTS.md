@@ -46,6 +46,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
 - [tests/unit/phase2-cli.test.ts](tests/unit/phase2-cli.test.ts) - Phase 2 全量 manifest、apply、status、repair 和 orphan 清理测试
+- [tests/unit/governance-deterministic.test.ts](tests/unit/governance-deterministic.test.ts) - dayu-format、Git hooks、GitHub validators、release policy 和 ruleset contract 确定性治理测试
 - [tests/smoke/dayu-harness-profile.sh](tests/smoke/dayu-harness-profile.sh) - local-fast / remote-smoke / remote-release 分层测试入口
 
 目录索引变化时，必须同步更新本区块。README 面向使用者，不维护完整仓库目录树；如目录变化影响使用方式或对外说明，再同步更新 [README.md](README.md) 的简版介绍。
@@ -315,6 +316,7 @@ npm run test:phase1c -- --test-reporter=spec
 npm run test:phase1d -- --test-reporter=spec
 npm run test:phase1e -- --test-reporter=spec
 npm run test:unit -- --test-reporter=spec
+npm run test:governance
 npx tsc --noEmit
 bats tests/unit/test-architecture-contracts.bats
 bats tests/unit/test-audit.bats
