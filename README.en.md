@@ -6,7 +6,7 @@
 
 # Dayu Harness Skill
 
-### *“Turn one-off AI collaboration prompts into long-running repository governance.”*
+### *“Write project rules into the repository so governance keeps working after the tool leaves.”*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
@@ -26,28 +26,22 @@
 <table>
 <tr><td align="left">
 
-🤖 &nbsp;Has your project already started letting agents join development, review, troubleshooting, and documentation maintenance?<br>
-📚 &nbsp;Are your rules still scattered across chat logs, PR comments, team conventions, and old documents?<br>
-🧭 &nbsp;Do you want the project to keep knowing how to collaborate, check, and retain experience after the Skill is removed?
+🧭 &nbsp;Are your project rules still scattered across chat logs, PR comments, spoken conventions, and old docs?<br>
+🧰 &nbsp;Do you want one entrypoint for commits, PRs, issues, releases, and quality checks?<br>
+📦 &nbsp;Do you want the tool to be removable after setup while the rules keep working in the project?
 
 </td></tr>
 </table>
 
-### ✨ Dayu Harness can handle these problems.
+### ✨ Dayu Harness deploys those rules into your repository.
 
 <br>
 
-From **one-off prompts to repository-level governance**, so rules no longer stay trapped in a single conversation.
+[🧭 Introduction](#-introduction) · [🧩 Prerequisites](#-prerequisites) · [🚀 Quick Start](#-quick-start) · [🛠️ Five Function Areas](#-five-function-areas)
 
-Chat logs · PR comments · team conventions · old documents · troubleshooting experience can all become reviewable project assets.
+[🔁 CLI Framework](#-cli-framework) · [📦 Written Files](#-written-files) · [🧭 How To Choose](#-how-to-choose) · [🌐 Bilingual And Compatibility](#-bilingual-and-compatibility)
 
-**Maps, guides, check scripts, and automation feedback** go to their proper places, so the project knows how to collaborate, check, and retain knowledge.
-
-<br>
-
-[🧭 Introduction](#-introduction) · [🚀 Quick Start and Use](#-quick-start-and-use) · [📦 What Will Be Generated](#-what-will-be-generated) · [🌐 Bilingual Deployment](#-bilingual-deployment)
-
-[📁 Project Structure](#-project-structure) · [🔎 More Details](#-more-details) · [📚 References](#-references) · [🤝 Contributing](#-contributing) · [⭐ Star History](#-star-history)
+[📁 Project Structure](#-project-structure) · [📚 More Docs](#-more-docs) · [🤝 Contributing](#-contributing) · [⭐ Star History](#-star-history)
 
 </div>
 
@@ -55,70 +49,61 @@ Chat logs · PR comments · team conventions · old documents · troubleshooting
 
 ## 🧭 Introduction
 
-Your project may already be letting agents participate in development, review, troubleshooting, and documentation maintenance, but are its rules still scattered across chat logs, PR comments, team conventions, and old documents?
+Dayu Harness Skill is a repository governance deployment tool. It writes project rules, documentation structure, check scripts, Git hooks, GitHub Actions, and common configuration into the target repository, so those rules can be versioned, reviewed, and moved with the project.
 
-Dayu Harness Skill is designed for [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)-style project governance. It is not about making one Agent obey better in one conversation; it deploys long-term rules into the target repository, making `AGENTS.md`, `docs/`, hooks, CI, and maintenance scripts the actual authority for collaboration.
+It is not a long-running service, and it is not a prompt pack that only works inside one chat window. After initialization or maintenance, you can remove the tool installation directory; the long-lived source of truth is the target project’s `AGENTS.md`, `docs/`, `.husky/`, `.github/`, config files, and state records.
 
-The name “Dayu” comes from Great Yu’s flood-control story: do not block the current at one point, but guide, divide, and establish long-term order. This Skill follows the same goal: convert one-off prompts, constraints, and experience into versioned, reviewable, and portable governance assets.
+It fits these situations:
 
-## 🎯 When It Fits
+- A new project wants a clear project entrypoint, documentation skeleton, and baseline Git rules from day one.
+- An existing project has scattered docs, hooks, CI, or commit rules that need one maintainable structure.
+- A team wants shared rules for commits, PRs, issues, releases, and quality checks instead of repeated manual reminders.
+- A project needs the same repository rules across Claude Code, Codex, Cursor, Copilot, and similar tools.
 
-- A new project wants an `AGENTS.md` root index, layered docs, and baseline engineering constraints from day one.
-- An existing project has scattered docs, hooks, CI, or commit rules that need to be fused into a maintainable governance system.
-- A team wants AI collaboration experience to persist instead of staying in unsearchable chat logs.
-- A project needs portable rules across Claude Code, Codex, and general Agent Skills clients.
+## 🧩 Prerequisites
 
-## 🚀 Quick Start and Use
+For basic use, prepare:
 
-Install this Skill only into the target repository that needs governance. Do not install it globally, and do not commit the Skill installation directory into the target project. Dayu Harness Skill is a one-time scaffold, fuse, diagnose, and maintenance entrypoint; after use it can be removed, while the long-lived effect remains in the target project’s `AGENTS.md`, `docs/`, hooks, CI, and check scripts.
+- Git: initializes repositories, installs hooks, detects the default branch, and commits governance files.
+- Node.js LTS: runs `npx dayu-harness` and installs governance tooling.
+- npm / npx: provided by Node.js, used to run the CLI and install required local check dependencies.
+- jq: used by environment check scripts to read JSON configuration.
 
-### 🧰 Phase 2 CLI Engine
+Prepare as needed:
 
-If you only need the deterministic execution layer, use the CLI directly after the npm package is published:
+- Python 3: used when PR, issue, or test-policy checks are enabled.
+- PyYAML: used when GitHub workflow YAML validation is needed.
+- GitHub CLI `gh`: required for GitHub repository, PR, issue, branch protection, or release-related features, with `gh auth login` completed first.
+
+Note: Node/npm are mainly used to run governance tools and local checks. Your application itself does not have to be a Node.js app. If the target project lacks `package.json`, the tool will prompt for initialization only when needed.
+
+## 🚀 Quick Start
+
+If you only want the CLI:
 
 ```bash
 cd <target-project>
-npx dayu-harness init --target .          # dry-run by default
-npx dayu-harness init --target . --apply  # write config and deploy default capabilities
-npx dayu-harness status --target .
+npx dayu-harness init --target .          # preview only by default
+npx dayu-harness init --target . --apply  # write default governance content after confirmation
+npx dayu-harness status --target .        # inspect current governance status
 ```
 
-For local development or pre-publish verification in this repository, build first and run the dist entry directly:
-
-```bash
-npm install --cache .npm-cache
-npm run build
-node dist/cli/main.js --help
-```
-
-The CLI supports `init`, `apply`, `merge`, `generate`, `repair`, `status`, `diagnose`, and `validate`. See [docs/configuration.md](docs/configuration.md) for the config contract and [docs/getting-started.md](docs/getting-started.md) for the quick start.
-
-### ⚡ Recommended: Vercel skills CLI
+If you want guided setup through the Skill entrypoint:
 
 ```bash
 cd <target-project>
 npx skills add kinoward/dayu-harness-skill
 ```
 
-If you want to target a specific client explicitly:
-
-```bash
-# Claude Code -> .claude/skills/
-npx skills add kinoward/dayu-harness-skill -a claude-code
-
-# Codex -> .agents/skills/
-npx skills add kinoward/dayu-harness-skill -a codex
-```
-
-After installation, open your Agent client in the target project and enter:
+After installation, enter this in a client that supports Skills:
 
 ```text
 /dayu-harness
 ```
 
-Then follow the prompts to initialize, fuse existing rules, diagnose project completeness, or maintain current governance content. The Skill analyzes repository state first, then uses the same Phase 2 CLI for local deterministic deployment, merging, generation, repair, and validation; existing hooks, CI, lint, and release configs receive merge plans instead of being overwritten directly.
+The tool first analyzes the target project, then guides initialization, existing-config fusion, completeness diagnosis, or drift repair. Existing hooks, CI, lint, and release config are not overwritten by default; the tool presents a preview or merge proposal first.
 
-After use, remove it with:
+After use, you can remove the Skill installation directory:
 
 ```bash
 npx skills remove dayu-harness
@@ -160,58 +145,103 @@ rm -rf .agents/skills/dayu-harness
 
 </details>
 
-## 📦 What Will Be Generated
+## 🛠️ Five Function Areas
 
-Dayu Harness Skill organizes project collaboration rules into the target repository. Common outputs include:
+| Area | What It Includes | When To Enable It |
+| --- | --- | --- |
+| Initialization and deployment | Project entry indexes, documentation skeleton, maintenance scripts, `.gitignore`, project status snapshot | New projects, or existing projects that need one entrypoint |
+| Rule deployment | Commit conventions, PR/issue conventions, branch protection, release version rules, test strategy | Teams that want rules in the repository instead of spoken convention |
+| Automatic checks | commit hook, pre-push hook, GitHub Actions, lint/format, fixed-format renderer | Projects that want problems caught before commit, push, PR, or release |
+| Fusion and repair | Existing-config diff preview, keep/replace/skip strategy, drift diagnosis and repair | Existing projects with docs, hooks, CI, or lint config already present |
+| Status and completion | Status view, consistency validation, precise commit, remote sync, and test artifact cleanup | After writing files, when you need to confirm governance works |
 
-- A root `AGENTS.md` governance entrypoint and required subdirectory indexes.
-- Collaboration guides, maintenance instructions, and check scripts under `docs/harness/`.
-- Git hooks, CI workflows, commit conventions, PR guidelines, and quality check configs.
-- The `dayu-format.mjs` fixed-format renderer for deterministic PR bodies, issue bodies, and commit messages.
-- Long-lived knowledge directories such as `docs/design-docs/`, `docs/troubleshooting/`, and `docs/references/`.
-- Repository settings policy docs, Issue dependency guidance, configurable TDD gate strategy files, and GitHub remote settings sync only after user confirmation.
-- `docs/product-specs/project-status.md` as a short project status snapshot entry point.
+Default content focuses on baseline governance; GitHub, release automation, and Node.js quality tooling are enabled as needed.
 
-These files stay in the target project and become the authority for future collaboration.
+## 🔁 CLI Framework
 
-## 🌐 Bilingual Deployment
+The CLI handles deterministic execution: read config, plan written content, deploy files, record state, and check results. Common commands are grouped by purpose:
 
-Dayu Harness Skill uses Chinese as the source language and recommends Chinese deployment by default; English content is mirrored from the Chinese semantics to help English users understand, not to rewrite the Chinese intent in reverse.
+| Group | Commands | Purpose |
+| --- | --- | --- |
+| Config and deployment | `init`, `apply` | Create config, preview content, write governance content |
+| Fusion and generation | `merge`, `generate` | Handle existing projects, or render preview content only |
+| Repair and checks | `repair`, `status`, `diagnose`, `validate` | Repair drift, inspect status, check completeness |
+| Completion | `finalize` | Verify, commit, sync remote when requested, and clean temporary artifacts |
 
-When running `/dayu-harness`, interactive questions and options are shown bilingually in Chinese and English, so English users can still choose correctly. Deployment writes only one language into the target project, defaults to Chinese, and writes English artifacts only when English is explicitly selected.
+Overall flow:
 
-`templates/` is the Chinese source template tree, and `templates.en/` is the English mirror template tree. The two directories stay isomorphic; maintainers can use the drift check script to confirm the README mirror, template trees, capability mappings, and bilingual Q&A remain aligned.
+```mermaid
+flowchart TD
+  A["Choose target project"] --> B["Generate or read dayu.config.yaml"]
+  B --> C["Preview governance content to write"]
+  C --> D{"User confirms?"}
+  D -->|No| E["Stop without writing"]
+  D -->|Yes| F["Write AGENTS.md, docs, hooks, CI, and config"]
+  F --> G["Record managed paths and state"]
+  G --> H["Run status, diagnosis, and validation checks"]
+  H --> I["Commit, sync remote, and clean up as needed"]
+  I --> J["Output completion report"]
+```
 
-The Q&A flow is grouped into blocking decision blocks, including version conflicts, GitHub remote creation, `.husky`/workflow merge, tracked `.claude` handling, and protected-branch scenarios, and always uses fixed bilingual options without requiring manual command input.
+More command details are in [docs/getting-started.md](docs/getting-started.md) and [docs/configuration.md](docs/configuration.md).
+
+## 📦 Written Files
+
+Common written files include:
+
+- `AGENTS.md` and required subdirectory indexes: entrypoints for project rules and docs.
+- `docs/harness/`: maintenance instructions, collaboration guides, check scripts, and review materials.
+- `.husky/`: local hooks for commit messages, push protection, quality checks, and related workflows.
+- `.github/`: PR/issue checks, release automation, repository policy, and ruleset templates.
+- Config files such as `commitlint.config.cjs`, `eslint.config.cjs`, `.prettierrc`, and `.lintstagedrc.json`.
+- Long-lived documentation directories such as `docs/design-docs/`, `docs/troubleshooting/`, `docs/references/`, `docs/product-specs/`, and `docs/archive/`.
+- `.dayu-harness/managed-paths.json`: records long-lived paths managed by the tool for later diagnosis, repair, and precise commits.
+
+Temporary locks, runtime logs, and caches are not committed as long-lived governance assets.
+
+## 🧭 How To Choose
+
+Dayu Harness borrows ideas from gstack, Spec Kit, OpenSpec, and related projects, but it has a different target. This comparison helps decide when each tool is useful.
+
+| Project | Better For | How Dayu Harness Differs |
+| --- | --- | --- |
+| [gstack](https://github.com/garrytan/gstack) | Organizing Claude Code into product, design, review, QA, and release workflows | Dayu does not provide a full workflow team; it writes project rules and check assets into the repository so they last |
+| [GitHub Spec Kit](https://github.github.com/spec-kit/index.html) | Organizing feature development around specs, plans, tasks, and implementation | Dayu does not replace spec-driven development; it adds repository entrypoints, hooks, CI, health checks, and existing-project fusion |
+| [OpenSpec](https://openspec.dev/) | Managing requirement evolution with lightweight specs and change directories | Dayu does more than manage requirement specs; it deploys checkable, repairable, portable project governance assets |
+
+Choose this way:
+
+- Need stronger personal or team workflow orchestration: start with gstack.
+- Need a complete spec workflow for new features: start with Spec Kit.
+- Need lightweight requirement changes reviewed with code: start with OpenSpec.
+- Need rules, docs, hooks, CI, and check scripts written into the repository: use Dayu Harness.
+
+These tools can be combined. Dayu Harness focuses on the project’s own long-lived rules, without requiring you to abandon your existing development flow.
+
+## 🌐 Bilingual And Compatibility
+
+Dayu Harness uses Chinese as the source language and provides mirrored English documentation and English deployment templates. When running `/dayu-harness`, key questions and options are shown in Chinese and English; deployment writes one language into the target project, defaults to Chinese, and writes English content only when explicitly selected.
+
+It stays neutral across coding assistants: the long-lived target-project assets are Markdown, Shell hooks, YAML workflows, and common configuration files. After the tool is removed, project rules remain in the repository.
 
 ## 📁 Project Structure
 
-The README only shows a high-level structure; the complete directory tree and ownership boundaries are maintained in AGENTS.md as the repository's long-lived governance source of truth.
+The README only shows a high-level structure; the full directory tree and maintenance rules are in [AGENTS.md](AGENTS.md).
 
-- Entry points & indexes: `README.md`, `README.en.md`, `AGENTS.md` (including subdirectory indexes)
-- Capabilities, schema, architecture contracts & deployment engine: `capabilities/`, `src/`, `locales/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
-- Maintainer-local validation toolchain: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`, `tests/unit/phase2-cli.test.ts`
-- Outputs & maintenance materials: `docs/`, `marketing/`, `tests/`
-- Publishing & repository automation: `.github/workflows/ci.yml`, `.github/workflows/release-please.yml`, `.github/workflows/npm-publish.yml`, `.github/workflows/update-contributors.yml`; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
+- Entry points and descriptions: `README.md`, `README.en.md`, `AGENTS.md`, `SKILL.md`
+- CLI and config: `src/`, `package.json`, `tsconfig.json`
+- Deployment materials: `templates/`, `templates.en/`, `assets/`, `locales/`
+- Governance list and scripts: `capabilities/`, `scripts/`
+- Usage and maintenance docs: `docs/`, `references/`
+- Tests and fixtures: `tests/`
 
-Full repository tree is in [AGENTS.md](AGENTS.md).
+## 📚 More Docs
 
-## 🔎 More Details
-
-- To understand the Skill behavior definition: read [SKILL.md](SKILL.md).
-- To use the CLI directly: read [docs/getting-started.md](docs/getting-started.md) and [docs/configuration.md](docs/configuration.md).
-- To understand repository maintenance rules, capability lists, script flow, and test baseline: read [AGENTS.md](AGENTS.md).
-- To understand the current Phase 1b-1e plan, progress, and QA lessons: read [docs/phase1-progress.md](docs/phase1-progress.md).
-- To understand compatibility across Agent clients: read [references/agent-compatibility.md](references/agent-compatibility.md).
-
-## 📚 References
-
-- [WeChat Official Account “浮之静”: Deep Analysis: Harness Engineering](https://mp.weixin.qq.com/s/-mgf8K7XZrTKoD0pMOIn3w): reference for project governance and AI collaboration concepts.
-- [OpenAI: Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/): philosophical source for this Skill.
-- [deusyu/harness-engineering](https://github.com/deusyu/harness-engineering): reference for README information layering, concept-first narrative, and AGENTS.md progressive disclosure practice.
-- [Martin Fowler: Harness Engineering](https://martinfowler.com/articles/harness-engineering.html): reference for the Guides and Sensors cybernetic framework.
-- [agentsmd/agents.md](https://github.com/agentsmd/agents.md): AGENTS.md open format specification.
-- [microsoft/skills](https://github.com/microsoft/skills): skill declaration and client compatibility practice.
+- [docs/getting-started.md](docs/getting-started.md): CLI quick start.
+- [docs/configuration.md](docs/configuration.md): `dayu.config.yaml` configuration reference.
+- [docs/troubleshooting.md](docs/troubleshooting.md): common troubleshooting.
+- [references/agent-compatibility.md](references/agent-compatibility.md): compatibility across clients.
+- [AGENTS.md](AGENTS.md): complete maintenance entrypoint for this repository.
 
 ## 🤝 Contributing
 
@@ -219,8 +249,7 @@ Issues and PRs are welcome: bug reports, usage feedback, compatibility adaptatio
 
 > [!TIP]
 >
-> We hope this repository becomes a technical sharing project: preserving good practices, failure experience, check scripts, and governance constraints from AI collaboration so more projects can reuse them.
-> We also welcome product feature and usage feedback to help improve Dayu Harness Skill.
+> We want this repository to be a reusable project governance tool: preserving rules, check scripts, documentation entrypoints, and long-term maintenance experience so more projects can install, review, and adjust them directly.
 >
 > **Organization maintainer:** [@kinoward](https://github.com/kinoward)
 
@@ -259,6 +288,6 @@ Issues and PRs are welcome: bug reports, usage feedback, compatibility adaptatio
 
 <p><strong>MIT License</strong> © <a href="https://github.com/kinoward">kinoward</a></p>
 
-<sub>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</sub>
+<sub>Made for projects that want repository rules to keep working after setup is done.</sub>
 
 </div>
