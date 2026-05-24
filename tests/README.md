@@ -17,6 +17,7 @@
 - `phase1c-architecture.test.ts`：验证 CLI 命令树、部署 DAG、概念依赖图和 Frontend/Tool/Product 三层分离契约。
 - `phase1d-cli.test.ts`：验证 TypeScript CLI 垂直切片的 dry-run JSON、apply、no-op、冲突检测、init roundtrip、diagnose、validate 和 Phase 2 generate 原型。
 - `phase1e-cli-scope.test.ts`：验证 Phase 1e 公开 CLI 收口、init 默认 dry-run、`apply --only` 和原子写入。
+- `phase2-cli.test.ts`：验证全量 manifest registry、完整能力 apply、repair、merge replace、orphan pruning 和 journal replay。
 
 其中新增环境依赖前置断言，覆盖：
 - `scripts/ensure-environment.sh --check` 的标准 JSON 字段契约；
@@ -142,7 +143,7 @@ bats tests/unit
 
 当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。2026-05-24 的本地基线：
 
-- `npm run test:unit -- --test-reporter=spec`：33/33 通过。
+- `npm run test:unit -- --test-reporter=spec`：43/43 通过。
 - `npx tsc --noEmit`：通过。
 - `TMPDIR=.tmp bash scripts/check-i18n-drift.sh --json`：8/8 通过。
 - `TMPDIR=.tmp bats tests/unit`：206/206 通过；真实 Claude CLI smoke 仍需显式设置 `RUN_CLAUDE_I18N_SMOKE=1`。

@@ -1,12 +1,12 @@
 # Phase 1 进度、计划与经验沉淀
 
-本文记录 Dayu Harness Skill 自身的当前工程状态。它不是部署到目标项目的模板，也不是使用者安装指南；它服务维护者理解 Phase 1 已经完成什么、当前工具能做什么、后续应该怎样推进。
+本文记录 Dayu Harness Skill 自身的当前工程状态。它不是部署到目标项目的模板，也不是使用者安装指南；它服务维护者理解 Phase 1/Phase 2 已经完成什么、当前工具能做什么、后续应该怎样推进。
 
 `docs/plan.md` 保留早期设计追溯和历史语境。当前事实以本文件、`SKILL.md`、`AGENTS.md`、`capabilities/*.json`、`src/` 和测试结果为准。
 
 ## 当前状态
 
-截至 2026-05-24，本分支已把 Phase 1 从文档设计推进到可运行的本地 TypeScript CLI 垂直切片：
+截至 2026-05-24，本分支已把 Phase 1 从文档设计推进到 Phase 2 可实践 CLI：
 
 | 阶段 | 状态 | 当前事实 |
 | --- | --- | --- |
@@ -14,6 +14,7 @@
 | Phase 1c | 已落地 | CLI 命令树、部署 DAG、概念依赖图和 Frontend/Tool/Product 三层分离已固化为 `src/architecture/` 契约。 |
 | Phase 1d | 已落地 | `src/cli/` 提供本地 CLI 垂直切片，能对 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 进行规划、写入、诊断和校验。 |
 | Phase 1e | 已落地 | 公开 CLI 收敛为 `init`、`apply`、`diagnose`、`validate`；`init` 默认 dry-run，`apply --only` 支持能力闭包部署，文件写入使用原子写入。 |
+| Phase 2 | 已落地 | 当前 20 个 manifest 全部迁移到 v2 字段；CLI 公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 发布链路配置。 |
 | QA 修复 | 已落地 | `scaffold.sh` 和 pre-push snippet 不再假设 `${TMPDIR:-/tmp}` 可写，会回退到仓库或目标项目内的可写临时目录。 |
 
 当前可直接使用的本地 CLI 入口：
@@ -22,12 +23,16 @@
 npm run dayu -- --help
 npm run dayu -- init --target <target> --json
 npm run dayu -- init --target <target> --apply --json
+npm run dayu -- status --target <target> --config <target>/dayu.config.yaml --json
+npm run dayu -- merge --target <target> --config <target>/dayu.config.yaml --dry-run --json
+npm run dayu -- generate --target <target> --config <target>/dayu.config.yaml --only core --json
+npm run dayu -- repair core --target <target> --config <target>/dayu.config.yaml --json
 npm run dayu -- apply --target <target> --config <target>/dayu.config.yaml --dry-run --json
 npm run dayu -- diagnose --target <target> --config <target>/dayu.config.yaml --json
 npm run dayu -- validate --target <target> --config <target>/dayu.config.yaml --json
 ```
 
-当前仍保留 `scripts/scaffold.sh` 作为完整 Skill 流程入口。TypeScript CLI 只覆盖 Phase 1 试点能力，不替代完整脚手架、融合、GitHub 远端同步和 release 流程。
+当前仍保留 `scripts/scaffold.sh` 作为完整 Skill 交互流程和 GitHub 远端 E2E 的兼容入口。TypeScript CLI 是 Phase 2 的确定性执行层，覆盖当前 20 个 manifest 的本地部署、融合、生成、修复、诊断和验证；真实 GitHub 远端同步和发布验证仍通过 profile smoke 显式开启。
 
 ## 覆盖图
 
@@ -36,28 +41,21 @@ npm run dayu -- validate --target <target> --config <target>/dayu.config.yaml --
 | manifest v2 与 `dayu.config.yaml` schema | `docs/phase1b-schema.md`、`AGENTS.md`、`SKILL.md`、`src/schemas/` | `tests/README.md` 中的 Phase 1b 命令 | 暂无 | `docs/phase1b-schema.md` 与测试契约说明 |
 | CLI 命令树与部署 DAG | `docs/phase1c-architecture.md`、`src/architecture/` | `docs/phase1d-cli.md` 的本地运行命令 | 暂无 | `docs/phase1c-architecture.md` 的三层分离和依赖模型 |
 | TypeScript CLI 垂直切片 | `docs/phase1d-cli.md`、`docs/phase1e-cli-scope.md` | `README.md`、本文件和 `tests/README.md` 的命令入口 | 暂无 | `docs/scaffold-sh-spike.md` 解释 Bash 到 TypeScript 的迁移边界 |
-| 公开 CLI 收口 | `docs/phase1e-cli-scope.md` | `tests/README.md` 的 Phase 1e 测试入口 | 暂无 | `docs/phase1e-cli-scope.md` 解释 `merge` / `generate` 推迟到 Phase 2 的原因 |
+| Phase 2 CLI 产品化 | `docs/phase2-product.md`、`docs/getting-started.md`、`docs/configuration.md`、`docs/troubleshooting.md` | `README.md` 与 `tests/README.md` 的命令入口 | 暂无 | `docs/phase2-product.md` 解释状态机、事务语义和目标项目结构 |
 | 临时目录回退策略 | 本文件、`.gitignore`、`scripts/scaffold.sh` | `tests/README.md` 的 `.tmp` 约定和本文件的验证命令 | 暂无 | 本文件的 QA 经验沉淀 |
 | 当前验证基线 | `tests/README.md` | `tests/README.md` 的命令清单 | 暂无 | 本文件的验收说明 |
 
-Tutorial 缺口是有意延后：Phase 1 的目标是把契约和本地工具跑通，不先写面向新贡献者的完整教学。等 Phase 2 扩大能力覆盖并稳定 CLI 分发方式后，再补独立教程更合适。
+Tutorial 缺口仍是有意延后：Phase 2 已提供快速开始、配置和排障文档，但还没有面向新贡献者的完整教学。等 npm 首发和外部试用反馈稳定后，再补独立教程更合适。
 
 ## 维护者计划
 
 近期计划：
 
-1. 保持 Bash `scaffold.sh` 和 TypeScript CLI 的职责边界清晰：Bash 继续承载完整 Skill 运行路径，TypeScript CLI 继续收敛试点能力的确定性 planner / apply / diagnose / validate。
+1. 保持 Bash `scaffold.sh` 和 TypeScript CLI 的职责边界清晰：Bash 继续承载完整 Skill 交互和远端 E2E，TypeScript CLI 承载可测试的本地 planner / apply / merge / generate / repair / status / diagnose / validate。
 2. 每次修改 manifest v2、schema、CLI 命令、installer adapter 或部署 DAG，都同步更新对应 Phase 测试。
 3. 将 QA 中发现的环境假设转成测试，尤其是临时目录、hook stdin、符号链接 hook、原子写入失败清理。
 4. 只在目标项目实际部署内容变化时修改 `templates/`、`templates.en/`、`assets/` 和 `capabilities/`，避免把维护者测试记录误写进部署产物。
-
-Phase 2 候选范围：
-
-- 将更多 legacy capability 迁移到 manifest v2。
-- 公开或重设 `merge` / `generate` 的 CLI 语义。
-- 让 Skill 前端通过 `dayu.config.yaml` 调用 TypeScript CLI，而不是重复解释模板和能力依赖。
-- 设计 CLI 分发方式，再决定是否支持 `npx dayu-harness`。
-- 把 GitHub 远端同步、release 流程和完整融合策略接入同一套结构化输出契约。
+5. npm 首发前保持 `npm pack --dry-run`、`npm publish --dry-run` 和 production install smoke warning-free。
 
 ## QA 经验
 
@@ -88,7 +86,7 @@ TMPDIR=.tmp bats tests/unit
 TMPDIR=.tmp/review-nonwritable scripts/scaffold.sh .tmp/review-fallback-target --dry-run
 ```
 
-结果：本地 CLI smoke、33 个 TypeScript 单元测试、8 项 i18n drift 检查、206 个 Bats 测试全部通过；Claude CLI 真实交互 smoke 仍是 opt-in，不纳入默认本地基线。
+结果：本地 CLI smoke、43 个 TypeScript 单元测试、8 项 i18n drift 检查、206 个 Bats 测试全部通过；Claude CLI 真实交互 smoke 仍是 opt-in，不纳入默认本地基线。
 
 ## 不变边界
 

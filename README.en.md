@@ -74,13 +74,21 @@ Install this Skill only into the target repository that needs governance. Do not
 
 ### 🧰 Phase 2 CLI Engine
 
-If you only need the deterministic execution layer, use the CLI directly:
+If you only need the deterministic execution layer, use the CLI directly after the npm package is published:
 
 ```bash
 cd <target-project>
 npx dayu-harness init --target .          # dry-run by default
 npx dayu-harness init --target . --apply  # write config and deploy default capabilities
 npx dayu-harness status --target .
+```
+
+For local development or pre-publish verification in this repository, build first and run the dist entry directly:
+
+```bash
+npm install --cache .npm-cache
+npm run build
+node dist/cli/main.js --help
 ```
 
 The CLI supports `init`, `apply`, `merge`, `generate`, `repair`, `status`, `diagnose`, and `validate`. See [docs/configuration.md](docs/configuration.md) for the config contract and [docs/getting-started.md](docs/getting-started.md) for the quick start.

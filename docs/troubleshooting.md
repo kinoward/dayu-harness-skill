@@ -2,6 +2,8 @@
 
 本页记录 Dayu Harness CLI 的常见问题和排查方式。
 
+以下 `npx dayu-harness ...` 命令假设 npm 包已经发布。发布前在本仓库本地验证时，可先运行 `npm run build`，再将命令中的 `npx dayu-harness` 替换为 `node dist/cli/main.js`。
+
 ## `npm install` 因用户级 cache 权限失败
 
 现象：

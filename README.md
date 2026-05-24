@@ -74,13 +74,21 @@ Dayu Harness Skill 面向 [Harness Engineering](https://openai.com/zh-Hans-CN/in
 
 ### 🧰 Phase 2 CLI 引擎
 
-如果只需要确定性执行层，可以直接使用 CLI：
+如果只需要确定性执行层，npm 包发布后可以直接使用 CLI：
 
 ```bash
 cd <target-project>
 npx dayu-harness init --target .          # 默认 dry-run
 npx dayu-harness init --target . --apply  # 写入配置并部署默认能力
 npx dayu-harness status --target .
+```
+
+本仓库本地开发或发布前验证时，先构建再直接运行 dist 入口：
+
+```bash
+npm install --cache .npm-cache
+npm run build
+node dist/cli/main.js --help
 ```
 
 CLI 支持 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。配置契约见 [docs/configuration.md](docs/configuration.md)，快速开始见 [docs/getting-started.md](docs/getting-started.md)。

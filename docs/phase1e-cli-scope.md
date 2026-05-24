@@ -29,9 +29,9 @@ Phase 2 后，当前 CLI 已扩展为 8 个公开命令，并迁移当前仓库�
 
 ## 验证
 
-Phase 1e 入口测试位于 [tests/unit/phase1e-cli-scope.test.ts](../tests/unit/phase1e-cli-scope.test.ts)，覆盖：
+Phase 1e 入口测试位于 [tests/unit/phase1e-cli-scope.test.ts](../tests/unit/phase1e-cli-scope.test.ts)，并在 Phase 2 后继续承担 CLI 公开面回归，覆盖：
 
-- `--help` 只展示 4 个公开命令。
+- Phase 2 public CLI 展示 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。
 - `init` 默认 dry-run，`init --apply` 才写入。
 - `apply --only git.commit-format` 部署 `core`、`git.hooks` 和 `git.commit-format`，不部署 `ai.execution`。
 - `diagnose` JSON 输出包含 capability RSE summary。
