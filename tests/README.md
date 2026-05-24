@@ -13,6 +13,7 @@
 - `test-architecture-contracts.bats`：验证 Skill 包结构、capability manifest、模板索引、脚手架行为和脚本 JSON 契约。
 - `test-audit.bats`：验证 `audit.sh`、`validate.sh`、`check-consistency.sh` 的核心诊断行为。
 - `test-diff-helper.bats`：验证 diff/merge 描述辅助脚本。
+- `governance-deterministic.test.ts`：TS/JS 确定性治理入口，用于覆盖 dayu-format、commit-msg、默认分支/发布标签 pre-push、Issue/PR validator、release policy 与 ruleset contract。
 - `phase1b-schema.test.ts`：验证 manifest v2、`dayu.config.yaml` schema、key-based i18n catalog、路径安全和 Phase 1 兼容契约。
 - `phase1c-architecture.test.ts`：验证 CLI 命令树、部署 DAG、概念依赖图和 Frontend/Tool/Product 三层分离契约。
 - `phase1d-cli.test.ts`：验证 TypeScript CLI 垂直切片的 dry-run JSON、apply、no-op、冲突检测、init roundtrip、diagnose、validate 和 Phase 2 generate 原型。
@@ -141,12 +142,13 @@ npx tsc --noEmit
 bats tests/unit
 ```
 
-当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。2026-05-24 的本地基线：
+当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。2026-05-25 的本地基线：
 
-- `npm run test:unit -- --test-reporter=spec`：43/43 通过。
+- `npm run test:unit -- --test-reporter=spec`：66/66 通过。
+- `npm run test:governance`：TS 7/7、Bats 188/188 通过。
 - `npx tsc --noEmit`：通过。
 - `TMPDIR=.tmp bash scripts/check-i18n-drift.sh --json`：8/8 通过。
-- `TMPDIR=.tmp bats tests/unit`：206/206 通过；真实 Claude CLI smoke 仍需显式设置 `RUN_CLAUDE_I18N_SMOKE=1`。
+- 完整 `TMPDIR=.tmp bats tests/unit` 仍作为维护者全量命令；真实 Claude CLI smoke 需显式设置 `RUN_CLAUDE_I18N_SMOKE=1`。
 - `npm run dayu -- init/diagnose/validate/apply` 的临时目标 smoke 通过，二次 `apply --dry-run` 无变更。
 - `TMPDIR` 指向不可写目录时，`scripts/scaffold.sh --dry-run` 能回退到目标内 `.tmp` 并正常输出计划。
 
