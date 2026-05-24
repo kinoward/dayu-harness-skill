@@ -10,11 +10,11 @@
 
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [CLAUDE.md](CLAUDE.md) - 任务路由入口
-- [docs/AGENTS.md](docs/AGENTS.md) - core docs 目录索引
-- [docs/harness/AGENTS.md](docs/harness/AGENTS.md) - core：规则、反馈检查、维护流程
+- [docs/AGENTS.md](docs/AGENTS.md) - 文档目录索引
+- [docs/harness/AGENTS.md](docs/harness/AGENTS.md) - 治理规则、反馈检查、维护流程
 - [docs/design-docs/AGENTS.md](docs/design-docs/AGENTS.md) - 默认：ADR 与设计决策
-- [docs/exec-plans/AGENTS.md](docs/exec-plans/AGENTS.md) - core：执行计划
-- [docs/generated/AGENTS.md](docs/generated/AGENTS.md) - core：自动生成资料索引
+- [docs/exec-plans/AGENTS.md](docs/exec-plans/AGENTS.md) - 执行计划
+- [docs/generated/AGENTS.md](docs/generated/AGENTS.md) - 自动生成资料索引
 - [docs/product-specs/AGENTS.md](docs/product-specs/AGENTS.md) - 默认：产品规格和项目上下文
 - [docs/references/AGENTS.md](docs/references/AGENTS.md) - 默认：外部资料和研究索引
 - [docs/troubleshooting/AGENTS.md](docs/troubleshooting/AGENTS.md) - 默认：排障知识库
@@ -50,25 +50,25 @@
 ## 当你准备创建或修改 PR
 
 > 触发：创建 PR、修正文案、CI 反馈失败
-- 若已启用 `github.pr` 且文件存在，请读取 `docs/harness/guides/pr-guidelines.md`
-- 若已启用 `github.pr` 且脚本存在，PR body 优先由 `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...` 生成，再通过 `gh pr create --body-file` 使用
+- PR 治理指南存在时，读取 `docs/harness/guides/pr-guidelines.md`
+- 固定格式 PR body 生成器存在时，PR body 优先由 `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...` 生成，再通过 `gh pr create --body-file` 使用
 - 关闭 issue 使用 GitHub closing keyword trailer，例如 `Closes #123`
 
 ## 当你发布版本、审阅 PR、排查环境
 
 > 触发：分支发布、审阅变更、进程/端口问题
-- 若已启用 `github.branch-protection` 且文件存在，请读取 `docs/harness/guides/branch-protection.md`
-- 若已启用 `release.versioning` 且文件存在，请读取 `docs/harness/guides/release-versioning.md`
-- 若已启用 `github.release-please` 且文件存在，请读取 `docs/harness/guides/release-please.md`
-- 若已启用 `github.pr` 且文件存在，请读取 `docs/harness/sensors/reviews/code-review-checklist.md`
-- 若已启用 `quality.practices` 且文件存在，请读取 `docs/harness/guides/dev-hygiene.md`
+- Git 主分支保护指南存在时，读取 `docs/harness/guides/branch-protection.md`
+- 发布版本与 Tag 保护指南存在时，读取 `docs/harness/guides/release-versioning.md`
+- 自动化版本发布指南存在时，读取 `docs/harness/guides/release-please.md`
+- PR 审查清单存在时，读取 `docs/harness/sensors/reviews/code-review-checklist.md`
+- 开发质量约束指南存在时，读取 `docs/harness/guides/dev-hygiene.md`
 
 ## 当你开始 AI 主导任务
 
 > 触发：AI 接手实现或执行
 - 读取 `docs/harness/guides/ai-execution.md`
 - 读取 `docs/harness/guides/ai-memory.md`
-- 若已启用 `quality.practices` 且文件存在，请读取 `docs/harness/guides/testing-strategy.md`
+- 测试策略指南存在时，读取 `docs/harness/guides/testing-strategy.md`
 
 ## 当你查阅知识库与项目上下文
 

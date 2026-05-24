@@ -16,6 +16,7 @@
 - 选项格式固定为 `[1] 中文选项 / English option`；默认项必须写明 `（默认，推荐）/ (default, recommended)`。
 - 问题正文使用两行或同段双语均可，但不能只显示中文，也不能只显示英文。
 - `description_nl`、dry-run、merge plan 或检查报告中的关键结论如要转成问题，也必须补充英文说明后再让用户选择。
+- 面向用户的运行时输出必须使用自然语言能力名，不展示 `core`、`git.commit-format`、`github.release-please` 等 capability key。维护者文档、manifest、`dayu.config.yaml`、CLI JSON、命令参数和调试日志可以保留 key；确认汇总、完成报告、提问标题和选项必须映射为自然语言名称。
 - 本节只约束 Skill 运行时问答，不属于部署到目标项目的治理内容。
 - 问答必须优先使用当前宿主已经暴露且可调用的原生交互能力（选择器、确认对话、计划审批控件或等价交互机制），不能默认把连续问题写成普通说明文本。
 - 如果宿主客户端没有暴露可调用的结构化交互能力，采用兼容降级：一次只提出一个阻塞问题，随后立即结束当前回复并等待用户输入；不得在同一轮继续执行命令、不得把语言选择、环境初始化、能力选择或 merge 策略合并成一个长问题，也不得声称已经打开原生交互控件。
@@ -89,8 +90,8 @@ The target project needs environment preparation first.
 After local initialization is confirmed, only confirm whether GitHub remote governance is needed; actual create/bind, commit, and sync must wait until deployment and capability validation have fully passed.
 
 ```markdown
-是否在部署验证通过后开启 GitHub 远端托管并同步初始化提交？
-Do you want to enable GitHub remote hosting and sync the initialization commit after deployment validation passes?
+是否在 apply 后的 finalize 验证通过后开启 GitHub 远端托管并同步初始化提交？
+Do you want to enable GitHub remote hosting and sync the initialization commit after post-apply finalize validation passes?
 
 [1] 开启 / Enable
 [2] 跳过 / Skip
@@ -112,24 +113,24 @@ Please choose the GitHub repository visibility.
 ```
 
 3. 运行 `scripts/github-remote.sh <project-root> --check` 解析可连接账户、origin、`owner/repo` 与本地/远端分支关系，但不写入远端。
-4. 先完成能力问答与 CLI dry-run/merge plan；用户确认后运行 `dayu-harness init --apply --json` 或 `dayu-harness apply --json` 完成本地部署。若需要远端同步，必须等本地 `validate/audit/check-consistency` 通过后，再显式运行远端辅助流程。
-5. CLI apply 不隐式创建提交、推送分支或修改 GitHub API。需要远端同步时，本地检查通过后再调用 `scripts/github-remote.sh <project-root> --apply` 或对应 smoke profile：远端缺默认分支、远端相同或本地领先则推送默认分支（仅首次创建默认分支时放行本地 pre-push 保护），远端领先或分叉则推送 `dayu-harness/init-*` 初始化分支并创建 PR；全程禁止 force push。
-6. 远端写入完成后，`scripts/github-remote.sh <project-root> --verify` 回读 repo settings、workflow permissions、rulesets 与默认分支状态。
+4. 先完成能力问答与 CLI dry-run/merge plan；用户确认后运行 `dayu-harness init --apply --json` 或 `dayu-harness apply --json` 完成本地部署。apply 成功后必须立即进入 `finalize`，不得把本地验证、提交、远端同步或 E2E 命令作为后续建议。
+5. CLI apply 不隐式创建提交、推送分支或修改 GitHub API；这些动作由 `finalize` 在 apply 通过后执行。`finalize` 必须先完成本地 `validate/audit/check-consistency`，再基于 `.dayu-harness/managed-paths.json` 精确 stage/commit；需要远端同步时继续调用 `scripts/github-remote.sh <project-root> --apply` 或对应 smoke profile：远端缺默认分支、远端相同或本地领先则推送默认分支（仅首次创建默认分支时放行本地 pre-push 保护），远端领先或分叉则推送 `dayu-harness/init-*` 初始化分支并创建 PR；全程禁止 force push。
+6. 远端写入完成后，`finalize` 必须回读 repo settings、workflow permissions、rulesets 与默认分支状态。启用 Issue/PR 能力时继续运行目标仓库 Issue -> PR E2E；启用 release-please 时继续运行真实 release 验证；验证后清理测试 Issue、测试 PR、测试分支和临时产物。
 
-默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入：
+默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入，并在面向用户的确认汇总中使用这些自然语言名称：
 
-- `core`
-- `git.commit-format`
-- `project.gitignore`
-- `ai.execution`
-- `ai.memory`
-- `knowledge.adr`
-- `knowledge.troubleshooting`
-- `knowledge.research`
-- `project.context`
-- `knowledge.archive`
+- 项目入口索引、文档维护说明和基础检查脚本
+- Git 提交格式约束和提交信息检查
+- 忽略文件配置
+- AI 执行边界和协作方式
+- AI 记忆边界与经验沉淀
+- 重要架构决策记录
+- 可复用排障知识
+- 研究资料记录
+- 项目背景和产品规格文档区
+- 历史内容归档区
 
-Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。GitHub remote/sync 只做前置检查和意图确认；GitHub Rulesets、release、quality/TDD 等可选能力必须先完成问答与 dry-run 确认，部署验证通过后再进入提交和远端同步。
+Git 相关能力默认启用；如果目标目录尚未初始化 Git，先说明 Git 约束已经纳入部署，但 hook 需要项目完成 Git/Husky 接入后才会实际触发。GitHub remote/sync 只做前置检查和意图确认；GitHub Rulesets、release、quality/TDD 等可选能力必须先完成问答与 dry-run 确认，apply 成功后由 `finalize` 继续完成验证、提交和远端同步。
 
 可选能力每项固定使用 3 个双语选项：[1] 启用 / Enable [2] 跳过 / Skip [3] 稍后配置 / Configure later。某些能力仍可附带 `自定义需求 / Custom request` 分支，但不作为默认选项。
 
@@ -162,8 +163,8 @@ A version baseline conflict was detected and deployment cannot continue with inc
 If remote governance is required, confirm permissions and sync strategy first; actual creation, commit, and push must wait until deployment and capability validation pass.
 
 ```markdown
-是否在部署验证通过后完成 GitHub 远端创建并同步初始化提交？
-Do you want to create/bind remote and sync the initialization commit after deployment validation passes?
+是否在 apply 后的 finalize 验证通过后完成 GitHub 远端创建并同步初始化提交？
+Do you want to create/bind remote and sync the initialization commit after post-apply finalize validation passes?
 
 [1] 验证通过后创建远端并同步 / Create/bind remote and sync after validation
 [2] 暂不创建远端，仅保留本地部署结果 / Defer remote creation and keep local deployment only
@@ -218,7 +219,7 @@ How should protected-branch policy be reconciled with existing rules?
 
 ## 专项能力提问示例（覆盖 /dayu-harness 关键能力）
 
-- `github.repository-settings`：仓库设置能力在用户选择启用后，只会在用户明确进入 GitHub remote apply 流程时同步远端 GitHub 仓库设置。请明确说明这一步需要 GitHub CLI 登录和仓库 administration 权限。
+- GitHub 仓库 PR 设置：用户选择启用后，只会在用户明确进入 GitHub remote apply 流程时同步远端 GitHub 仓库设置。请明确说明这一步需要 GitHub CLI 登录和仓库 administration 权限。维护者映射的 capability key 可以保留在配置或 JSON 中，但不要出现在用户可见提问标题里。
 
 ```markdown
 是否立即启用 GitHub 仓库 PR 设置（PR 自动合并、合并后删除分支）？
@@ -236,7 +237,7 @@ Before applying, `gh auth status` must pass and the current account must have ad
 [3] 稍后配置 / Configure later
 ```
 
-- `github.pr`：PR 质量治理只关注结构、签名、Troubleshooting 索引与 issue closing 位置；不做语言约束。
+- PR 协作治理：只关注结构、签名、Troubleshooting 索引与 issue closing 位置；不做语言约束。
 
 ```markdown
 是否启用 PR 协作治理（结构化 PR body、提交签名、review 检查与 issue closing 位置）？
@@ -251,7 +252,7 @@ Note: This capability does not enforce language. It checks structure, signatures
 [3] 稍后配置 / Configure later
 ```
 
-- `github.issue`：Issues 工作流按 `Depends on: #N` 维护前后置序；不打标签、不评论、不过滤语言。
+- Issue workflow：按 `Depends on: #N` 维护前后置序；不打标签、不评论、不过滤语言。
 
 ```markdown
 是否启用 Issue workflow（包含依赖关系校验）？
@@ -269,7 +270,7 @@ This capability does not add labels, does not post comments, and does not enforc
 [3] 稍后配置 / Configure later
 ```
 
-- `quality.tdd`：TDD gate 使用策略文件定义路径；未配置路径不应阻断。
+- PR TDD Gate：使用策略文件定义路径；未配置路径不应阻断。
 
 ```markdown
 是否启用 PR TDD Gate（按策略文件判定测试路径）？
@@ -288,9 +289,9 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 
 以下能力不询问是否启用，只在 dry-run 或已有配置冲突时展示影响范围与 merge plan。
 
-以下清单应从 manifest 字段生成或校验：`id`、`description_nl`、`dependencies`、`requires`、`acceptance`、`suggested_when`。
+以下清单应从 manifest 字段生成或校验：`id`、`description_nl`、`dependencies`、`requires`、`acceptance`、`suggested_when`。本表是维护者映射表，运行时向用户展示时只使用“提问重点”或自然语言能力名，不展示左列 key。
 
-| capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
+| 维护者 capability id（运行时不展示） | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
 | `git.commit-format` | 每次提交必须可追溯、可自动审查，减少后续 review 与回溯成本。 | 采用 commitlint + commit-msg hook snippet；如检测到已有 hook 会走逐文件确认与 merge plan。 | Git 项目；已有 hook 逐文件确认 |
 | `project.gitignore` | 仓库必须有基础忽略规则，避免把构建产物、依赖目录或本地缓存纳入版本控制。 | 从 `github/gitignore` 快照按项目内容动态选择 Node/Python/Go/Rust/Java/Dotnet 等模板并 merge，始终追加 Dayu 本地排除段。 | Git 项目；已有 `.gitignore` 走 merge plan |
@@ -304,7 +305,9 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 
 ## 可选治理能力提问清单
 
-| capability id | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
+本表是维护者映射表。实际向用户提问时，标题、确认汇总和完成报告只展示自然语言能力名，不展示左列 key。
+
+| 维护者 capability id（运行时不展示） | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
 | `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | CLI 部署仓库设置策略模板；只有用户明确进入远端同步 apply 流程时，才会通过 `scripts/github-remote.sh` 或等价 `gh api` 写入 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`，dry-run 和 skip 只预览/跳过。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、signature、troubleshooting index 与 issue closing 位置校验；不限制提交/正文语言。 | GitHub 项目 |
@@ -316,8 +319,8 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 | `quality.tdd` | 是否启用可配置的 PR TDD 门禁策略（基于路径/触发事件）？<br>Do you want configurable PR TDD gate policy (path/event based)? | 部署 TDD 策略检查脚本。未配置检查路径时不阻断。 | 启用时需在仓库确认策略文件 |
 | `github.release-please` | 是否希望发版过程可复用、可追踪并减少手工版本与发布过程出错？<br>Do you want reusable and traceable releases with fewer manual versioning and publishing mistakes? | 通过 `release-please` guide、workflow、策略文件和校验器联动：`docs/harness/guides/release-please.md`、`.github/workflows/release-please.yml`、`release-please-config.json`、`.release-please-manifest.json`、`.github/release-please-policy.json`、`.github/scripts/release_please_policy.py`。<br>Deploy `github.release-please` via linked deliverables: guide + workflow + config + manifest + policy + checker script; release filter policy is managed in the policy file. | 仅在 GitHub + `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning` 后建议；不自动启用 |
 
-项目状态快照（`docs/product-specs/project-status.md`）为 `project.context` 默认能力的一部分，不另外提问；在每次部署完成后可由用户/AI 补充。
-Project status snapshot (`docs/product-specs/project-status.md`) is part of default `project.context` and does not require a separate question; it can be filled by users or AI after completion.
+项目状态快照（`docs/product-specs/project-status.md`）为“项目背景和产品规格文档区”默认能力的一部分，不另外提问；在每次部署完成后可由用户/AI 补充。
+Project status snapshot (`docs/product-specs/project-status.md`) is part of the default project context documentation area and does not require a separate question; it can be filled by users or AI after completion.
 
 ## 确认汇总
 
@@ -327,15 +330,15 @@ Project status snapshot (`docs/product-specs/project-status.md`) is part of defa
 ## 确认汇总 / Confirmation Summary
 
 ### 启用的治理能力 / Enabled Governance Capabilities
-- 默认必选 / Required defaults → core、Git 提交/.gitignore、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
-- github.pr → 用户选择启用 PR 协作检查与交付结构约束 / The user chose to enable PR collaboration checks and delivery structure constraints
+- 默认必选 / Required defaults → 项目入口索引、Git 提交与忽略文件约束、AI 执行/记忆、ADR、排障、研究、项目上下文、归档
+- PR 协作检查与交付结构约束 / PR collaboration checks and delivery structure constraints
 
 ### 需要确认策略的已有文件 / Existing Files Requiring Strategy Confirmation
-- .husky/commit-msg → manual_required
-- .github/workflows/pr-lint.yml → manual_required
+- .husky/commit-msg → 需要人工确认 / requires manual confirmation
+- .github/workflows/pr-lint.yml → 需要人工确认 / requires manual confirmation
 
 ### 跳过的治理能力 / Skipped Governance Capabilities
-- quality.node-tooling（用户选择跳过 / user chose to skip）
+- Node.js 代码质量与格式化工具（用户选择跳过 / user chose to skip）
 
 [1] 确认 dry-run / Confirm dry-run
 [2] 调整选择 / Adjust choices
@@ -369,9 +372,26 @@ Merge plan:
 2. 用户选择 GitHub remote/sync 后，先运行 `gh auth status`；未登录则给出重试登录、暂不创建远端、跳过 GitHub 能力三类选项。
 3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，再运行 `scripts/github-remote.sh <project-root> --check` 解析远端、权限和分支关系，不写入远端。
 4. 继续询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力；更新或生成 `dayu.config.yaml` 后，用 `dayu-harness init --json`、`dayu-harness apply --dry-run --json` 或 `dayu-harness merge --json` 输出 JSON plan。CLI 会自动包含 `default=true` 的必选能力，并按 manifest 部署 DAG 展示本地写入计划。
-5. 用户确认可选治理能力和已有配置策略后，才执行 `dayu-harness init --apply --json`、`dayu-harness apply --json` 或 `dayu-harness merge --apply --strategy <keep|replace|skip> --json`。需要远端同步时，必须在本地验证通过后单独进入 remote apply；启用 GitHub Issue/PR 能力时，只有在用户确认远端 E2E 后才创建目标仓库测试 Issue/PR，并在验证后清理测试产物。
+5. 用户确认可选治理能力和已有配置策略后，才执行 `dayu-harness init --apply --json`、`dayu-harness apply --json` 或 `dayu-harness merge --apply --strategy <keep|replace|skip> --json`。写入成功后必须立即调用 `finalize`：先本地验证，再精确 stage/commit；需要远端同步时继续完成 remote apply/verify；启用 GitHub Issue/PR 能力时创建目标仓库测试 Issue/PR 并等待 workflow 成功；启用 release-please 时执行真实 release 验证；最后清理测试产物。不得把这些动作作为后续建议。
 6. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 CLI `merge` 产出融合预览，或用 `generate` 产出待写内容预览，再结合 diff-helper/manual review 说明差异。
 7. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`。
-8. 应用后执行 `docs/harness/sensors/scripts/validate.sh --json`；需要结构一致性时执行 `docs/harness/sensors/scripts/check-consistency.sh --json`；GitHub 能力启用时再执行 `scripts/github-remote.sh <project-root> --verify`。这些只属于结构/配置验证，不能替代 GitHub 端到端测试。
-9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验；目标仓库启用 `github.issue` + `github.pr` 且用户已确认远端同步 apply 时，Skill 必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，随后关闭测试 PR、关闭测试 Issue 并删除测试分支；`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR 合并和自动关闭；`remote-release` 只在显式开启时验证 release-please 的 `docs:`/`chore:` 负向边界和 `feat:` 正向触发；不得用 `workflow_dispatch` 作为远端成功标准。
-10. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项。
+8. `finalize` 中执行 `docs/harness/sensors/scripts/validate.sh --json`、`docs/harness/sensors/scripts/audit.sh --json` 和 `docs/harness/sensors/scripts/check-consistency.sh --json`；GitHub 能力启用时再执行 `scripts/github-remote.sh <project-root> --verify`。这些只属于结构/配置验证，不能替代 GitHub 端到端测试。
+9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验；目标仓库启用 Issue workflow + PR 协作治理且用户已确认远端同步 apply 时，Skill 必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，随后关闭测试 PR、关闭测试 Issue 并删除测试分支；`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR 合并和自动关闭；`remote-release` 在启用自动化版本发布流程时验证 release-please 的 `docs:`/`chore:` 负向边界和 `feat:` 正向触发；不得用 `workflow_dispatch` 作为远端成功标准。
+10. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项。完成报告之后必须结构化询问是否删除一次性 Skill 安装目录，默认删除，并展示绝对路径。
+
+## 一次性 Skill 安装目录清理
+
+完成报告后必须立即提出以下结构化问题。`<absolute-skill-install-dir>` 必须替换为本次实际使用的 Skill 安装目录绝对路径；不得只显示相对路径或省略路径。
+
+```markdown
+是否删除本次一次性 Skill 安装目录？
+Do you want to delete this one-time Skill installation directory?
+
+路径 / Path: `<absolute-skill-install-dir>`
+
+[1] 删除（默认，推荐）/ Delete (default, recommended)
+[2] 保留 / Keep
+[3] 暂不处理 / Not now
+```
+
+选择删除时，只删除上述绝对路径指向的 Skill 安装目录；不得删除目标项目、目标项目中的 `AGENTS.md`、`docs/`、hooks、CI、`.dayu-harness/managed-paths.json` 或任何托管治理产物。

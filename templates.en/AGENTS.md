@@ -13,11 +13,11 @@ The directory index for this level must be kept in sync when directories, files,
 
 - [AGENTS.md](AGENTS.md) - Current index
 - [CLAUDE.md](CLAUDE.md) - Task routing entry
-- [docs/AGENTS.md](docs/AGENTS.md) - Core docs index
-- [docs/harness/AGENTS.md](docs/harness/AGENTS.md) - Core: governance rules, feedback checks, maintenance workflow
+- [docs/AGENTS.md](docs/AGENTS.md) - Documentation directory index
+- [docs/harness/AGENTS.md](docs/harness/AGENTS.md) - Governance rules, feedback checks, maintenance workflow
 - [docs/design-docs/AGENTS.md](docs/design-docs/AGENTS.md) - Default: ADRs and design decisions
-- [docs/exec-plans/AGENTS.md](docs/exec-plans/AGENTS.md) - Core: execution plans
-- [docs/generated/AGENTS.md](docs/generated/AGENTS.md) - Core: auto-generated material index
+- [docs/exec-plans/AGENTS.md](docs/exec-plans/AGENTS.md) - Execution plans
+- [docs/generated/AGENTS.md](docs/generated/AGENTS.md) - Auto-generated material index
 - [docs/product-specs/AGENTS.md](docs/product-specs/AGENTS.md) - Default: product specs and project context
 - [docs/references/AGENTS.md](docs/references/AGENTS.md) - Default: external references and research index
 - [docs/troubleshooting/AGENTS.md](docs/troubleshooting/AGENTS.md) - Default: troubleshooting knowledge base
@@ -51,25 +51,25 @@ The directory index for this level must be kept in sync when directories, files,
 ## Before PR Create/Update
 
 > Trigger: creating a PR, editing PR content, or when CI feedback fails.
-- If `github.pr` is enabled and the file exists, read `docs/harness/guides/pr-guidelines.md`
-- If `github.pr` is enabled and the script exists, render the PR body with `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...`, then pass it through `gh pr create --body-file`
+- When the PR governance guide exists, read `docs/harness/guides/pr-guidelines.md`
+- When the fixed-format PR body generator exists, render the PR body with `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...`, then pass it through `gh pr create --body-file`
 - Close linked issues with GitHub closing keyword trailers, e.g. `Closes #123`
 
 ## During Release, PR Review, and Troubleshooting
 
 > Trigger: branch release, reviewing changes, process/environment issues.
-- If `github.branch-protection` is enabled and the file exists, read `docs/harness/guides/branch-protection.md`
-- If `release.versioning` is enabled and the file exists, read `docs/harness/guides/release-versioning.md`
-- If `github.release-please` is enabled and the file exists, read `docs/harness/guides/release-please.md`
-- If `github.pr` is enabled and the file exists, read `docs/harness/sensors/reviews/code-review-checklist.md`
-- If `quality.practices` is enabled and the file exists, read `docs/harness/guides/dev-hygiene.md`
+- When the Git main-branch protection guide exists, read `docs/harness/guides/branch-protection.md`
+- When the release versioning and tag protection guide exists, read `docs/harness/guides/release-versioning.md`
+- When the automated version release guide exists, read `docs/harness/guides/release-please.md`
+- When the PR review checklist exists, read `docs/harness/sensors/reviews/code-review-checklist.md`
+- When the development quality guide exists, read `docs/harness/guides/dev-hygiene.md`
 
 ## During AI-led Execution
 
 > Trigger: AI takes over implementation or execution.
 - Read `docs/harness/guides/ai-execution.md`
 - Read `docs/harness/guides/ai-memory.md`
-- If `quality.practices` is enabled and the file exists, read `docs/harness/guides/testing-strategy.md`
+- When the testing strategy guide exists, read `docs/harness/guides/testing-strategy.md`
 
 ## Reviewing Knowledge and Project Context
 

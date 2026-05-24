@@ -4,10 +4,10 @@ This file is the index for the `docs/` directory. AI should read the root `AGENT
 
 ## Directory Index
 - [AGENTS.md](AGENTS.md) - Current index
-- [harness/AGENTS.md](harness/AGENTS.md) - Core: governance rules, feedback checks, maintenance flow
+- [harness/AGENTS.md](harness/AGENTS.md) - Governance rules, feedback checks, maintenance flow
 - [design-docs/AGENTS.md](design-docs/AGENTS.md) - Default: architecture and design decisions
-- [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - Core: execution plans
-- [generated/AGENTS.md](generated/AGENTS.md) - Core: auto-generated materials index
+- [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - Execution plans
+- [generated/AGENTS.md](generated/AGENTS.md) - Auto-generated materials index
 - [product-specs/AGENTS.md](product-specs/AGENTS.md) - Default: product specs and project context
 - [references/AGENTS.md](references/AGENTS.md) - Default: external materials and research index
 - [troubleshooting/AGENTS.md](troubleshooting/AGENTS.md) - Default: troubleshooting knowledge base

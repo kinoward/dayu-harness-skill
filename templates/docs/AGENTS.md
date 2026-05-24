@@ -5,10 +5,10 @@
 ## 目录索引
 
 - [AGENTS.md](AGENTS.md) - 当前索引
-- [harness/AGENTS.md](harness/AGENTS.md) - core：治理规则、反馈检查和维护流程
+- [harness/AGENTS.md](harness/AGENTS.md) - 治理规则、反馈检查和维护流程
 - [design-docs/AGENTS.md](design-docs/AGENTS.md) - 默认：架构与设计决策
-- [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - core：执行计划
-- [generated/AGENTS.md](generated/AGENTS.md) - core：自动生成资料索引
+- [exec-plans/AGENTS.md](exec-plans/AGENTS.md) - 执行计划
+- [generated/AGENTS.md](generated/AGENTS.md) - 自动生成资料索引
 - [product-specs/AGENTS.md](product-specs/AGENTS.md) - 默认：产品规格与项目上下文
 - [references/AGENTS.md](references/AGENTS.md) - 默认：外部资料和研究索引
 - [troubleshooting/AGENTS.md](troubleshooting/AGENTS.md) - 默认：排障知识库
