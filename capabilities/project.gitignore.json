@@ -1,14 +1,45 @@
 {
   "id": "project.gitignore",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Project gitignore management",
   "description_nl": "Enable project .gitignore generation and merge using a universal base plus github/gitignore snapshots selected by project contents, including Node.js, Python, Go, Rust, Java, and Dotnet.",
   "default": true,
-  "dependencies": ["core"],
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
+  "dependencies": [
+    "core"
+  ],
+  "i18n": {
+    "title_key": "capability.project.gitignore.title",
+    "description_key": "capability.project.gitignore.description",
+    "acceptance_keys": [
+      "capability.project.gitignore.acceptance.1",
+      "capability.project.gitignore.acceptance.2"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.project.gitignore.rule",
+      "artifacts": [
+        ".gitignore"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [],
   "asset_files": [],
   "installer": {
     "script": "install-gitignore.sh",
-    "safe_strategies": ["merge", "replace", "skip"],
+    "safe_strategies": [
+      "merge",
+      "replace",
+      "skip"
+    ],
     "notes": "Detects project type, selects matching github/gitignore snapshots, and merges missing ignore patterns."
   },
   "acceptance": [

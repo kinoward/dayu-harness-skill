@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -14,8 +14,13 @@ import type { ManifestRegistry } from "./types.js";
 
 export const PHASE1D_CAPABILITY_IDS = ["core", "git.hooks", "git.commit-format", "ai.execution"] as const;
 
-export function loadPhase1dManifestRegistry(skillRoot: string = resolveSkillRoot()): ManifestRegistry {
-  const manifests = PHASE1D_CAPABILITY_IDS.map((id) => readManifest(skillRoot, id));
+export function loadManifestRegistry(skillRoot: string = resolveSkillRoot()): ManifestRegistry {
+  const capabilityDir = join(skillRoot, "capabilities");
+  const capabilityIds = readdirSync(capabilityDir)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => entry.replace(/\.json$/, ""))
+    .sort();
+  const manifests = capabilityIds.map((id) => readManifest(skillRoot, id));
   const manifestById = new Map<string, ManifestV2>();
 
   for (const manifest of manifests) {
@@ -23,6 +28,10 @@ export function loadPhase1dManifestRegistry(skillRoot: string = resolveSkillRoot
   }
 
   return { skillRoot, manifests, manifestById };
+}
+
+export function loadPhase1dManifestRegistry(skillRoot: string = resolveSkillRoot()): ManifestRegistry {
+  return loadManifestRegistry(skillRoot);
 }
 
 export function assertConfigCapabilitiesKnown(config: DayuConfig, registry: ManifestRegistry): void {

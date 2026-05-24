@@ -1,11 +1,58 @@
 {
   "id": "github.pr",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "GitHub pull request structure and review hygiene",
   "description_nl": "Deploy PR structure workflow, helper script, PR guide, and review checklist.",
   "default": false,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [
+    "git.commit-format"
+  ],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.github.pr.title",
+    "description_key": "capability.github.pr.description",
+    "acceptance_keys": [
+      "capability.github.pr.acceptance.1",
+      "capability.github.pr.acceptance.2",
+      "capability.github.pr.acceptance.3",
+      "capability.github.pr.acceptance.4",
+      "capability.github.pr.acceptance.5"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.github.pr.rule",
+      "artifacts": [
+        "docs/harness/guides/pr-guidelines.md",
+        "docs/harness/sensors/reviews/code-review-checklist.md",
+        ".github/workflows/pr-lint.yml",
+        ".github/pull_request_template.md",
+        ".github/scripts/pr_body_structure.py"
+      ]
+    },
+    "sensor": {
+      "type": "script",
+      "checks": [
+        ".github/scripts/pr_body_structure.py",
+        ".github/workflows/pr-lint.yml"
+      ],
+      "summary_key": "capability.github.pr.sensor"
+    },
+    "enforcer": {
+      "type": "ci",
+      "mechanisms": [
+        "pr-lint.yml"
+      ],
+      "summary_key": "capability.github.pr.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/pr-guidelines.md",
@@ -30,15 +77,6 @@
       "dst": ".github/scripts/pr_body_structure.py"
     }
   ],
-  "installer": null,
-  "acceptance": [
-    "PR lint workflow exists",
-    "PR body validator script exists",
-    "PR title lint check exists",
-    "Sub-commit trailer policy check exists",
-    "Troubleshooting entry changes require synced AGENTS and TL;DR in first 20 lines"
-  ],
-  "suggested_when": "Enable when project uses GitHub pull requests.",
   "template_files_i18n": {
     "en": [
       {
@@ -50,5 +88,14 @@
         "dst": "docs/harness/sensors/reviews/code-review-checklist.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "PR lint workflow exists",
+    "PR body validator script exists",
+    "PR title lint check exists",
+    "Sub-commit trailer policy check exists",
+    "Troubleshooting entry changes require synced AGENTS and TL;DR in first 20 lines"
+  ],
+  "suggested_when": "Enable when project uses GitHub pull requests."
 }

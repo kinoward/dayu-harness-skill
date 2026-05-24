@@ -13,10 +13,14 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [package.json](package.json) - 本地 TypeScript schema 与验证工具链入口
 - [package-lock.json](package-lock.json) - Node 依赖锁定文件
 - [tsconfig.json](tsconfig.json) - TypeScript 编译与测试配置
+- [tsconfig.build.json](tsconfig.build.json) - npm 发布构建用 TypeScript 配置
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) - CLI lint、测试和构建 CI
+- [.github/workflows/release-please.yml](.github/workflows/release-please.yml) - npm 发布版本 PR 自动化
+- [.github/workflows/npm-publish.yml](.github/workflows/npm-publish.yml) - GitHub Release 触发的 npm provenance 发布工作流
 - [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 动态区块自动更新工作流
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
 - [LICENSE](LICENSE) - MIT 许可文件
-- [src/](src/) - Phase 1 TypeScript schema、架构契约、CLI 垂直切片与本地验证源码
+- [src/](src/) - TypeScript schema、架构契约、Phase 2 CLI 部署引擎与本地验证源码
 - [locales/](locales/) - key-based i18n 文案 catalog
 - [agents/](agents/) - Codex UI 与触发策略元数据
 - [references/agent-compatibility.md](references/agent-compatibility.md) - 跨 Agent 兼容说明
@@ -32,11 +36,16 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [docs/phase1b-schema.md](docs/phase1b-schema.md) - Phase 1b schema、manifest v2、config、i18n 和路径安全契约
 - [docs/phase1c-architecture.md](docs/phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
 - [docs/phase1-progress.md](docs/phase1-progress.md) - Phase 1 当前进度、维护者计划和 QA 经验沉淀
+- [docs/getting-started.md](docs/getting-started.md) - Phase 2 CLI 快速开始与常用命令
+- [docs/configuration.md](docs/configuration.md) - `dayu.config.yaml` 配置契约与能力口径
+- [docs/troubleshooting.md](docs/troubleshooting.md) - CLI 常见问题与排查方式
+- [docs/phase2-product.md](docs/phase2-product.md) - Phase 2 CLI 状态机、目标目录树和产品化口径
 - [docs/phase1d-cli.md](docs/phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
 - [docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md) - Phase 1e CLI 公开范围收口、init/apply 行为和验证方式
 - [docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md) - `scaffold.sh` 内部逻辑 spike 与 TypeScript port 风险记录
 - [tests/](tests/) - Skill 自身测试和 fixture 项目
 - [tests/README.md](tests/README.md) - Skill 自身执行测试基线
+- [tests/unit/phase2-cli.test.ts](tests/unit/phase2-cli.test.ts) - Phase 2 全量 manifest、apply、status、repair 和 orphan 清理测试
 - [tests/smoke/dayu-harness-profile.sh](tests/smoke/dayu-harness-profile.sh) - local-fast / remote-smoke / remote-release 分层测试入口
 
 目录索引变化时，必须同步更新本区块。README 面向使用者，不维护完整仓库目录树；如目录变化影响使用方式或对外说明，再同步更新 [README.md](README.md) 的简版介绍。
@@ -66,7 +75,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 1c 将 CLI 命令树、部署 DAG、概念依赖图和三层分离约束固化在 `src/architecture/` 与 `docs/phase1c-architecture.md`。Phase 1d/1e 在 `src/cli/` 围绕 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 四个 v2 试点 manifest 提供 TypeScript CLI 垂直切片；公开命令收敛为 `init`、`apply`、`diagnose`、`validate`，并补齐默认 dry-run、`apply --only` 和原子写入契约。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为可测试 schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。
 
 4. **机械化检查优先于文字承诺**
 
@@ -92,7 +101,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 ## 能力清单
 
-`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。Phase 1b 试点能力开始采用 manifest v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；其中 `kind` 区分 hard / soft / infra 能力，`rse` 描述 Rule-Sensor-Enforcer 链路或其子集。Phase 1c 明确 `deployment_deps` 只服务 CLI apply 的部署顺序，`conceptual_deps` 只服务 Skill/CLI 的说明与展示顺序，不阻塞部署。Phase 1d/1e 只加载 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 四个 v2 试点能力，完整能力迁移和公开 `merge` / `generate` 命令留到 Phase 2。未迁移能力仍按旧 manifest 字段服务现有脚手架流程。
+`capabilities/*.json` 是部署清单的单一事实源。默认能力始终安装；可选能力由用户在脚手架、融合或维护流程中选择。Phase 2 以当前仓库事实 20 个 manifest 为准，全部采用 manifest v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；其中 `kind` 区分 hard / soft / infra 能力，`rse` 描述 Rule-Sensor-Enforcer 链路或其子集。`deployment_deps` 只服务 CLI apply 的部署顺序，`conceptual_deps` 只服务 Skill/CLI 的说明与展示顺序，不阻塞部署。
 
 | 分组 | 能力 ID | 部署内容 |
 | --- | --- | --- |

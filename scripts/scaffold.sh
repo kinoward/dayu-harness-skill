@@ -12,6 +12,31 @@ ENVIRONMENT_SCRIPT="$SCRIPTS_DIR/ensure-environment.sh"
 GITHUB_REMOTE_SCRIPT="$SCRIPTS_DIR/github-remote.sh"
 OUTPUT_BASE="$(pwd)"
 
+dayu_tmp_dir() {
+    local base="${TMPDIR:-/tmp}"
+    local candidate
+    case "$base" in
+        /*) ;;
+        *) base="$OUTPUT_BASE/$base" ;;
+    esac
+
+    for candidate in "$base" "$OUTPUT_BASE/.tmp" "$SKILL_DIR/.tmp"; do
+        [ -n "$candidate" ] || continue
+        if mkdir -p "$candidate" 2>/dev/null && [ -d "$candidate" ] && [ -w "$candidate" ]; then
+            printf '%s\n' "${candidate%/}"
+            return 0
+        fi
+    done
+
+    echo "error: no writable temporary directory found" >&2
+    return 1
+}
+
+dayu_mktemp() {
+    local prefix="$1"
+    mktemp "$(dayu_tmp_dir)/${prefix}.XXXXXX"
+}
+
 MODE="prompt"
 TARGET=""
 ENABLED_CATEGORIES=""

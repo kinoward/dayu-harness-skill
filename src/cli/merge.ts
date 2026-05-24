@@ -1,17 +1,17 @@
-import { buildApplyPlan } from "./apply.js";
-import { loadPhase1dManifestRegistry } from "./manifest-registry.js";
+import { applyDayuConfig, buildApplyPlan } from "./apply.js";
+import { loadManifestRegistry } from "./manifest-registry.js";
 import { summarizeRse } from "./rse.js";
 import type {
-  ApplyOptions,
   FileOperation,
   InstallerOperation,
   MergeCapabilityPlan,
+  MergeOptions,
   MergeReport,
   MergeStrategy,
   ManifestRegistry
 } from "./types.js";
 
-export function planDayuMerge(options: ApplyOptions = {}): MergeReport {
+export function planDayuMerge(options: MergeOptions = {}): MergeReport {
   const plan = buildApplyPlan({ ...options, dryRun: true });
   const registry = loadRegistryFromPlan();
   const capabilities = plan.deploymentOrder.map((capabilityId): MergeCapabilityPlan => {
@@ -27,7 +27,7 @@ export function planDayuMerge(options: ApplyOptions = {}): MergeReport {
       installerOperations.some((operation) => operation.status === "missing-source" || operation.status === "unsupported");
     const hasConflict = fileOperations.some((operation) => operation.status === "conflict");
     const hasWork =
-      fileOperations.some((operation) => operation.status === "create" || operation.status === "chmod") ||
+      fileOperations.some((operation) => ["create", "overwrite", "delete", "chmod"].includes(operation.status)) ||
       installerOperations.some((operation) => operation.status === "create" || operation.status === "merge");
 
     if (hasError) {
@@ -106,6 +106,25 @@ export function planDayuMerge(options: ApplyOptions = {}): MergeReport {
 
 const STRATEGY_OPTIONS: readonly MergeStrategy[] = ["keep", "replace", "skip"];
 
+export function applyDayuMerge(options: MergeOptions = {}): MergeReport {
+  const dryRun = options.dryRun ?? true;
+  const plan = planDayuMerge({ ...options, dryRun: true });
+  if (dryRun || options.strategy === "keep" || options.strategy === "skip") {
+    return plan;
+  }
+
+  const applied = applyDayuConfig({
+    ...options,
+    dryRun: false,
+    force: options.strategy === "replace" || options.force
+  });
+
+  return {
+    ...plan,
+    status: applied.status === "conflict" || applied.status === "error" ? applied.status : "merged"
+  };
+}
+
 function summarizeCapabilityOperations(
   fileOperations: readonly FileOperation[],
   installerOperations: readonly InstallerOperation[]
@@ -114,6 +133,8 @@ function summarizeCapabilityOperations(
     create:
       fileOperations.filter((operation) => operation.status === "create").length +
       installerOperations.filter((operation) => operation.status === "create").length,
+    overwrite: fileOperations.filter((operation) => operation.status === "overwrite").length,
+    delete: fileOperations.filter((operation) => operation.status === "delete").length,
     chmod: fileOperations.filter((operation) => operation.status === "chmod").length,
     merge: installerOperations.filter((operation) => operation.status === "merge").length,
     skip:
@@ -128,5 +149,5 @@ function summarizeCapabilityOperations(
 }
 
 function loadRegistryFromPlan(): ManifestRegistry {
-  return loadPhase1dManifestRegistry();
+  return loadManifestRegistry();
 }

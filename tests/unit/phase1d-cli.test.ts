@@ -19,6 +19,19 @@ import {
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const tmpRoot = join(repoRoot, ".tmp");
 const cliPath = join(repoRoot, "src/cli/main.ts");
+const defaultPhase2Order = [
+  "core",
+  "git.hooks",
+  "knowledge.adr",
+  "knowledge.archive",
+  "knowledge.research",
+  "knowledge.troubleshooting",
+  "project.context",
+  "project.gitignore",
+  "git.commit-format",
+  "ai.execution",
+  "ai.memory"
+];
 
 function makeTarget(t: TestContext): string {
   mkdirSync(tmpRoot, { recursive: true });
@@ -48,7 +61,7 @@ test("Phase 1d apply dry-run emits deterministic JSON deployment plan", (t) => {
 
   assert.equal(report.command, "apply");
   assert.equal(report.status, "planned");
-  assert.deepEqual(report.deploymentOrder, ["core", "git.hooks", "git.commit-format", "ai.execution"]);
+  assert.deepEqual(report.deploymentOrder, defaultPhase2Order);
   assert.ok(report.fileOperations.some((operation) => operation.dst === "docs/harness/guides/commit-guidelines.md"));
   assert.ok(report.installerOperations.some((operation) => operation.dst === ".husky/commit-msg"));
   assert.equal(report.summary.conflict, 0);
@@ -85,7 +98,7 @@ test("Phase 1d apply deploys the vertical slice and second apply is no-op", (t) 
 
   const validate = validateDayuProject({ configPath, targetRoot: target });
   assert.equal(validate.status, "valid");
-  assert.deepEqual(validate.deployment.order, ["core", "git.hooks", "git.commit-format", "ai.execution"]);
+  assert.deepEqual(validate.deployment.order, defaultPhase2Order);
 });
 
 test("Phase 1d apply reports conflicting files without overwriting them", (t) => {

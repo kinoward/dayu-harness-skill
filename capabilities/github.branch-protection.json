@@ -1,12 +1,57 @@
 {
   "id": "github.branch-protection",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Branch protection assets and local push guard",
   "description_nl": "Deploy branch protection guidance, default-branch ruleset, and local pre-push branch guard.",
   "default": false,
+  "deployment_deps": [
+    "core",
+    "git.hooks"
+  ],
+  "conceptual_deps": [
+    "github.repository-settings"
+  ],
   "dependencies": [
     "core",
     "git.hooks"
   ],
+  "i18n": {
+    "title_key": "capability.github.branch-protection.title",
+    "description_key": "capability.github.branch-protection.description",
+    "acceptance_keys": [
+      "capability.github.branch-protection.acceptance.1",
+      "capability.github.branch-protection.acceptance.2",
+      "capability.github.branch-protection.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.github.branch-protection.rule",
+      "artifacts": [
+        "docs/harness/guides/branch-protection.md",
+        ".github/rulesets/protect-main.json",
+        ".husky/"
+      ]
+    },
+    "sensor": {
+      "type": "config",
+      "checks": [
+        ".github/rulesets/protect-main.json",
+        ".husky/pre-push"
+      ],
+      "summary_key": "capability.github.branch-protection.sensor"
+    },
+    "enforcer": {
+      "type": "hook",
+      "mechanisms": [
+        "pre-push",
+        "GitHub branch ruleset"
+      ],
+      "summary_key": "capability.github.branch-protection.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/branch-protection.md",
@@ -19,6 +64,22 @@
       "dst": ".github/rulesets/protect-main.json"
     }
   ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/branch-protection.md",
+        "dst": "docs/harness/guides/branch-protection.md"
+      }
+    ]
+  },
+  "installer": {
+    "script": "install-husky.sh",
+    "safe_strategies": [
+      "merge",
+      "skip"
+    ],
+    "notes": "Installs only the pre-push default/main/master branch protection snippet."
+  },
   "remote_actions": [
     {
       "kind": "ruleset",
@@ -33,26 +94,10 @@
       ]
     }
   ],
-  "installer": {
-    "script": "install-husky.sh",
-    "safe_strategies": [
-      "merge",
-      "skip"
-    ],
-    "notes": "Installs only the pre-push default/main/master branch protection snippet."
-  },
   "acceptance": [
     "Default-branch ruleset exists",
     "Pre-push hook protects the detected default branch plus main/master compatibility branches",
     "No existing hooks replaced by default"
   ],
-  "suggested_when": "Enable when branch protection is required.",
-  "template_files_i18n": {
-    "en": [
-      {
-        "src": "templates.en/docs/harness/guides/branch-protection.md",
-        "dst": "docs/harness/guides/branch-protection.md"
-      }
-    ]
-  }
+  "suggested_when": "Enable when branch protection is required."
 }

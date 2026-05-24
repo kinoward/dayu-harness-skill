@@ -13,12 +13,16 @@ import {
 } from "../schemas/index.js";
 import { CliError } from "./errors.js";
 import { writeFileAtomically } from "./filesystem.js";
+import { loadManifestRegistry } from "./manifest-registry.js";
 
-export const DEFAULT_PHASE1D_CAPABILITIES: readonly CapabilityId[] = [
-  "core",
-  "git.commit-format",
-  "ai.execution"
-] as const;
+export function defaultCapabilityIds(): CapabilityId[] {
+  return loadManifestRegistry()
+    .manifests.filter((manifest) => manifest.default && !manifest.internal)
+    .map((manifest) => manifest.id)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export const DEFAULT_PHASE1D_CAPABILITIES: readonly CapabilityId[] = defaultCapabilityIds();
 
 export function readDayuConfig(configPath: string): DayuConfig {
   try {
@@ -40,7 +44,7 @@ export function createDefaultDayuConfig(targetRoot: string, locale: LocaleCode =
     project: {
       name: basename(targetRoot)
     },
-    capabilities: DEFAULT_PHASE1D_CAPABILITIES.map((id) => ({ id }))
+    capabilities: defaultCapabilityIds().map((id) => ({ id }))
   });
 }
 
