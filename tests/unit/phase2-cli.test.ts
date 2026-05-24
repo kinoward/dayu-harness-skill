@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -268,6 +268,328 @@ test("Phase 2 finalize blocks unrelated pre-staged files before committing", (t)
   assert.ok(report.checks.some((check) => check.name === "Git 暂存区边界" && check.status === "failed"));
   assert.equal(spawnSync("git", ["-C", target, "rev-parse", "--verify", "HEAD"], { encoding: "utf8" }).status, 128);
   assert.match(git(target, ["diff", "--cached", "--name-only"]), /src\/user-work\.js/);
+});
+
+test("Phase 2 finalize exposes remote apply/verify items from manifest-based remote actions", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = [
+    "core",
+    "git.hooks",
+    "github.repository-settings",
+    "github.branch-protection",
+    "release.versioning"
+  ];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteActionLog = join(target, "remote-actions.log");
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="check"
+for arg in "\$@"; do
+  case "\$arg" in
+    --apply|--verify|--check)
+      MODE="\${arg#--}"
+      ;;
+  esac
+done
+
+if [ -n "\${DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG:-}" ]; then
+  printf '{"mode":"%s","actions":%s}\n' "\$MODE" "\${DAYU_HARNESS_REMOTE_ACTIONS_JSON:-[]}" >> "\$DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG"
+fi
+
+cat <<JSON
+{"status":"ok","repository":"acme/fake","default_branch":"main","description_nl":"ok","items":[{"kind":"script","mode":"$MODE","status":"ok"}]}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const staleRuleset = join(target, ".github", "rulesets", "protect-stale.json");
+  mkdirSync(dirname(staleRuleset), { recursive: true });
+  writeFileSync(staleRuleset, '{"name":"protect-stale","target":"tag"}', "utf8");
+
+  const previousLog = process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
+  process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = remoteActionLog;
+  t.after(() => {
+    if (previousLog === undefined) {
+      delete process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
+    } else {
+      process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = previousLog;
+    }
+  });
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "apply",
+    skillRoot
+  });
+  if (report.status !== "completed") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "completed");
+  assert.equal(report.remote?.applyItems?.[0]?.mode, "apply");
+  assert.equal(report.remote?.verifyItems?.[0]?.mode, "verify");
+
+  const remoteKinds = new Set((report.remote?.remoteActions ?? []).map((action) => String(action.kind)));
+  assert.equal(remoteKinds.has("repository_settings"), true);
+  assert.equal(remoteKinds.has("ruleset"), true);
+  assert.equal(remoteKinds.has("workflow_permissions"), false);
+  const logged = readFileSync(remoteActionLog, "utf8");
+  assert.equal(/protect-stale/.test(logged), false);
+  assert.equal(/protect-main/.test(logged), true);
+  assert.equal(/protect-tags/.test(logged), true);
+  assert.equal(/repository_settings/.test(logged), true);
+  assert.equal(/workflow_permissions/.test(logged), false);
+});
+
+test("Phase 2 finalize collects remote actions from deployment dependencies", (t) => {
+  const target = makeTarget(t);
+  const configPath = writeConfig(target, ["github.release-please"]);
+  const remoteActionLog = join(target, "remote-actions-dependencies.log");
+  const manifestIds = [
+    "core",
+    "git.hooks",
+    "git.commit-format",
+    "github.pr",
+    "github.repository-settings",
+    "release.versioning",
+    "github.release-please"
+  ];
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+MODE="check"
+for arg in "\$@"; do
+  case "\$arg" in
+    --apply|--verify|--check)
+      MODE="\${arg#--}"
+      ;;
+  esac
+done
+if [ -n "\${DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG:-}" ]; then
+  printf '{"mode":"%s","actions":%s}\n' "\$MODE" "\${DAYU_HARNESS_REMOTE_ACTIONS_JSON:-[]}" >> "\$DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG"
+fi
+cat <<JSON
+{"status":"ok","repository":"acme/fake","default_branch":"main","description_nl":"ok","items":[{"kind":"script","mode":"$MODE","status":"ok"}]}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, manifestIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const previousLog = process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
+  process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = remoteActionLog;
+  t.after(() => {
+    if (previousLog === undefined) {
+      delete process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
+    } else {
+      process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = previousLog;
+    }
+  });
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "apply",
+    skillRoot
+  });
+
+  if (!report.remote) {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.remote?.applyStatus, "ok");
+  assert.equal(report.remote?.verifyStatus, "ok");
+  const logged = readFileSync(remoteActionLog, "utf8");
+  assert.match(logged, /workflow_permissions/);
+  assert.match(logged, /repository_settings/);
+  assert.match(logged, /protect-tags/);
+});
+
+test("Phase 2 finalize should be partial when githubRemote is skipped but remote actions are pending", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = [
+    "core",
+    "git.hooks",
+    "github.repository-settings",
+    "github.branch-protection",
+    "release.versioning"
+  ];
+  const configPath = writeConfig(target, capabilityIds);
+
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+cat <<JSON
+{"status":"error","repository":"acme/fake","default_branch":"main","description_nl":"should not be called"}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "skip",
+    skillRoot
+  });
+  if (report.status !== "partial") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "partial");
+  assert.equal(report.remote?.applyStatus, "skipped");
+  assert.equal(report.remote?.verifyStatus, "skipped");
+  assert.equal((report.remote?.applyItems ?? []).length, 0);
+  assert.equal((report.remote?.verifyItems ?? []).length, 0);
+  assert.ok(report.checks.some((check) => check.name === "GitHub 远端同步" && check.status === "skipped"));
+  assert.equal(report.issuePrE2e, undefined);
+  assert.equal(report.releaseE2e, undefined);
+});
+
+test("Phase 2 finalize should be partial when Issue/PR E2E is enabled but githubRemote is skipped", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "github.issue", "github.pr"];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+echo "remote script should not be called when githubRemote is skipped" >&2
+exit 99
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "skip",
+    skillRoot
+  });
+
+  if (report.status !== "partial") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "partial");
+  assert.equal(report.remote?.applyStatus, "skipped");
+  assert.equal(report.remote?.verifyStatus, "skipped");
+  assert.deepEqual(report.remote?.remoteActions, []);
+  assert.equal(report.issuePrE2e?.status, "skipped");
+  assert.equal(report.releaseE2e, undefined);
+  assert.ok(report.checks.some((check) => check.name === "GitHub 远端同步" && check.status === "skipped"));
+});
+
+test("Phase 2 finalize reports partial remote status even when no remote actions are configured", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core"];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+cat <<JSON
+{"status":"needs_user_action","repository":"acme/fake","default_branch":"main","description_nl":"auth required","items":[{"kind":"auth","status":"needs_user_action","description_nl":"login required"}]}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "apply",
+    skillRoot
+  });
+
+  assert.equal(report.status, "partial");
+  assert.equal(report.remote?.applyStatus, "needs_user_action");
+  assert.equal(report.remote?.verifyStatus, "needs_user_action");
+  assert.deepEqual(report.remote?.remoteActions, []);
+  assert.equal(report.remote?.applyItems?.[0]?.kind, "auth");
+  assert.equal(report.remote?.verifyItems?.[0]?.kind, "auth");
+});
+
+test("Phase 2 finalize preserves remote missing items and reports partial remote status", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "github.repository-settings", "github.branch-protection"];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+MODE="check"
+for arg in "\$@"; do
+  case "\$arg" in
+    --apply|--verify|--check)
+      MODE="\${arg#--}"
+      ;;
+  esac
+done
+
+if [ "\$MODE" = "apply" ]; then
+  cat <<JSON
+{"status":"needs_user_action","repository":"acme/fake","default_branch":"main","description_nl":"auth required","items":[{"kind":"auth","status":"needs_user_action","description_nl":"login required"}]}
+JSON
+else
+  cat <<JSON
+{"status":"missing","repository":"acme/fake","default_branch":"main","description_nl":"ruleset missing","items":[{"kind":"rulesets","status":"missing","missing":["protect-main"],"description_nl":"missing protect-main"}]}
+JSON
+fi
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({
+    configPath,
+    targetRoot: target,
+    githubRemote: "apply",
+    skillRoot
+  });
+
+  if (report.status !== "partial") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "partial");
+  assert.equal(report.remote?.applyStatus, "needs_user_action");
+  assert.equal(report.remote?.verifyStatus, "missing");
+  assert.equal(report.remote?.applyItems?.[0]?.kind, "auth");
+  assert.equal(report.remote?.verifyItems?.[0]?.kind, "rulesets");
+  assert.deepEqual(report.remote?.verifyItems?.[0]?.missing, ["protect-main"]);
+  assert.ok(report.checks.some((check) => check.name === "GitHub 远端同步" && check.status === "skipped"));
+  assert.ok(report.checks.some((check) => check.name === "GitHub 远端校验" && check.status === "skipped"));
 });
 
 test("Phase 2 dry-run apply does not migrate legacy state directory", (t) => {
@@ -554,6 +876,74 @@ function sha256(content: string): string {
 
 function git(target: string, args: string[]): string {
   return execFileSync("git", ["-C", target, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function makeFakeSkillRoot(t: TestContext, manifestIds: readonly string[], remoteScript: string): string {
+  const skillRoot = mkdtempSync(join(tmpRoot, "fake-skill-"));
+  t.after(() => rmSync(skillRoot, { recursive: true, force: true }));
+
+  const fakeScriptPath = join(skillRoot, "scripts", "github-remote.sh");
+  mkdirSync(dirname(fakeScriptPath), { recursive: true });
+  writeFileSync(fakeScriptPath, remoteScript, "utf8");
+  chmodSync(fakeScriptPath, 0o755);
+
+  const fakeCapabilitiesPath = join(skillRoot, "capabilities");
+  mkdirSync(fakeCapabilitiesPath, { recursive: true });
+  for (const manifestId of manifestIds) {
+    const source = join(repoRoot, "capabilities", `${manifestId}.json`);
+    writeFileSync(join(fakeCapabilitiesPath, `${manifestId}.json`), readFileSync(source, "utf8"), "utf8");
+  }
+
+  return skillRoot;
+}
+
+function seedDocsForIntegrityChecks(target: string): void {
+  const files: Array<{ src: string; dst: string; fallback: string }> = [
+    { src: "templates/docs/design-docs/AGENTS.md", dst: "docs/design-docs/AGENTS.md", fallback: "# design-docs\n" },
+    { src: "templates/docs/design-docs/adr-template.md", dst: "docs/design-docs/adr-template.md", fallback: "# ADR template\n" },
+    { src: "templates/docs/harness/guides/ai-execution.md", dst: "docs/harness/guides/ai-execution.md", fallback: "# AI execution\n" },
+    { src: "templates/docs/harness/guides/ai-memory.md", dst: "docs/harness/guides/ai-memory.md", fallback: "# AI memory\n" },
+    {
+      src: "templates/docs/harness/guides/commit-guidelines.md",
+      dst: "docs/harness/guides/commit-guidelines.md",
+      fallback: "# Commit guidelines\n"
+    },
+    { src: "templates/docs/product-specs/AGENTS.md", dst: "docs/product-specs/AGENTS.md", fallback: "# project-specs\n" },
+    {
+      src: "templates/docs/references/AGENTS.md",
+      dst: "docs/references/AGENTS.md",
+      fallback: "# references\n\n- [research](research/)\n"
+    },
+    {
+      src: "templates/docs/references/research/AGENTS.md",
+      dst: "docs/references/research/AGENTS.md",
+      fallback: "# research\n"
+    },
+    { src: "templates/docs/troubleshooting/AGENTS.md", dst: "docs/troubleshooting/AGENTS.md", fallback: "# troubleshooting\n" },
+    { src: "templates/docs/archive/AGENTS.md", dst: "docs/archive/AGENTS.md", fallback: "# archive\n" },
+    {
+      src: "templates/docs/archive/product-specs/AGENTS.md",
+      dst: "docs/archive/product-specs/AGENTS.md",
+      fallback: "# archive/product-specs\n"
+    }
+  ];
+  for (const file of files) {
+    const templatePath = join(repoRoot, file.src);
+    const destinationPath = join(target, file.dst);
+    if (existsSync(destinationPath)) {
+      continue;
+    }
+    mkdirSync(dirname(destinationPath), { recursive: true });
+    if (!existsSync(templatePath)) {
+      writeFileSync(destinationPath, file.fallback, "utf8");
+      continue;
+    }
+    writeFileSync(destinationPath, readFileSync(templatePath, "utf8"), "utf8");
+  }
+  const projectStatusPath = join(target, "docs/product-specs/project-status.md");
+  if (!existsSync(projectStatusPath)) {
+    writeFileSync(projectStatusPath, "# Project status\n\n- Baseline fixture status.\n", "utf8");
+  }
 }
 
 function configureGitIdentity(target: string): void {

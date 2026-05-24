@@ -282,6 +282,9 @@ export interface FinalizeReport {
     verifyStatus?: string;
     repository?: string;
     initializationPullRequestMerged?: boolean;
+    remoteActions?: readonly Record<string, unknown>[];
+    applyItems?: readonly Record<string, unknown>[];
+    verifyItems?: readonly Record<string, unknown>[];
   };
   issuePrE2e?: {
     status: "passed" | "failed" | "skipped";

@@ -968,7 +968,7 @@ ruleset_json_for_name() {
     local ruleset_id list_entry detail
 
     list_entry="$(printf '%s' "$rulesets_json" | jq -c --arg name "$ruleset_name" 'if type == "array" then .[]? elif type == "object" then (.rulesets // [])[]? else empty end | select(.name == $name)' 2>/dev/null | sed -n '1p')"
-    if [ -n "$list_entry" ] && printf '%s' "$list_entry" | jq -e '.conditions != null' >/dev/null 2>&1; then
+    if [ -n "$list_entry" ] && printf '%s' "$list_entry" | jq -e '.conditions != null and .target != null and .rules != null' >/dev/null 2>&1; then
         printf '%s' "$list_entry"
         return 0
     fi
@@ -992,6 +992,26 @@ ruleset_ref_includes() {
     detail="$(ruleset_json_for_name "$rulesets_json" "$ruleset_name" 2>/dev/null || true)"
     [ -n "$detail" ] || return 1
     printf '%s' "$detail" | jq -e --arg ref "$ref" '(.conditions.ref_name.include // []) | index($ref)' >/dev/null 2>&1
+}
+
+ruleset_target_is() {
+    local rulesets_json="$1"
+    local ruleset_name="$2"
+    local target="$3"
+    local detail
+    detail="$(ruleset_json_for_name "$rulesets_json" "$ruleset_name" 2>/dev/null || true)"
+    [ -n "$detail" ] || return 1
+    printf '%s' "$detail" | jq -e --arg target "$target" '.target == $target' >/dev/null 2>&1
+}
+
+ruleset_has_rule_type() {
+    local rulesets_json="$1"
+    local ruleset_name="$2"
+    local rule_type="$3"
+    local detail
+    detail="$(ruleset_json_for_name "$rulesets_json" "$ruleset_name" 2>/dev/null || true)"
+    [ -n "$detail" ] || return 1
+    printf '%s' "$detail" | jq -e --arg rule_type "$rule_type" '(.rules // []) | any(.type == $rule_type)' >/dev/null 2>&1
 }
 
 apply_ruleset_file() {
@@ -1206,12 +1226,48 @@ verify_mode() {
                 continue
             fi
             if [ "$req" = "protect-main" ] && [ -n "$DEFAULT_BRANCH" ]; then
+                if ! ruleset_target_is "$rulesets_json" "protect-main" "branch"; then
+                    if [ -n "$missing_rulesets" ]; then
+                        missing_rulesets+=$'\n'
+                    fi
+                    missing_rulesets+="protect-main:target=branch"
+                fi
                 if ! ruleset_ref_includes "$rulesets_json" "protect-main" "refs/heads/$DEFAULT_BRANCH"; then
                     if [ -n "$missing_rulesets" ]; then
                         missing_rulesets+=$'\n'
                     fi
                     missing_rulesets+="protect-main:refs/heads/$DEFAULT_BRANCH"
                 fi
+                for rule_type in deletion non_fast_forward pull_request; do
+                    if ! ruleset_has_rule_type "$rulesets_json" "protect-main" "$rule_type"; then
+                        if [ -n "$missing_rulesets" ]; then
+                            missing_rulesets+=$'\n'
+                        fi
+                        missing_rulesets+="protect-main:rule=$rule_type"
+                    fi
+                done
+            fi
+            if [ "$req" = "protect-tags" ]; then
+                if ! ruleset_target_is "$rulesets_json" "protect-tags" "tag"; then
+                    if [ -n "$missing_rulesets" ]; then
+                        missing_rulesets+=$'\n'
+                    fi
+                    missing_rulesets+="protect-tags:target=tag"
+                fi
+                if ! ruleset_ref_includes "$rulesets_json" "protect-tags" "refs/tags/v*"; then
+                    if [ -n "$missing_rulesets" ]; then
+                        missing_rulesets+=$'\n'
+                    fi
+                    missing_rulesets+="protect-tags:refs/tags/v*"
+                fi
+                for rule_type in deletion non_fast_forward update; do
+                    if ! ruleset_has_rule_type "$rulesets_json" "protect-tags" "$rule_type"; then
+                        if [ -n "$missing_rulesets" ]; then
+                            missing_rulesets+=$'\n'
+                        fi
+                        missing_rulesets+="protect-tags:rule=$rule_type"
+                    fi
+                done
             fi
         done
     fi
@@ -1300,9 +1356,9 @@ verify_mode() {
     if [ "${#REQUIRED_RULESETS[@]}" -eq 0 ]; then
         rulesets_desc="当前能力集合未要求远端 rulesets；此项无需校验。"
     elif [ -n "$missing_rulesets" ]; then
-        rulesets_desc="检测到的 rulesets 未匹配全部预期，protect-main 还会校验具体默认分支 ref。"
+        rulesets_desc="检测到的 rulesets 未匹配全部预期，protect-main 会校验 branch target、默认分支 ref 和保护规则；protect-tags 会校验 tag target、tag ref 和保护规则。"
     else
-        rulesets_desc="检测到的 rulesets 已匹配预期，protect-main 已校验具体默认分支 ref。"
+        rulesets_desc="检测到的 rulesets 已匹配预期，protect-main 已校验 branch target、默认分支 ref 和保护规则；protect-tags 已校验 tag target、tag ref 和保护规则。"
     fi
 
     add_resource_item \

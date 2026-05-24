@@ -107,12 +107,32 @@ function humanizeReport(report: CliReport): string {
         `target: ${report.targetRoot}`,
         report.commitSha ? `commit: ${report.commitSha}` : "commit: none",
         `github-remote=${report.githubRemote} release-validation=${report.releaseValidation}`,
+        report.remote
+          ? `remote: apply=${report.remote.applyStatus ?? "n/a"} verify=${report.remote.verifyStatus ?? "n/a"} repo=${report.remote.repository ?? "n/a"}`
+          : "remote: none",
         ...report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`),
+        report.remote?.applyItems?.length
+          ? `remote apply items: ${report.remote.applyItems.map((item) => formatRemoteItem(item)).join(" | ")}`
+          : "",
+        report.remote?.verifyItems?.length
+          ? `remote verify items: ${report.remote.verifyItems.map((item) => formatRemoteItem(item)).join(" | ")}`
+          : "",
+        report.remote?.remoteActions?.length
+          ? `required remote actions: ${report.remote.remoteActions.map((action) => formatRemoteItem(action)).join(" | ")}`
+          : "",
         report.issuePrE2e ? `Issue/PR E2E: ${report.issuePrE2e.status} - ${report.issuePrE2e.description}` : "",
         report.releaseE2e ? `Release Please: ${report.releaseE2e.status} - ${report.releaseE2e.description}` : ""
       ]
         .filter(Boolean)
         .join("\n");
+  }
+}
+
+function formatRemoteItem(item: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(item);
+  } catch {
+    return String(item);
   }
 }
 

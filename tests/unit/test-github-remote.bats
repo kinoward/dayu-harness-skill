@@ -20,12 +20,18 @@ set -euo pipefail
 
 if [ "${1:-}" = "-C" ]; then
   if [ "${3:-}" = "push" ]; then
+    if [ -n "${DAYU_HARNESS_GIT_PUSH_ENV_LOG:-}" ]; then
+      printf 'DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=%s\n' "${DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION:-}" >> "$DAYU_HARNESS_GIT_PUSH_ENV_LOG"
+    fi
     if [ -n "${DAYU_HARNESS_GIT_PUSH_LOG:-}" ]; then
       printf '%s\n' "${*:3}" >> "$DAYU_HARNESS_GIT_PUSH_LOG"
     fi
     exit 0
   fi
 elif [ "${1:-}" = "push" ]; then
+  if [ -n "${DAYU_HARNESS_GIT_PUSH_ENV_LOG:-}" ]; then
+    printf 'DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=%s\n' "${DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION:-}" >> "$DAYU_HARNESS_GIT_PUSH_ENV_LOG"
+  fi
   if [ -n "${DAYU_HARNESS_GIT_PUSH_LOG:-}" ]; then
     printf '%s\n' "$*" >> "$DAYU_HARNESS_GIT_PUSH_LOG"
   fi
@@ -148,7 +154,19 @@ JSON
         fi
         if [ "$SCENARIO" = "real_arrays" ]; then
           cat <<JSON
-[{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}},{"id":43,"name":"protect-tags","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}}}]
+[{"id":42,"name":"protect-main","target":"branch","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"pull_request"}]},{"id":43,"name":"protect-tags","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"update"}]}]
+JSON
+          exit 0
+        fi
+        if [ "$SCENARIO" = "wrong_tag_ruleset" ]; then
+          cat <<JSON
+[{"id":42,"name":"protect-main","target":"branch","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"pull_request"}]},{"id":43,"name":"protect-tags","target":"branch","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"deletion"}]}]
+JSON
+          exit 0
+        fi
+        if [ "$SCENARIO" = "wrong_main_ruleset" ]; then
+          cat <<JSON
+[{"id":42,"name":"protect-main","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"}]},{"id":43,"name":"protect-tags","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"update"}]}]
 JSON
           exit 0
         fi
@@ -164,20 +182,20 @@ JSON
 JSON
         else
           cat <<JSON
-{"total_count":2,"rulesets":[{"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}},{"name":"protect-tags"}]}
+{"total_count":2,"rulesets":[{"id":42,"name":"protect-main","target":"branch","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"pull_request"}]},{"id":43,"name":"protect-tags","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"update"}]}]}
 JSON
         fi
         exit 0
         ;;
       "repos/$REPO/rulesets/42")
         cat <<JSON
-{"id":42,"name":"protect-main","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}}}
+{"id":42,"name":"protect-main","target":"branch","conditions":{"ref_name":{"include":["refs/heads/$DEFAULT_BRANCH"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"pull_request"}]}
 JSON
         exit 0
         ;;
       "repos/$REPO/rulesets/43")
         cat <<JSON
-{"id":43,"name":"protect-tags","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}}}
+{"id":43,"name":"protect-tags","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"],"exclude":[]}},"rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"update"}]}
 JSON
         exit 0
         ;;
@@ -314,6 +332,44 @@ setup_repo() {
     echo "$output" | jq -e '.status == "ok"'
     grep -Fq "repo create acme/default-private --private --source=. --remote=origin" "$call_log"
     grep -Fq "push -u origin HEAD:main" "$push_log"
+}
+
+@test "github-remote --apply creates first default branch through controlled pre-push allow path" {
+    local repo_dir="$TEST_DIR/apply-first-default-branch"
+    local push_log="$TEST_DIR/push-first-default-branch.log"
+    local push_env_log="$TEST_DIR/push-first-default-branch.env.log"
+    local call_log="$TEST_DIR/gh-first-default-branch.log"
+    setup_repo "$repo_dir"
+    mkdir -p "$repo_dir/.husky"
+    cat > "$repo_dir/.husky/pre-push" <<'HOOK'
+#!/usr/bin/env bash
+if [ "${DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION:-}" != "1" ]; then
+  echo "ERROR: direct push to main is not allowed."
+  exit 1
+fi
+HOOK
+    chmod +x "$repo_dir/.husky/pre-push"
+
+    export DAYU_HARNESS_GH_SCENARIO="repo_missing"
+    export DAYU_HARNESS_GH_REPO="acme/first-default-branch"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GH_CALL_LOG="$call_log"
+    export DAYU_HARNESS_GIT_PUSH_LOG="$push_log"
+    export DAYU_HARNESS_GIT_PUSH_ENV_LOG="$push_env_log"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/first-default-branch"
+    unset DAYU_HARNESS_GITHUB_VISIBILITY
+    write_fake_gh repo_missing
+
+    run bash "$SCRIPT" "$repo_dir" --apply
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "ok"'
+    grep -Fq "repo create acme/first-default-branch --private --source=. --remote=origin" "$call_log"
+    if grep -Fq -- "--push" "$call_log"; then
+      echo "gh repo create --push must not be used by the controlled remote path"
+      exit 1
+    fi
+    grep -Fq "push -u origin HEAD:main" "$push_log"
+    grep -Fxq "DAYU_HARNESS_ALLOW_DEFAULT_BRANCH_CREATION=1" "$push_env_log"
 }
 
 @test "github-remote --apply binds existing repository when no origin is set" {
@@ -893,6 +949,48 @@ JSON
     echo "$output" | jq -e '.items | any(.kind=="branches" and .status=="ok" and (.present | index("main") != null))'
     echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="ok" and (.present | index("protect-main") != null) and (.present | index("protect-tags") != null))'
     echo "$output" | jq -e '.items | any(.kind=="workflow_permissions" and .status=="ok" and (.present | index("can_approve_pull_request_reviews=true") != null))'
+}
+
+@test "github-remote --verify rejects same-name protect-tags ruleset with wrong target ref or rules" {
+    local repo_dir="$TEST_DIR/verify-wrong-tag-ruleset"
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/verify-wrong-tag-ruleset.git"
+
+    export DAYU_HARNESS_GH_SCENARIO="wrong_tag_ruleset"
+    export DAYU_HARNESS_GH_REPO="acme/verify-wrong-tag-ruleset"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/verify-wrong-tag-ruleset"
+    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
+    write_fake_gh wrong_tag_ruleset
+
+    run bash "$SCRIPT" "$repo_dir" --verify
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_user_action"'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-tags:target=tag") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-tags:refs/tags/v*") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-tags:rule=non_fast_forward") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-tags:rule=update") != null))'
+}
+
+@test "github-remote --verify rejects same-name protect-main ruleset with wrong target ref or rules" {
+    local repo_dir="$TEST_DIR/verify-wrong-main-ruleset"
+    setup_repo "$repo_dir"
+    git -C "$repo_dir" remote add origin "https://github.com/acme/verify-wrong-main-ruleset.git"
+
+    export DAYU_HARNESS_GH_SCENARIO="wrong_main_ruleset"
+    export DAYU_HARNESS_GH_REPO="acme/verify-wrong-main-ruleset"
+    export DAYU_HARNESS_GH_AUTH_STATUS="ok"
+    export DAYU_HARNESS_GITHUB_REPOSITORY="acme/verify-wrong-main-ruleset"
+    export DAYU_HARNESS_REMOTE_ACTIONS_JSON='[{"kind":"ruleset","name":"protect-main"},{"kind":"ruleset","name":"protect-tags"}]'
+    write_fake_gh wrong_main_ruleset
+
+    run bash "$SCRIPT" "$repo_dir" --verify
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e '.status == "needs_user_action"'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-main:target=branch") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-main:refs/heads/main") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-main:rule=non_fast_forward") != null))'
+    echo "$output" | jq -e '.items | any(.kind=="rulesets" and .status=="missing" and (.missing | index("protect-main:rule=pull_request") != null))'
 }
 
 @test "github-remote --verify fetches ruleset detail when list omits conditions" {

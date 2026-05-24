@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
+import { resolveDeploymentOrder } from "../architecture/index.js";
 import { enabledCapabilityIds, readDayuConfig } from "./config.js";
 import { diagnoseDayuProject } from "./diagnose.js";
 import { CliError } from "./errors.js";
@@ -11,15 +12,25 @@ import { DEFAULT_CONFIG_FILE, resolveConfigPath, resolveTargetRoot } from "./pat
 import { statusDayuProject } from "./status.js";
 import type { FinalizeCheck, FinalizeOptions, FinalizeReport } from "./types.js";
 import { validateDayuProject } from "./validate.js";
+import type { CapabilityId, ManifestV2 } from "../schemas/index.js";
 
 export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeReport {
   const targetRoot = options.targetRoot ? resolveTargetRoot(options.targetRoot) : resolveTargetRoot();
   const configPath = options.configPath ? resolve(options.configPath) : resolveConfigPath(targetRoot);
   const skillRoot = options.skillRoot ? resolve(options.skillRoot) : loadManifestRegistry().skillRoot;
+  const manifestRegistry = loadManifestRegistry(skillRoot);
   const githubRemote = options.githubRemote ?? "skip";
   const releaseValidation = options.releaseValidation ?? "readiness";
   const config = readDayuConfig(configPath);
   const capabilityIds = new Set(enabledCapabilityIds(config));
+  const deploymentOrder = resolveDeploymentOrder(manifestRegistry.manifests, [...capabilityIds] as CapabilityId[]);
+  const deployedCapabilityIds = new Set<CapabilityId>(deploymentOrder);
+  const remoteActions = collectEnabledRemoteActions(deployedCapabilityIds, manifestRegistry.manifestById);
+  const remoteActionsJson = JSON.stringify(remoteActions);
+  const hasRemoteActions = remoteActions.length > 0;
+  const needsIssuePrE2e = deployedCapabilityIds.has("github.issue") && deployedCapabilityIds.has("github.pr");
+  const needsReleaseValidation = deployedCapabilityIds.has("github.release-please");
+  const needsRemoteE2e = needsIssuePrE2e || needsReleaseValidation;
   const checks: FinalizeCheck[] = [];
 
   runLocalChecks(targetRoot, configPath, checks);
@@ -73,30 +84,24 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
   const commitSha = commitIfNeeded(targetRoot, checks);
 
   let remote: FinalizeReport["remote"] | undefined;
-  let issuePrE2e: FinalizeReport["issuePrE2e"] = {
-    status: "skipped",
-    description: "未启用 GitHub 远端同步。"
-  };
-  let releaseE2e: FinalizeReport["releaseE2e"] = {
-    status: "skipped",
-    description: "未启用 Release Please 真实验证。"
-  };
+  let issuePrE2e: FinalizeReport["issuePrE2e"];
+  let releaseE2e: FinalizeReport["releaseE2e"];
 
   if (githubRemote === "apply") {
-    remote = applyAndVerifyRemote(targetRoot, skillRoot, checks);
+    remote = applyAndVerifyRemote(targetRoot, skillRoot, remoteActionsJson, remoteActions, checks);
     const remoteReady =
       remote?.applyStatus === "ok" &&
       remote.verifyStatus === "ok" &&
       Boolean(remote.repository) &&
       remote.initializationPullRequestMerged !== false;
-    if (capabilityIds.has("github.issue") && capabilityIds.has("github.pr") && remoteReady) {
+    if (needsIssuePrE2e && remoteReady) {
       issuePrE2e = runIssuePrE2e(targetRoot, remote?.repository);
       checks.push({
         name: "GitHub Issue/PR E2E",
         status: issuePrE2e.status === "passed" ? "passed" : "failed",
         description: issuePrE2e.description
       });
-    } else if (capabilityIds.has("github.issue") && capabilityIds.has("github.pr")) {
+    } else if (needsIssuePrE2e) {
       issuePrE2e = {
         status: "skipped",
         description: "GitHub 远端未完成，已暂停 Issue/PR E2E。"
@@ -107,7 +112,7 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
         description: issuePrE2e.description
       });
     }
-    if (capabilityIds.has("github.release-please") && remoteReady) {
+    if (needsReleaseValidation && remoteReady) {
       releaseE2e =
         releaseValidation === "real"
           ? runReleasePleaseRealValidation(targetRoot, remote?.repository)
@@ -117,7 +122,7 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
         status: releaseE2e.status === "passed" ? "passed" : releaseE2e.status === "skipped" ? "skipped" : "failed",
         description: releaseE2e.description
       });
-    } else if (capabilityIds.has("github.release-please")) {
+    } else if (needsReleaseValidation) {
       releaseE2e = {
         status: "skipped",
         description: "GitHub 远端未完成，已暂停 Release Please 验证。"
@@ -127,6 +132,33 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
         status: "skipped",
         description: releaseE2e.description
       });
+    }
+  } else if (hasRemoteActions || needsRemoteE2e) {
+    remote = {
+      applyStatus: "skipped",
+      verifyStatus: "skipped",
+      remoteActions,
+      applyItems: [],
+      verifyItems: []
+    };
+    checks.push({
+      name: "GitHub 远端同步",
+      status: "skipped",
+      description: hasRemoteActions
+        ? `已跳过远端同步，未应用远端动作：${describeRemoteActions(remoteActions)}。`
+        : "已跳过远端同步，需远端仓库的 E2E 验证未执行。"
+    });
+    if (needsIssuePrE2e) {
+      issuePrE2e = {
+        status: "skipped",
+        description: "GitHub 远端未完成，已暂停 Issue/PR E2E。"
+      };
+    }
+    if (needsReleaseValidation) {
+      releaseE2e = {
+        status: "skipped",
+        description: "GitHub 远端未完成，已暂停 Release Please 验证。"
+      };
     }
   }
 
@@ -146,18 +178,64 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
 
 function finalizeReport(input: Omit<FinalizeReport, "command" | "status"> & { status?: FinalizeReport["status"] }): FinalizeReport {
   const failed = input.checks.some((check) => check.status === "failed");
-  const partial =
-    !failed &&
-    (input.checks.some((check) => check.status === "skipped") ||
-      input.issuePrE2e?.status === "skipped" ||
-      input.releaseE2e?.status === "skipped" ||
-      input.remote?.applyStatus === "needs_user_action" ||
-      input.remote?.verifyStatus === "needs_user_action");
+  const remoteCapabilityEnabled = Boolean(input.remote?.remoteActions && input.remote.remoteActions.length > 0);
+  const remoteAttempted = Boolean(input.remote);
+  const remoteCheckNames = new Set([
+    "GitHub 远端同步",
+    "GitHub 远端校验",
+    "初始化 PR 后远端校验"
+  ]);
+  const remoteCheckSkipped = input.checks.some((check) => remoteCheckNames.has(check.name) && check.status === "skipped");
+  const remoteIncomplete =
+    remoteAttempted &&
+    ((remoteCapabilityEnabled && input.githubRemote === "skip") ||
+      ["needs_user_action", "needs_initialization", "missing", "partial", "skipped"].includes(input.remote?.applyStatus ?? "") ||
+      ["needs_user_action", "needs_initialization", "missing", "partial", "skipped"].includes(input.remote?.verifyStatus ?? ""));
+  const enabledE2eSkipped = input.issuePrE2e?.status === "skipped" || input.releaseE2e?.status === "skipped";
+  const partial = !failed && (remoteCheckSkipped || remoteIncomplete || enabledE2eSkipped);
   return {
     command: "finalize",
     ...input,
     status: input.status ?? (failed ? "failed" : partial ? "partial" : "completed")
   };
+}
+
+function collectEnabledRemoteActions(
+  enabledCapabilityIds: ReadonlySet<CapabilityId>,
+  manifestById: ReadonlyMap<string, ManifestV2>
+): ReadonlyArray<Record<string, unknown>> {
+  const actions: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+
+  for (const manifest of manifestById.values()) {
+    if (!enabledCapabilityIds.has(manifest.id) || !manifest.remote_actions) {
+      continue;
+    }
+
+    for (const action of manifest.remote_actions) {
+      const normalizedAction = action as Record<string, unknown>;
+      const key = JSON.stringify(normalizedAction);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      actions.push(normalizedAction);
+    }
+  }
+  return actions;
+}
+
+function describeRemoteActions(actions: ReadonlyArray<Record<string, unknown>>): string {
+  if (actions.length === 0) {
+    return "（无）";
+  }
+  return actions
+    .map((action) => {
+      const kind = typeof action.kind === "string" ? action.kind : "unknown";
+      const name = typeof action.name === "string" ? action.name : "";
+      return name ? `${kind}(${name})` : kind;
+    })
+    .join("、");
 }
 
 function runLocalChecks(targetRoot: string, configPath: string, checks: FinalizeCheck[]): void {
@@ -316,20 +394,26 @@ function commitIfNeeded(targetRoot: string, checks: FinalizeCheck[]): string | u
   return sha;
 }
 
-function applyAndVerifyRemote(targetRoot: string, skillRoot: string, checks: FinalizeCheck[]): FinalizeReport["remote"] {
+function applyAndVerifyRemote(
+  targetRoot: string,
+  skillRoot: string,
+  remoteActionsJson: string,
+  remoteActions: ReadonlyArray<Record<string, unknown>>,
+  checks: FinalizeCheck[]
+): FinalizeReport["remote"] {
   const scriptPath = join(skillRoot, "scripts/github-remote.sh");
   if (!existsSync(scriptPath)) {
     checks.push({ name: "GitHub 远端同步", status: "failed", description: "缺少 scripts/github-remote.sh。" });
     return { applyStatus: "error" };
   }
 
-  const apply = runRemoteScript(scriptPath, targetRoot, "--apply");
+  const apply = runRemoteScript(scriptPath, targetRoot, "--apply", remoteActionsJson);
   checks.push({
     name: "GitHub 远端同步",
     status: remoteScriptCheckStatus(apply.status),
     description: apply.description
   });
-  let verify = runRemoteScript(scriptPath, targetRoot, "--verify");
+  let verify = runRemoteScript(scriptPath, targetRoot, "--verify", remoteActionsJson);
   checks.push({
     name: "GitHub 远端校验",
     status: remoteScriptCheckStatus(verify.status),
@@ -348,7 +432,7 @@ function applyAndVerifyRemote(targetRoot: string, skillRoot: string, checks: Fin
     });
     if (merged) {
       syncLocalDefaultBranch(targetRoot, verify.defaultBranch || apply.defaultBranch);
-      verify = runRemoteScript(scriptPath, targetRoot, "--verify");
+      verify = runRemoteScript(scriptPath, targetRoot, "--verify", remoteActionsJson);
       checks.push({
         name: "初始化 PR 后远端校验",
         status: remoteScriptCheckStatus(verify.status),
@@ -361,7 +445,10 @@ function applyAndVerifyRemote(targetRoot: string, skillRoot: string, checks: Fin
     applyStatus: apply.status,
     verifyStatus: verify.status,
     repository: verify.repository || apply.repository,
-    initializationPullRequestMerged
+    initializationPullRequestMerged,
+    remoteActions,
+    applyItems: apply.items,
+    verifyItems: verify.items
   };
 }
 
@@ -383,10 +470,19 @@ interface RemoteScriptResult {
   items: Array<Record<string, unknown>>;
 }
 
-function runRemoteScript(scriptPath: string, targetRoot: string, mode: "--apply" | "--verify"): RemoteScriptResult {
+function runRemoteScript(
+  scriptPath: string,
+  targetRoot: string,
+  mode: "--apply" | "--verify",
+  remoteActionsJson: string
+): RemoteScriptResult {
   const output = execFileSync("bash", [scriptPath, targetRoot, mode], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      DAYU_HARNESS_REMOTE_ACTIONS_JSON: remoteActionsJson
+    }
   });
   const parsed = JSON.parse(output) as { status?: string; repository?: string; default_branch?: string; description_nl?: string; items?: unknown };
   return {
