@@ -1,9 +1,21 @@
 # Protect default/main/master branches from destructive pushes.
 if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
-    DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "${TMPDIR:-/tmp}/dayu-harness-pre-push.XXXXXX")"
+    for DAYU_HARNESS_TMP_CANDIDATE in "${DAYU_HARNESS_TMPDIR:-}" "${TMPDIR:-}" ".git/dayu-harness-tmp" ".dayu-harness-tmp" "/tmp"; do
+        [ -n "$DAYU_HARNESS_TMP_CANDIDATE" ] || continue
+        mkdir -p "$DAYU_HARNESS_TMP_CANDIDATE" 2>/dev/null || true
+        DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "${DAYU_HARNESS_TMP_CANDIDATE%/}/dayu-harness-pre-push.XXXXXX" 2>/dev/null || true)"
+        if [ -n "$DAYU_HARNESS_PRE_PUSH_INPUT" ]; then
+            break
+        fi
+    done
+    if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
+        echo "ERROR: unable to create temporary pre-push input file." >&2
+        exit 1
+    fi
     cat > "$DAYU_HARNESS_PRE_PUSH_INPUT"
     export DAYU_HARNESS_PRE_PUSH_INPUT
     trap 'rm -f "$DAYU_HARNESS_PRE_PUSH_INPUT"' EXIT
+    unset DAYU_HARNESS_TMP_CANDIDATE
 fi
 
 while read -r local_ref local_sha remote_ref remote_sha; do
