@@ -25,14 +25,14 @@ npm run dayu -- init --target <target> --json
 npm run dayu -- init --target <target> --apply --json
 npm run dayu -- status --target <target> --config <target>/dayu.config.yaml --json
 npm run dayu -- merge --target <target> --config <target>/dayu.config.yaml --dry-run --json
-npm run dayu -- generate --target <target> --config <target>/dayu.config.yaml --only core --json
+npm run dayu -- generate --target <target> --config <target>/dayu.config.yaml --capability core --json
 npm run dayu -- repair core --target <target> --config <target>/dayu.config.yaml --json
 npm run dayu -- apply --target <target> --config <target>/dayu.config.yaml --dry-run --json
 npm run dayu -- diagnose --target <target> --config <target>/dayu.config.yaml --json
 npm run dayu -- validate --target <target> --config <target>/dayu.config.yaml --json
 ```
 
-当前仍保留 `scripts/scaffold.sh` 作为完整 Skill 交互流程和 GitHub 远端 E2E 的兼容入口。TypeScript CLI 是 Phase 2 的确定性执行层，覆盖当前 20 个 manifest 的本地部署、融合、生成、修复、诊断和验证；真实 GitHub 远端同步和发布验证仍通过 profile smoke 显式开启。
+当前仍保留 `scripts/scaffold.sh` 作为 legacy 兼容和 GitHub 远端 E2E 辅助入口。TypeScript CLI 是 Phase 2 的主确定性执行层，覆盖当前 20 个 manifest 的本地部署、融合、生成、修复、诊断和验证；真实 GitHub 远端同步和发布验证仍通过独立辅助脚本或 profile smoke 显式开启。
 
 ## 覆盖图
 
@@ -51,7 +51,7 @@ Tutorial 缺口仍是有意延后：Phase 2 已提供快速开始、配置和排
 
 近期计划：
 
-1. 保持 Bash `scaffold.sh` 和 TypeScript CLI 的职责边界清晰：Bash 继续承载完整 Skill 交互和远端 E2E，TypeScript CLI 承载可测试的本地 planner / apply / merge / generate / repair / status / diagnose / validate。
+1. 保持 legacy Bash `scaffold.sh` 和 TypeScript CLI 的职责边界清晰：`/dayu-harness` 本地部署、融合、生成、修复、诊断和验证以 TypeScript CLI 为主；Bash 只保留兼容和远端 E2E 辅助职责。
 2. 每次修改 manifest v2、schema、CLI 命令、installer adapter 或部署 DAG，都同步更新对应 Phase 测试。
 3. 将 QA 中发现的环境假设转成测试，尤其是临时目录、hook stdin、符号链接 hook、原子写入失败清理。
 4. 只在目标项目实际部署内容变化时修改 `templates/`、`templates.en/`、`assets/` 和 `capabilities/`，避免把维护者测试记录误写进部署产物。

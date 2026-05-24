@@ -49,7 +49,7 @@ Phase 1c 明确两类依赖：
 - 缺失部署依赖和环依赖是 fatal error。
 - 当多个能力的依赖都已满足时，排序按 `infra`、`hard`、`soft` 的能力类型优先级执行，同类型再按能力 ID 字典序排序，保证 dry-run/apply 输出不依赖文件系统读取顺序。
 - 概念依赖可以影响展示顺序，但不得扩大部署闭包。
-- Phase 1 迁移期内，v2 试点 manifest 的旧 `dependencies` 必须继续镜像 `deployment_deps`，因为现有 `scaffold.sh` 仍读取 `dependencies`。
+- Phase 1 迁移期内，v2 试点 manifest 的旧 `dependencies` 必须继续镜像 `deployment_deps`，因为 legacy `scaffold.sh` 兼容入口仍读取 `dependencies`。
 
 Phase 1d 选定能力的部署 DAG：
 

@@ -36,9 +36,10 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 - 所有面向用户的提问和选项必须中英双语展示，格式为中文在前、英文在后；选项使用 `[1] 中文 / English`，默认项写明 `（默认，推荐）/ (default, recommended)`
 - 初始化第一个阻塞问题必须是部署内容语言（中文 / English）。不得先询问项目编程语言、技术栈或项目类型；这些信息由 Skill 根据文件自动判断，空项目默认按 Node.js 治理工具链基线处理。
 - 问答交互规则只约束 Skill 运行时，不写入目标项目部署产物。若宿主客户端暴露了可调用的原生交互机制（如选择器、确认对话或计划审批控件），必须优先使用；若当前客户端没有暴露可调用的结构化交互能力，则采用兼容降级：一次只提出一个阻塞问题，立即结束当前回复并等待用户输入，不得在同一轮继续运行命令、不得合并多个阻塞问题、不得假装已经进入交互控件
-- 可选的 `github.repository-settings` 在用户选择启用、部署验证通过且本次流程明确追加 `--github-remote apply` 后，才调用 GitHub API 同步 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；dry-run 只预览，不修改远端。Issue/PR/TDD/发布能力仍以配置、策略文件、工作流和说明为主。
+- 可选的 `github.repository-settings` 在用户选择启用、部署验证通过且本次流程明确进入远端同步 apply 后，才调用 GitHub API 同步 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`；CLI dry-run、本地 apply、check 和 verify 都不修改远端。Issue/PR/TDD/发布能力仍以配置、策略文件、工作流和说明为主。
 - 部署/融合前统一执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`；尚未确定可选能力时不传 `--capabilities`，脚本按默认必选能力检查。若返回 `needs_install`、`needs_initialization` 或 `needs_user_action`，先向用户展示安装/初始化建议并确认；若用户拒绝，当前流程终止
-- 任何涉及已有配置的操作，按能力清单中的可管理项/联动组件逐项处理：installer-backed 组件（如 husky hook 片段、`.gitignore`）先走 manifest installer 的 `--check`；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置文件、`.github/workflows`、ruleset JSON）改用 `scaffold.sh --dry-run` 输出变更预览；若可提供现有文件与目标文件对，优先调用 `diff-helper.sh merge-plan <existing> <incoming>`；否则继续基于 `scaffold.sh --dry-run` 做人工确认
+- Phase 2 起，`/dayu-harness` 的本地主执行路径是 TypeScript CLI：Skill 负责分析现状、提问和生成/维护 `dayu.config.yaml`；CLI 负责 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate` 的确定性执行。源码检出场景先在 Skill 根目录运行 `npm run build`，再用 `node dist/cli/main.js ...`；已发布包场景可用 `npx dayu-harness ...`。`scaffold.sh` 仅作为 legacy 兼容和远端 E2E 辅助入口，不作为本地部署、融合、维护的默认路径。
+- 任何涉及已有配置的操作，按能力清单中的可管理项/联动组件逐项处理：installer-backed 组件（如 husky hook 片段、`.gitignore`）先走 manifest installer 的 `--check`；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置文件、`.github/workflows`、ruleset JSON）优先用 CLI `merge --json` 输出融合预览，或用 `generate --json` 输出待写内容预览；若可提供现有文件与目标文件对，优先调用 `diff-helper.sh merge-plan <existing> <incoming>`；否则基于 CLI 预览结果做人工确认。只有当前 CLI 无法覆盖的 legacy 或远端 E2E 场景，才说明原因后调用 `scaffold.sh`
 - **不覆盖已有配置**，必须经用户确认
 
 ### 结构化提问约束（全流程）
@@ -62,8 +63,8 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 2. 分析项目现状（读取文件结构、已有配置）
 3. 按 [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) 的交互门禁询问 GitHub、发布、代码工具等可选能力（默认治理与 Git 能力直接纳入部署）
 4. 展示确认汇总
-5. 用户确认后：调用 `scaffold.sh --dry-run --enable <optional capability ids>` 预览变更 → 对已有配置确认策略 → `scaffold.sh --apply --finalize-git auto --enable <optional capability ids>`（如有冲突再加 `--strategy`，如用户已确认远端同步再加 `--github-remote apply`；启用 GitHub Issue/PR 且需跳过目标仓库 E2E 时必须显式追加 `--github-e2e skip`）复制默认与可选模板文档 + 安装联动的脚本资产 + 始终部署核心维护脚本
-6. `scaffold.sh --apply` 必须先完成 `validate/audit/check-consistency/capability-smoke`，通过后再精确 stage managed paths、创建初始化提交，并按远端状态推送默认分支或创建初始化 PR；启用 GitHub Issue/PR 且远端同步成功后，必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支，避免目标仓库残留测试产物；随后使用完成报告模板向用户汇报
+5. 用户确认后：用 CLI 预览和应用本地部署。缺少配置时先执行 `dayu-harness init --target <project-root> --locale <zh|en> --json` 预览，再执行 `dayu-harness init --target <project-root> --locale <zh|en> --apply --json`；已有配置时先更新 `dayu.config.yaml` 中的能力选择，再执行 `dayu-harness apply --target <project-root> --config <config-path> --dry-run --json` 预览，确认后执行 `dayu-harness apply --target <project-root> --config <config-path> --json`。如遇漂移，必须先说明影响并取得用户确认，才可追加 `--force`；只在用户明确要求清理托管孤儿文件时追加 `--prune-orphans`。
+6. CLI 写入完成后必须执行 `validate`、`diagnose`、`status` 以及目标项目内的 `validate/audit/check-consistency` 收尾检查。Git stage、commit、push、GitHub 远端创建/绑定和 Issue/PR E2E 不属于 CLI 本地写入的隐式副作用；只有用户已明确选择远端同步或远端 E2E 时，才在本地检查通过后调用 `scripts/github-remote.sh` 或对应 smoke profile，并在验证后清理测试 Issue、测试 PR 和测试分支。
 
 ### 2. 诊断
 
@@ -81,12 +82,12 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 1. 诊断现有状态（调用 `audit.sh --json`）
 2. 对每个已有组件按能力 manifest 中的联动项区分：
    - 有 manifest installer 的组件：调用对应 installer 脚本 `--check` 获取结构化 merge plan
-   - 无 installer 的组件（静态模板/资产文件）：先用 `scaffold.sh --dry-run` 获取差异说明；若有源文件和目标文件对可用，再补充 `diff-helper.sh merge-plan <existing> <incoming>` 的结构化说明，再展示给用户
+   - 无 installer 的组件（静态模板/资产文件）：先用 `dayu-harness merge --target <project-root> --config <config-path> --json` 获取融合预览，或用 `dayu-harness generate --target <project-root> --config <config-path> --json` 获取待写内容预览；若有源文件和目标文件对可用，再补充 `diff-helper.sh merge-plan <existing> <incoming>` 的结构化说明，再展示给用户
 3. 将 merge plan 或差异说明中的 `description_nl` 以自然语言呈现给用户
 4. 逐项双语询问：[1] 保留现有 / Keep existing [2] 替换 / Replace [3] 合并 / Merge [4] 跳过 / Skip
 5. 用户逐项确认后，按组件类型执行：
    - installer-backed 组件：调用对应 installer `--apply <merge|replace|skip>`
-   - 无 installer 组件：按用户确认方案，用 `scaffold.sh --apply` 或手工更新
+   - 无 installer 组件：按用户确认方案，用 `dayu-harness merge --apply --strategy <keep|replace|skip>`、`dayu-harness apply` 或手工更新
 6. 按「执行收尾验证」流程检查融合结果，并使用完成报告模板向用户汇报
 
 ### 4. 维护
@@ -94,8 +95,8 @@ Skill 不在日常 AI 协作中自动介入。Skill 删除后，治理体系的�
 触发：用户要求增删改约束或更新文档
 
 子功能：
-- **删除约束**：按联动组件逐项处理：installer-backed 组件先调用相关 installer 的 `--check` 获取影响范围；无 installer 组件先用 `scaffold.sh --dry-run` 标注待删差异并确认（如有源文件与目标文件对可用，再调用 `diff-helper.sh merge-plan <existing> <incoming>`） → 展示 → 确认 → 移除 → 更新 AGENTS.md 索引
-- **修改约束**：有现有/目标文件对时调用 `diff-helper.sh merge-plan <existing> <incoming>` 获取变更描述；无可用对时回退到 `scaffold.sh --dry-run` 的人工审核输出 → 展示 → 确认 → 更新
+- **删除约束**：按联动组件逐项处理：installer-backed 组件先调用相关 installer 的 `--check` 获取影响范围；无 installer 组件先用 `dayu-harness merge --json` 标注待删差异，或用 `dayu-harness generate --json` 预览调整后的托管内容（如有源文件与目标文件对可用，再调用 `diff-helper.sh merge-plan <existing> <incoming>`） → 展示 → 确认 → 移除 → 更新 AGENTS.md 索引
+- **修改约束**：有现有/目标文件对时调用 `diff-helper.sh merge-plan <existing> <incoming>` 获取变更描述；无可用对时回退到 `dayu-harness merge --json` 或 `dayu-harness generate --json` 的人工审核输出 → 展示 → 确认 → 更新
 - **完整性检查**：同诊断模式
 - **更新项目文档**：按 `docs/harness/maintenance.md` 流程 → 更新内容 → 同步索引
 
@@ -114,7 +115,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 1. `docs/harness/sensors/scripts/validate.sh --json <project-root>`：检查已启用的 hooks、配置和 workflow 是否可用。
 2. `docs/harness/sensors/scripts/audit.sh --json <project-root>`：检查 `AGENTS.md`、`CLAUDE.md`、docs 索引和维护脚本是否完整。
 3. `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`：检查文档链接、索引和孤儿文档。
-4. `scaffold.sh --apply` 输出中的 `post_apply_checks.capability-smoke`：必须覆盖本次所有已部署能力的 manifest 文件存在性和关键行为，包括 `.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy 和 release-please policy。不能只测试 GitHub 相关能力。
+4. `dayu-harness diagnose --target <project-root> --json`、`dayu-harness validate --target <project-root> --json` 和 `dayu-harness status --target <project-root> --json`：必须覆盖本次所有已部署能力的 manifest 文件存在性、漂移、执行位、依赖图和关键行为。对 `.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy 和 release-please policy 等硬能力，若 CLI 或传感器报告没有直接覆盖，必须手动抽查对应命令或脚本。不能只测试 GitHub 相关能力。
 
 以上本地检查属于结构/配置/关键行为验证，不能把它们表述成 GitHub Actions 已经端到端生效。启用 GitHub Issue/PR 能力并完成远端同步后，还必须运行目标仓库 Issue -> PR E2E：创建测试 Issue，再基于该 Issue 创建测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支。需要验证合并后自动关闭 Issue 时，使用 `tests/smoke/dayu-harness-profile.sh --profile remote-smoke` 的 disposable repo 流程。
 
@@ -178,7 +179,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 ## 能力清单约定
 
-- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。`deployment_deps` 阻塞部署，`conceptual_deps` 只影响说明和交互排序。`src/cli/` 公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。
+- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供 legacy `scaffold.sh` 兼容使用。`deployment_deps` 阻塞 CLI 部署，`conceptual_deps` 只影响说明和交互排序。`src/cli/` 是当前本地确定性执行层，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。
 - `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。通用质量实践、GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
@@ -197,7 +198,7 @@ Skill 目录中的其他文件按需加载：
 - **[locales/](locales/)**：key-based i18n 文案 catalog，覆盖当前全部 manifest v2 能力的中英文本契约。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），默认 Git 资产和用户选择的可选资产会部署到项目对应位置。
-- **[scripts/](scripts/)**：Skill 内部初始化脚本（`scaffold.sh`、`install-husky.sh`、`install-gitignore.sh`；其余能力按 manifest 指定 `installer.script` 调用），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。
+- **[scripts/](scripts/)**：Skill 内部辅助脚本（`ensure-environment.sh`、`github-remote.sh`、`install-husky.sh`、`install-gitignore.sh`，以及 legacy `scaffold.sh`）。`ensure-environment.sh` 负责环境依赖完整性与初始化确认；本地部署、融合、生成、修复、诊断和验证优先调用 `src/cli/`。
 - **[package.json](package.json)** 与 **[tsconfig.json](tsconfig.json)**：本地 TypeScript schema 验证工具链入口。
 - **[tests/](tests/)**：Skill 自身测试（维护者可选 bats 单元测试 + fixture 项目）；非运行时依赖，不会部署到目标项目。
 - **[docs/phase1b-schema.md](docs/phase1b-schema.md)**：Phase 1b schema、manifest v2、`dayu.config.yaml`、locale catalog 和路径安全契约。
@@ -205,5 +206,5 @@ Skill 目录中的其他文件按需加载：
 - **[docs/phase1d-cli.md](docs/phase1d-cli.md)**：Phase 1d TypeScript CLI 垂直切片命令语义、阶段边界和验证方式。
 - **[docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md)**：Phase 1e CLI 公开范围收口、默认 dry-run、`apply --only` 和原子写入契约。
 - **[docs/phase1-progress.md](docs/phase1-progress.md)**：Phase 1b-1e 当前进度、维护者计划、验证基线和 QA 经验沉淀。
-- **[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)**：`scaffold.sh` 内部逻辑 spike，记录 TypeScript port 前必须保留的 Bash 行为和风险。
+- **[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)**：`scaffold.sh` 内部逻辑 spike，记录 TypeScript port 前需要理解的历史 Bash 行为和风险。
 - **[docs/plan.md](docs/plan.md)**：Skill 设计计划和架构文档，仅供 Skill 维护者参考。

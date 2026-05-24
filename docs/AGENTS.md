@@ -36,7 +36,7 @@ Skill 自身文档索引。
 - [phase1c-architecture.md](phase1c-architecture.md)：Phase 1c CLI 命令树、DAG 和三层边界契约
 - [phase1d-cli.md](phase1d-cli.md)：Phase 1d TypeScript CLI 垂直切片实现边界、命令语义和验证方式
 - [phase1e-cli-scope.md](phase1e-cli-scope.md)：Phase 1e 公开 CLI 命令收口、默认 dry-run 和 `apply --only` 契约
-- [scaffold-sh-spike.md](scaffold-sh-spike.md)：现有 `scaffold.sh` 的关键执行语义与 TS port 注意事项
+- [scaffold-sh-spike.md](scaffold-sh-spike.md)：legacy `scaffold.sh` 的关键执行语义与 TS port 注意事项
 - [completion-report-template.md](completion-report-template.md)：Skill 执行完成后如何检查目标项目并向用户汇报结果
 
 ## 约定

@@ -116,7 +116,7 @@ npx skills add kinoward/dayu-harness-skill -a codex
 /dayu-harness
 ```
 
-然后按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再给出变更计划；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
+然后按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再通过同一个 Phase 2 CLI 执行本地确定性部署、融合、生成、修复和验证；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
 
 使用完成后可删除：
 

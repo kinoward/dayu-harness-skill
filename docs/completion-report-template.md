@@ -20,7 +20,7 @@
 1. 运行 `docs/harness/sensors/scripts/validate.sh --json <project-root>`，确认已启用的自动检查、配置和协作流程能正常工作。
 2. 运行 `docs/harness/sensors/scripts/audit.sh --json <project-root>`，确认项目入口、文档索引和维护说明完整。
 3. 运行 `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`，确认文档之间能互相找到，旧文档没有被遗漏。
-4. 检查 `scaffold.sh --apply` 输出中的 `post_apply_checks.capability-smoke`，确认所有已部署能力都被覆盖：manifest 文件存在性、`.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy、release-please policy 等。不要只抽查 GitHub 能力。
+4. 运行 `dayu-harness diagnose --target <project-root> --json`、`dayu-harness validate --target <project-root> --json` 和 `dayu-harness status --target <project-root> --json`，确认所有已部署能力都被覆盖：manifest 文件存在性、漂移、执行位、依赖图、`.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy、release-please policy 等。CLI 或传感器没有直接覆盖的硬能力必须手动抽查对应命令或脚本；不要只抽查 GitHub 能力。
 5. 如果启用了 GitHub/release 能力，先回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。
 6. 如果启用了 GitHub Issue/PR 能力并完成远端同步，创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支，避免目标仓库残留测试产物。只有 disposable `remote-smoke` profile 才验证合并后自动关闭 Issue。
 7. PR body、Issue body、commit message 等固定格式内容，优先用 `docs/harness/sensors/scripts/dayu-format.mjs`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；模型只提供结构化字段和错误解释。

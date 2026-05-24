@@ -116,7 +116,7 @@ After installation, open your Agent client in the target project and enter:
 /dayu-harness
 ```
 
-Then follow the prompts to initialize, fuse existing rules, diagnose project completeness, or maintain current governance content. The Skill analyzes repository state first and proposes a change plan; existing hooks, CI, lint, and release configs receive merge plans instead of being overwritten directly.
+Then follow the prompts to initialize, fuse existing rules, diagnose project completeness, or maintain current governance content. The Skill analyzes repository state first, then uses the same Phase 2 CLI for local deterministic deployment, merging, generation, repair, and validation; existing hooks, CI, lint, and release configs receive merge plans instead of being overwritten directly.
 
 After use, remove it with:
 

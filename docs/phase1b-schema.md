@@ -35,7 +35,7 @@ Phase 1b 只迁移 4 个试点 manifest：
 | `i18n` | 文案 key 声明，要求 locale catalog 有对应条目。 |
 | `rse` | Rule-Sensor-Enforcer 链路描述，说明能力由规则、传感器和执行器中的哪些部分组成。 |
 
-迁移期要求：旧 `dependencies` 字段必须继续保留，并且与 `deployment_deps` 完全一致。原因是完整脚手架仍由 `scripts/scaffold.sh` 承载，而 Bash 版本继续读取 `dependencies`。
+迁移期要求：旧 `dependencies` 字段必须继续保留，并且与 `deployment_deps` 完全一致。原因是 legacy `scripts/scaffold.sh` 兼容入口仍会读取 `dependencies`；Phase 2 本地部署主路径读取 `deployment_deps`。
 
 ## RSE 约束
 
@@ -73,7 +73,7 @@ Phase 1b 引入 key-based i18n catalog，用于把能力说明、错误信息和
 
 当前边界：
 
-- Bash `scaffold.sh` 仍主要依赖 `templates/` 与 `templates.en/` 双模板树。
+- legacy Bash `scaffold.sh` 仍主要依赖 `templates/` 与 `templates.en/` 双模板树。
 - `{{dayu:key}}` token 属于 schema/token 契约，尚未接入完整 Bash 渲染。
 - Phase 1d/1e TypeScript CLI 继续保留双模板树语义，避免一次迁移过多行为。
 

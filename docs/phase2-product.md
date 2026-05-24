@@ -89,3 +89,14 @@ Phase 2 apply 在每个写入前记录 preimage：
 | 修复与检查 | `repair`、`status`、`diagnose`、`validate` |
 
 所有命令支持 `--json` 输出机器可读结果。
+
+## 非目标
+
+Phase 2 CLI 是本地确定性执行层，不隐式执行以下远端或版本控制副作用：
+
+- Git stage、commit、push 或创建初始化 PR。
+- GitHub API 写入仓库设置、ruleset 或 workflow permissions。
+- 创建测试 Issue、测试分支、测试 PR，或等待远端 GitHub Actions 完成。
+- release-please 远端发布验证。
+
+这些操作必须由 `/dayu-harness` 在用户明确确认后，通过独立辅助脚本、GitHub CLI 或 smoke profile 执行，并在完成后清理测试产物。

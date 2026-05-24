@@ -24,7 +24,7 @@
 TypeScript port 启示：
 
 - Phase 1d 应读取 `deployment_deps`，但只针对 v2 试点 manifest。
-- 迁移期间不能删除 legacy `dependencies`，否则现有 `scaffold.sh` 行为会断。
+- 迁移期间不能删除 legacy `dependencies`，否则 legacy `scaffold.sh` 行为会断。
 - 依赖解析要返回结构化错误：unknown capability、missing dependency、cycle。
 
 ## 2. 文件收集

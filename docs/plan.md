@@ -132,7 +132,7 @@ Skill 删除后，上述意图由 AI 读取项目中的 `docs/harness/maintenanc
       node.gitignore / python.gitignore / universal.gitignore
 
   scripts/                          # Skill 初始化脚本（仅 Skill 内部使用，不部署到项目）
-    scaffold.sh                     # 主脚手架
+    scaffold.sh                     # 早期主脚手架；Phase 2 后为 legacy 兼容入口
     install-husky.sh
     install-gitignore.sh
 

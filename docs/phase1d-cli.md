@@ -40,7 +40,7 @@ npm run dayu -- diagnose --config <target>/dayu.config.yaml --target <target> --
 - Phase 1d 不迁移全量 capability；Phase 2 当前仓库的 20 个 manifest 已迁移到 v2 字段。
 - Phase 1d 不发布 npm 包，不保证全局 `npx dayu-harness` 分发体验；Phase 2 已补齐 npm 发布配置。
 - Phase 1d 不实现 `--force` 覆盖、孤儿文件清理、完整事务回滚、remote 操作或 Git finalization。
-- 不替换现有 `scripts/scaffold.sh`；旧脚手架继续服务完整 Skill 流程。
+- Phase 1d 当时不替换现有 `scripts/scaffold.sh`；Phase 2 后，本地确定性执行主路径已切换到 TypeScript CLI，`scaffold.sh` 仅保留 legacy 兼容和远端 E2E 辅助职责。
 
 ## 验证
 

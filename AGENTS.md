@@ -75,7 +75,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为可测试 schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为可测试 schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供 legacy `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。当前 `/dayu-harness` 本地部署、融合、生成、修复、诊断和验证应以该 CLI 为主执行层。
 
 4. **机械化检查优先于文字承诺**
 
@@ -149,8 +149,14 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 | 命令 | 用途 |
 | --- | --- |
 | `/dayu-harness` | Skill 显式入口。 |
-| `scripts/scaffold.sh <project-root> --dry-run --enable <optional ids>` | 预览默认能力与可选能力的部署计划。 |
-| `scripts/scaffold.sh <project-root> --apply --enable <optional ids>` | 应用用户确认后的部署计划。 |
+| `dayu-harness init --target <project-root> --json` | 预览默认能力配置和初始化部署计划。 |
+| `dayu-harness init --target <project-root> --apply --json` | 写入 `dayu.config.yaml` 并部署默认能力。 |
+| `dayu-harness apply --target <project-root> --dry-run --json` | 基于已有配置预览部署计划。 |
+| `dayu-harness apply --target <project-root> --json` | 基于已有配置应用部署计划。 |
+| `dayu-harness merge --target <project-root> --json` | 对已有项目预览能力级 keep/replace/skip 融合方案。 |
+| `dayu-harness generate --target <project-root> --json` | 渲染托管内容预览，不写入目标项目。 |
+| `dayu-harness repair <capability> --target <project-root> --json` | 修复单个能力或当前部署计划的漂移。 |
+| `scripts/scaffold.sh ...` | legacy 兼容与远端 E2E 辅助入口；本地部署默认使用 Phase 2 CLI。 |
 | `docs/harness/sensors/scripts/validate.sh --json <project-root>` | 在目标项目中检查启用的 hooks、配置和工作流。 |
 | `docs/harness/sensors/scripts/audit.sh --json <project-root>` | 检查入口文件、文档索引和治理结构完整性。 |
 | `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>` | 检查文档链接、索引同步和孤儿文档。 |
