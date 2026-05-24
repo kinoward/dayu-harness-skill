@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -103,6 +103,41 @@ test("Phase 1d apply reports conflicting files without overwriting them", (t) =>
   const merge = planDayuMerge({ configPath, targetRoot: target });
   assert.equal(merge.status, "conflict");
   assert.equal(merge.capabilities.find((capability) => capability.capabilityId === "core")?.recommendation, "review");
+});
+
+test("Phase 1d apply reports missing template sources without writing partial output", (t) => {
+  const target = makeTarget(t);
+  const configPath = writeDefaultConfig(target);
+  const skillRoot = mkdtempSync(join(tmpRoot, "phase1d-skill-"));
+  const originalSkillRoot = process.env.DAYU_HARNESS_SKILL_ROOT;
+  const originalNodeEnv = process.env.NODE_ENV;
+  for (const entry of ["assets", "capabilities", "locales", "scripts", "templates", "templates.en", "package.json"]) {
+    cpSync(join(repoRoot, entry), join(skillRoot, entry), { recursive: true });
+  }
+  rmSync(join(skillRoot, "templates", "AGENTS.md"));
+  process.env.NODE_ENV = "test";
+  process.env.DAYU_HARNESS_SKILL_ROOT = skillRoot;
+  t.after(() => {
+    if (originalSkillRoot === undefined) {
+      delete process.env.DAYU_HARNESS_SKILL_ROOT;
+    } else {
+      process.env.DAYU_HARNESS_SKILL_ROOT = originalSkillRoot;
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+    rmSync(skillRoot, { recursive: true, force: true });
+  });
+
+  const report = applyDayuConfig({ configPath, targetRoot: target });
+
+  assert.equal(report.status, "error");
+  assert.equal(report.summary.missingSource, 1);
+  assert.deepEqual(report.changedPaths, []);
+  assert.equal(existsSync(join(target, "CLAUDE.md")), false);
+  assert.equal(existsSync(join(target, "AGENTS.md")), false);
 });
 
 test("Phase 1d init roundtrip creates config that apply can consume", (t) => {
