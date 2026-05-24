@@ -1,11 +1,37 @@
 {
   "id": "knowledge.adr",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Architecture decision record templates",
   "description_nl": "Deploy decision record documentation templates and index.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.knowledge.adr.title",
+    "description_key": "capability.knowledge.adr.description",
+    "acceptance_keys": [
+      "capability.knowledge.adr.acceptance.1",
+      "capability.knowledge.adr.acceptance.2"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.knowledge.adr.rule",
+      "artifacts": [
+        "docs/design-docs/AGENTS.md",
+        "docs/design-docs/adr-template.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/design-docs/AGENTS.md",
@@ -17,12 +43,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "ADR AGENTS exists",
-    "ADR template exists"
-  ],
-  "suggested_when": "Enable for projects that want explicit decision records.",
   "template_files_i18n": {
     "en": [
       {
@@ -34,5 +54,11 @@
         "dst": "docs/design-docs/adr-template.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "ADR AGENTS exists",
+    "ADR template exists"
+  ],
+  "suggested_when": "Enable for projects that want explicit decision records."
 }

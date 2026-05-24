@@ -1,11 +1,37 @@
 {
   "id": "knowledge.archive",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Project knowledge archive scaffold",
   "description_nl": "Create archive indexes for historical project records and retired knowledge.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.knowledge.archive.title",
+    "description_key": "capability.knowledge.archive.description",
+    "acceptance_keys": [
+      "capability.knowledge.archive.acceptance.1",
+      "capability.knowledge.archive.acceptance.2"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.knowledge.archive.rule",
+      "artifacts": [
+        "docs/archive/AGENTS.md",
+        "docs/archive/product-specs/AGENTS.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/archive/AGENTS.md",
@@ -17,12 +43,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Archive AGENTS exists",
-    "Archive product specs AGENTS exists"
-  ],
-  "suggested_when": "Enable when archived project artifacts or retired knowledge need a fixed location.",
   "template_files_i18n": {
     "en": [
       {
@@ -34,5 +54,11 @@
         "dst": "docs/archive/product-specs/AGENTS.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Archive AGENTS exists",
+    "Archive product specs AGENTS exists"
+  ],
+  "suggested_when": "Enable when archived project artifacts or retired knowledge need a fixed location."
 }

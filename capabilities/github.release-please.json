@@ -1,8 +1,21 @@
 {
   "id": "github.release-please",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Automated release workflow with release-please",
   "description_nl": "Deploy release-please guide, workflow, and manifest/config files.",
   "default": false,
+  "deployment_deps": [
+    "core",
+    "git.commit-format",
+    "github.pr",
+    "github.repository-settings",
+    "release.versioning"
+  ],
+  "conceptual_deps": [
+    "release.versioning",
+    "github.pr"
+  ],
   "dependencies": [
     "core",
     "git.commit-format",
@@ -10,6 +23,47 @@
     "github.repository-settings",
     "release.versioning"
   ],
+  "i18n": {
+    "title_key": "capability.github.release-please.title",
+    "description_key": "capability.github.release-please.description",
+    "acceptance_keys": [
+      "capability.github.release-please.acceptance.1",
+      "capability.github.release-please.acceptance.2",
+      "capability.github.release-please.acceptance.3",
+      "capability.github.release-please.acceptance.4",
+      "capability.github.release-please.acceptance.5",
+      "capability.github.release-please.acceptance.6"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.github.release-please.rule",
+      "artifacts": [
+        "docs/harness/guides/release-please.md",
+        ".github/release-please-policy.json",
+        ".github/workflows/release-please.yml",
+        "release-please-config.json",
+        ".release-please-manifest.json",
+        ".github/scripts/release_please_policy.py"
+      ]
+    },
+    "sensor": {
+      "type": "script",
+      "checks": [
+        ".github/scripts/release_please_policy.py",
+        ".github/workflows/release-please.yml"
+      ],
+      "summary_key": "capability.github.release-please.sensor"
+    },
+    "enforcer": {
+      "type": "ci",
+      "mechanisms": [
+        "release-please.yml"
+      ],
+      "summary_key": "capability.github.release-please.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/release-please.md",
@@ -38,6 +92,15 @@
       "dst": ".github/scripts/release_please_policy.py"
     }
   ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/release-please.md",
+        "dst": "docs/harness/guides/release-please.md"
+      }
+    ]
+  },
+  "installer": null,
   "remote_actions": [
     {
       "kind": "workflow_permissions",
@@ -51,7 +114,6 @@
       "can_approve_pull_request_reviews": true
     }
   ],
-  "installer": null,
   "acceptance": [
     "release-please workflow exists",
     "release-please guide exists",
@@ -60,13 +122,5 @@
     "release-please policy file exists",
     "release-please policy script exists"
   ],
-  "suggested_when": "Enable for GitHub-backed automated release management.",
-  "template_files_i18n": {
-    "en": [
-      {
-        "src": "templates.en/docs/harness/guides/release-please.md",
-        "dst": "docs/harness/guides/release-please.md"
-      }
-    ]
-  }
+  "suggested_when": "Enable for GitHub-backed automated release management."
 }

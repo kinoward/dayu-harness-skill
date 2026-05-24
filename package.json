@@ -1,13 +1,28 @@
 {
-  "name": "dayu-harness-skill",
+  "name": "dayu-harness",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "bin": {
-    "dayu-harness": "./src/cli/main.ts"
+    "dayu-harness": "./dist/cli/main.js"
   },
+  "files": [
+    "dist/",
+    "assets/",
+    "capabilities/",
+    "locales/",
+    "scripts/",
+    "templates/",
+    "templates.en/",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dayu": "TMPDIR=.tmp tsx src/cli/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck",
     "test": "npm run test:unit",
     "test:unit": "TMPDIR=.tmp node --import tsx --test tests/unit/*.test.ts",
     "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts",
@@ -16,6 +31,7 @@
     "test:phase1e": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1e-cli-scope.test.ts"
   },
   "dependencies": {
+    "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "yaml": "^2.8.2",
     "zod": "^4.1.12"

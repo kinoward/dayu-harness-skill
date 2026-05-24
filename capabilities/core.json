@@ -12,9 +12,12 @@
     "title_key": "capability.core.title",
     "description_key": "capability.core.description",
     "acceptance_keys": [
-      "capability.core.acceptance.docs",
-      "capability.core.acceptance.scripts",
-      "capability.core.acceptance.dayu-format"
+      "capability.core.acceptance.1",
+      "capability.core.acceptance.2",
+      "capability.core.acceptance.3",
+      "capability.core.acceptance.4",
+      "capability.core.acceptance.5",
+      "capability.core.acceptance.6"
     ]
   },
   "rse": {
@@ -22,11 +25,24 @@
       "type": "infrastructure",
       "summary_key": "capability.core.rule",
       "artifacts": [
+        "CLAUDE.md",
         "AGENTS.md",
+        "docs/AGENTS.md",
+        "docs/harness/AGENTS.md",
         "docs/harness/maintenance.md",
-        "docs/harness/sensors/scripts/validate.sh",
+        "docs/harness/guides/AGENTS.md",
+        "docs/harness/sensors/AGENTS.md",
+        "docs/harness/sensors/scripts/AGENTS.md",
         "docs/harness/sensors/scripts/audit.sh",
-        "docs/harness/sensors/scripts/check-consistency.sh"
+        "docs/harness/sensors/scripts/check-consistency.sh",
+        "docs/harness/sensors/scripts/diff-helper.sh",
+        "docs/harness/sensors/scripts/validate.sh",
+        "docs/harness/sensors/scripts/dayu-format.mjs",
+        "docs/harness/sensors/reviews/AGENTS.md",
+        "docs/exec-plans/AGENTS.md",
+        "docs/exec-plans/active/AGENTS.md",
+        "docs/exec-plans/completed/AGENTS.md",
+        "docs/generated/AGENTS.md"
       ]
     },
     "sensor": null,
@@ -112,16 +128,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Core docs exist after scaffold",
-    "Harness indexes exist",
-    "Generated docs index exists",
-    "Maintenance scripts AGENTS index exists",
-    "Maintenance scripts are executable",
-    "Fixed-format content renderer exists"
-  ],
-  "suggested_when": "Always deploy in every scaffold run.",
   "template_files_i18n": {
     "en": [
       {
@@ -202,5 +208,15 @@
         "dst": "docs/generated/AGENTS.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Core docs exist after scaffold",
+    "Harness indexes exist",
+    "Generated docs index exists",
+    "Maintenance scripts AGENTS index exists",
+    "Maintenance scripts are executable",
+    "Fixed-format content renderer exists"
+  ],
+  "suggested_when": "Always deploy in every scaffold run."
 }

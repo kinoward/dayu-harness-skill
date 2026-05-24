@@ -12,6 +12,31 @@ ENVIRONMENT_SCRIPT="$SCRIPTS_DIR/ensure-environment.sh"
 GITHUB_REMOTE_SCRIPT="$SCRIPTS_DIR/github-remote.sh"
 OUTPUT_BASE="$(pwd)"
 
+dayu_tmp_dir() {
+    local base="${TMPDIR:-/tmp}"
+    local candidate
+    case "$base" in
+        /*) ;;
+        *) base="$OUTPUT_BASE/$base" ;;
+    esac
+
+    for candidate in "$base" "$OUTPUT_BASE/.tmp" "$SKILL_DIR/.tmp"; do
+        [ -n "$candidate" ] || continue
+        if mkdir -p "$candidate" 2>/dev/null && [ -d "$candidate" ] && [ -w "$candidate" ]; then
+            printf '%s\n' "${candidate%/}"
+            return 0
+        fi
+    done
+
+    echo "error: no writable temporary directory found" >&2
+    return 1
+}
+
+dayu_mktemp() {
+    local prefix="$1"
+    mktemp "$(dayu_tmp_dir)/${prefix}.XXXXXX"
+}
+
 MODE="prompt"
 TARGET=""
 ENABLED_CATEGORIES=""
@@ -633,7 +658,7 @@ run_github_remote() {
 
     remote_stderr_file=""
     if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
-        remote_stderr_file="$(mktemp "${TMPDIR%/}/dayu-github-remote-stderr.XXXXXX" 2>/dev/null || true)"
+        remote_stderr_file="$(dayu_mktemp "dayu-github-remote-stderr" 2>/dev/null || true)"
     fi
     if [ -z "$remote_stderr_file" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
         remote_stderr_file="$(mktemp "/tmp/dayu-github-remote-stderr.XXXXXX" 2>/dev/null || true)"
@@ -1460,7 +1485,7 @@ run_capability_smoke_checks() {
         elif ! grep -Fq "commitlint" "$TARGET/.husky/commit-msg" 2>/dev/null; then
             add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未包含 commitlint 校验片段。"
         else
-            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-commit-msg.XXXXXX")"
+            tmp_file="$(dayu_mktemp "dayu-commit-msg")"
             printf '%s\n' "test: verify dayu harness commit hook" > "$tmp_file"
             set +e
             (cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" >/dev/null 2>&1)
@@ -1473,7 +1498,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "git.commit-format" "commit-msg-hook" "failed" "commit-msg hook 未接受有效 Conventional Commit 消息。"
             fi
 
-            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-commit-msg-bad.XXXXXX")"
+            tmp_file="$(dayu_mktemp "dayu-commit-msg-bad")"
             printf '%s\n' "bad commit message" > "$tmp_file"
             set +e
             command_output="$(cd "$TARGET" && bash ".husky/commit-msg" "$tmp_file" 2>&1)"
@@ -1518,7 +1543,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.husky/pre-push" ]; then
             add_smoke_item "github.branch-protection" "pre-push-default-branch" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
         else
-            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-branch.XXXXXX")"
+            input_file="$(dayu_mktemp "dayu-pre-push-branch")"
             printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/$DEFAULT_BRANCH 2222222222222222222222222222222222222222" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1531,7 +1556,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.branch-protection" "pre-push-default-branch" "failed" "pre-push hook 未按预期拒绝默认分支直接推送。"
             fi
 
-            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-feature.XXXXXX")"
+            input_file="$(dayu_mktemp "dayu-pre-push-feature")"
             printf '%s\n' "refs/heads/dayu-smoke 1111111111111111111111111111111111111111 refs/heads/dayu-smoke 0000000000000000000000000000000000000000" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1550,7 +1575,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.husky/pre-push" ]; then
             add_smoke_item "release.versioning" "pre-push-release-tag" "skipped" "pre-push hook 未安装；可能是 installer strategy=skip。"
         else
-            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-tag.XXXXXX")"
+            input_file="$(dayu_mktemp "dayu-pre-push-tag")"
             printf '%s\n' "refs/tags/v0.1.0 1111111111111111111111111111111111111111 refs/tags/v0.1.0 2222222222222222222222222222222222222222" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1563,7 +1588,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "release.versioning" "pre-push-release-tag" "failed" "pre-push hook 未按预期拒绝覆盖 release tag。"
             fi
 
-            input_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pre-push-new-tag.XXXXXX")"
+            input_file="$(dayu_mktemp "dayu-pre-push-new-tag")"
             printf '%s\n' "refs/tags/v9.9.9 1111111111111111111111111111111111111111 refs/tags/v9.9.9 0000000000000000000000000000000000000000" > "$input_file"
             set +e
             command_output="$(cd "$TARGET" && DAYU_HARNESS_PRE_PUSH_INPUT="$input_file" bash ".husky/pre-push" 2>&1)"
@@ -1582,7 +1607,7 @@ run_capability_smoke_checks() {
         if [ ! -f "$TARGET/.github/scripts/pr_body_structure.py" ]; then
             add_smoke_item "github.pr" "pr-body-validator" "failed" "PR body validator 缺失。"
         else
-            body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pr-body.XXXXXX")"
+            body_file="$(dayu_mktemp "dayu-pr-body")"
             render_dayu_pr_body "1" "Verify deterministic PR body rendering." "Render and validate a Dayu Harness PR body without model free-form text." "docs/harness/sensors/scripts/validate.sh --json ." > "$body_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
@@ -1595,7 +1620,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.pr" "pr-body-validator" "failed" "确定性生成的 PR body 未通过 PR 结构校验。"
             fi
 
-            body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-pr-body-bad.XXXXXX")"
+            body_file="$(dayu_mktemp "dayu-pr-body-bad")"
             printf '%s\n\n%s\n' "## Summary" "- Missing required sections and issue trailer." > "$body_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_body_structure.py" < "$body_file" >/dev/null 2>&1
@@ -1615,7 +1640,7 @@ run_capability_smoke_checks() {
             add_smoke_item "github.issue" "issue-body-validator" "failed" "Issue depends-on validator 缺失。"
         else
             body="$(render_dayu_issue_body "Verify deterministic issue body rendering." "Render and validate a Dayu Harness issue body without model free-form text.")"
-            event_file="$(mktemp "${TMPDIR:-/tmp}/dayu-issue-event.XXXXXX")"
+            event_file="$(dayu_mktemp "dayu-issue-event")"
             jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
             set +e
             python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
@@ -1629,7 +1654,7 @@ run_capability_smoke_checks() {
             fi
 
             body="$(printf '## Summary\n\n- Invalid depends-on trailer.\n\nDepends on #1\n')"
-            event_file="$(mktemp "${TMPDIR:-/tmp}/dayu-issue-event-bad.XXXXXX")"
+            event_file="$(dayu_mktemp "dayu-issue-event-bad")"
             jq -n --arg body "$body" '{issue:{body:$body}}' > "$event_file"
             set +e
             python3 "$TARGET/.github/scripts/issue_depends_on.py" "$event_file" >/dev/null 2>&1
@@ -1656,7 +1681,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "quality.tdd" "policy-validator" "failed" "TDD policy 文件未通过 checker 解析。"
             fi
 
-            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-tdd-policy-bad.XXXXXX")"
+            tmp_file="$(dayu_mktemp "dayu-tdd-policy-bad")"
             printf '%s\n' '{"impl_patterns":"src/.*"}' > "$tmp_file"
             set +e
             python3 "$TARGET/.github/scripts/pr_tdd_check.py" "$tmp_file" --validate-policy-only >/dev/null 2>&1
@@ -1685,7 +1710,7 @@ run_capability_smoke_checks() {
                 add_smoke_item "github.release-please" "release-policy-validator" "failed" "release-please policy 本地校验失败。"
             fi
 
-            tmp_file="$(mktemp "${TMPDIR:-/tmp}/dayu-release-policy-bad.XXXXXX")"
+            tmp_file="$(dayu_mktemp "dayu-release-policy-bad")"
             printf '%s\n' '{}' > "$tmp_file"
             set +e
             python3 "$TARGET/.github/scripts/release_please_policy.py" "$tmp_file" "$TARGET" >/dev/null 2>&1
@@ -1948,12 +1973,7 @@ run_post_apply_checks_at_root() {
 make_writable_tmpdir() {
     local prefix="$1"
     local tmpdir=""
-    if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR:-}" ] && [ -w "${TMPDIR:-}" ]; then
-        tmpdir="$(mktemp -d "${TMPDIR%/}/${prefix}.XXXXXX" 2>/dev/null || true)"
-    fi
-    if [ -z "$tmpdir" ] && [ -d "/tmp" ] && [ -w "/tmp" ]; then
-        tmpdir="$(mktemp -d "/tmp/${prefix}.XXXXXX" 2>/dev/null || true)"
-    fi
+    tmpdir="$(mktemp -d "$(dayu_tmp_dir)/${prefix}.XXXXXX" 2>/dev/null || true)"
     printf '%s' "$tmpdir"
 }
 
@@ -2236,7 +2256,7 @@ run_github_target_e2e() {
     fi
     head_sha="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
 
-    body_file="$(mktemp "${TMPDIR:-/tmp}/dayu-e2e-pr-body.XXXXXX")"
+    body_file="$(dayu_mktemp "dayu-e2e-pr-body")"
     render_dayu_pr_body "$issue_number" \
       "Verify Dayu Harness GitHub Issue to PR governance after initialization." \
       "Adds a smoke marker on an isolated validation branch." \

@@ -16,8 +16,8 @@
     "title_key": "capability.ai.execution.title",
     "description_key": "capability.ai.execution.description",
     "acceptance_keys": [
-      "capability.ai.execution.acceptance.document",
-      "capability.ai.execution.acceptance.autonomy"
+      "capability.ai.execution.acceptance.1",
+      "capability.ai.execution.acceptance.2"
     ]
   },
   "rse": {
@@ -38,12 +38,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "AI execution practice document exists",
-    "Autonomous execution and retry rules are documented"
-  ],
-  "suggested_when": "Enable when AI agents regularly implement or maintain project work.",
   "template_files_i18n": {
     "en": [
       {
@@ -51,5 +45,11 @@
         "dst": "docs/harness/guides/ai-execution.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "AI execution practice document exists",
+    "Autonomous execution and retry rules are documented"
+  ],
+  "suggested_when": "Enable when AI agents regularly implement or maintain project work."
 }

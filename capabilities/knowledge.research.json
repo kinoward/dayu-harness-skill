@@ -1,11 +1,36 @@
 {
   "id": "knowledge.research",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Research notes knowledge base scaffold",
   "description_nl": "Create research notes index and structure.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.knowledge.research.title",
+    "description_key": "capability.knowledge.research.description",
+    "acceptance_keys": [
+      "capability.knowledge.research.acceptance.1"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.knowledge.research.rule",
+      "artifacts": [
+        "docs/references/AGENTS.md",
+        "docs/references/research/AGENTS.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/references/AGENTS.md",
@@ -17,11 +42,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Research AGENTS exists"
-  ],
-  "suggested_when": "Enable for teams that keep product or technology research in repository.",
   "template_files_i18n": {
     "en": [
       {
@@ -33,5 +53,10 @@
         "dst": "docs/references/research/AGENTS.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Research AGENTS exists"
+  ],
+  "suggested_when": "Enable for teams that keep product or technology research in repository."
 }

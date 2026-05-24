@@ -1,6 +1,11 @@
 # Protect default/main/master branches from destructive pushes.
 if [ -z "${DAYU_HARNESS_PRE_PUSH_INPUT:-}" ]; then
-    DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "${TMPDIR:-/tmp}/dayu-harness-pre-push.XXXXXX")"
+    dayu_tmp_dir="${TMPDIR:-${PWD:-.}/.dayu/tmp}"
+    if ! mkdir -p "$dayu_tmp_dir" 2>/dev/null || [ ! -w "$dayu_tmp_dir" ]; then
+        dayu_tmp_dir="${PWD:-.}/.dayu/tmp"
+        mkdir -p "$dayu_tmp_dir"
+    fi
+    DAYU_HARNESS_PRE_PUSH_INPUT="$(mktemp "$dayu_tmp_dir/dayu-harness-pre-push.XXXXXX")"
     cat > "$DAYU_HARNESS_PRE_PUSH_INPUT"
     export DAYU_HARNESS_PRE_PUSH_INPUT
     trap 'rm -f "$DAYU_HARNESS_PRE_PUSH_INPUT"' EXIT

@@ -72,6 +72,19 @@ The name “Dayu” comes from Great Yu’s flood-control story: do not block th
 
 Install this Skill only into the target repository that needs governance. Do not install it globally, and do not commit the Skill installation directory into the target project. Dayu Harness Skill is a one-time scaffold, fuse, diagnose, and maintenance entrypoint; after use it can be removed, while the long-lived effect remains in the target project’s `AGENTS.md`, `docs/`, hooks, CI, and check scripts.
 
+### 🧰 Phase 2 CLI Engine
+
+If you only need the deterministic execution layer, use the CLI directly:
+
+```bash
+cd <target-project>
+npx dayu-harness init --target .          # dry-run by default
+npx dayu-harness init --target . --apply  # write config and deploy default capabilities
+npx dayu-harness status --target .
+```
+
+The CLI supports `init`, `apply`, `merge`, `generate`, `repair`, `status`, `diagnose`, and `validate`. See [docs/configuration.md](docs/configuration.md) for the config contract and [docs/getting-started.md](docs/getting-started.md) for the quick start.
+
 ### ⚡ Recommended: Vercel skills CLI
 
 ```bash
@@ -169,15 +182,16 @@ The README only shows a high-level structure; the complete directory tree and ow
 
 - Entry points & indexes: `README.md`, `README.en.md`, `AGENTS.md` (including subdirectory indexes)
 - Capabilities, schema, architecture contracts & deployment engine: `capabilities/`, `src/`, `locales/`, `templates/`, `templates.en/`, `assets/`, `scripts/`
-- Local validation toolchain: `package.json`, `tsconfig.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`
+- Local validation toolchain: `package.json`, `tsconfig.json`, `tsconfig.build.json`, `tests/unit/phase1b-schema.test.ts`, `tests/unit/phase1c-architecture.test.ts`, `tests/unit/phase1d-cli.test.ts`, `tests/unit/phase1e-cli-scope.test.ts`, `tests/unit/phase2-cli.test.ts`
 - Outputs & maintenance materials: `docs/`, `marketing/`, `tests/`
-- Publishing & repository automation: `.github/workflows/update-contributors.yml` refreshes README dynamic blocks; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
+- Publishing & repository automation: `.github/workflows/ci.yml`, `.github/workflows/release-please.yml`, `.github/workflows/npm-publish.yml`, `.github/workflows/update-contributors.yml`; GitHub capability workflow, ruleset, and policy templates live under `assets/github/`
 
 Full repository tree is in [AGENTS.md](AGENTS.md).
 
 ## 🔎 More Details
 
 - To understand the Skill behavior definition: read [SKILL.md](SKILL.md).
+- To use the CLI directly: read [docs/getting-started.md](docs/getting-started.md) and [docs/configuration.md](docs/configuration.md).
 - To understand repository maintenance rules, capability lists, script flow, and test baseline: read [AGENTS.md](AGENTS.md).
 - To understand compatibility across Agent clients: read [references/agent-compatibility.md](references/agent-compatibility.md).
 

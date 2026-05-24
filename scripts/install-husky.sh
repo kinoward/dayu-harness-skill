@@ -81,7 +81,21 @@ hook_write_target() {
 
 hook_file_mode() {
     local dst="$1"
-    stat -L -f '%Lp' "$dst" 2>/dev/null || stat -L -c '%a' "$dst" 2>/dev/null || true
+    local mode
+
+    mode="$(stat -L -c '%a' "$dst" 2>/dev/null || true)"
+    if printf '%s' "$mode" | grep -Eq '^[0-7]{3,4}$'; then
+        printf '%s\n' "$mode"
+        return 0
+    fi
+
+    mode="$(stat -L -f '%Lp' "$dst" 2>/dev/null || true)"
+    if printf '%s' "$mode" | grep -Eq '^[0-7]{3,4}$'; then
+        printf '%s\n' "$mode"
+        return 0
+    fi
+
+    return 0
 }
 
 write_hook_atomically() {

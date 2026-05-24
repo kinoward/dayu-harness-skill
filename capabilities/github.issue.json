@@ -1,11 +1,53 @@
 {
   "id": "github.issue",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "GitHub issue body dependency lint",
   "description_nl": "Deploy issue lint workflow and depends-on body validator.",
   "default": false,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.github.issue.title",
+    "description_key": "capability.github.issue.description",
+    "acceptance_keys": [
+      "capability.github.issue.acceptance.1",
+      "capability.github.issue.acceptance.2",
+      "capability.github.issue.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.github.issue.rule",
+      "artifacts": [
+        "docs/harness/guides/issue-guidelines.md",
+        ".github/workflows/issue-lint.yml",
+        ".github/ISSUE_TEMPLATE/dayu-harness-issue.md",
+        ".github/scripts/issue_depends_on.py"
+      ]
+    },
+    "sensor": {
+      "type": "script",
+      "checks": [
+        ".github/scripts/issue_depends_on.py",
+        ".github/workflows/issue-lint.yml"
+      ],
+      "summary_key": "capability.github.issue.sensor"
+    },
+    "enforcer": {
+      "type": "ci",
+      "mechanisms": [
+        "issue-lint.yml"
+      ],
+      "summary_key": "capability.github.issue.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/issue-guidelines.md",
@@ -26,13 +68,6 @@
       "dst": ".github/scripts/issue_depends_on.py"
     }
   ],
-  "installer": null,
-  "acceptance": [
-    "Issue lint workflow exists",
-    "Issue depends-on validator exists",
-    "Issue linting guide exists"
-  ],
-  "suggested_when": "Enable when project uses GitHub issues.",
   "template_files_i18n": {
     "en": [
       {
@@ -40,5 +75,12 @@
         "dst": "docs/harness/guides/issue-guidelines.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Issue lint workflow exists",
+    "Issue depends-on validator exists",
+    "Issue linting guide exists"
+  ],
+  "suggested_when": "Enable when project uses GitHub issues."
 }

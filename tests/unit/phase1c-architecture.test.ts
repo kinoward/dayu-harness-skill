@@ -30,21 +30,23 @@ function readTrialManifests(): ManifestV2[] {
   return phase1cCapabilityIds.map((id) => readManifest(id));
 }
 
-test("Phase 1c/1e CLI command tree defines the four Phase 1 public tool commands", () => {
+test("Phase 2 CLI command tree exposes product commands", () => {
   assert.deepEqual(
     CLI_COMMAND_TREE.map((command) => command.name),
-    ["init", "apply", "diagnose", "validate"]
+    ["init", "apply", "diagnose", "validate", "merge", "generate", "status", "repair"]
   );
 
   for (const command of CLI_COMMAND_TREE) {
     assert.equal(command.layer, "tool", command.name);
     assert.equal(command.interactive, false, command.name);
     assert.equal(command.supportsJson, true, command.name);
-    assert.equal(command.phase1Slice, true, command.name);
+    assert.equal(command.phase1Slice, false, command.name);
   }
 
   assert.deepEqual(getCliCommandSpec("init").delegatesTo, ["apply"]);
   assert.equal(getCliCommandSpec("apply").supportsDryRun, true);
+  assert.deepEqual(getCliCommandSpec("status").delegatesTo, ["diagnose"]);
+  assert.deepEqual(getCliCommandSpec("repair").delegatesTo, ["apply"]);
 });
 
 test("architecture layer contracts preserve frontend, tool, and product separation", () => {

@@ -1,11 +1,35 @@
 {
   "id": "knowledge.troubleshooting",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Troubleshooting knowledge base scaffold",
   "description_nl": "Create troubleshooting knowledge index and structure.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.knowledge.troubleshooting.title",
+    "description_key": "capability.knowledge.troubleshooting.description",
+    "acceptance_keys": [
+      "capability.knowledge.troubleshooting.acceptance.1"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.knowledge.troubleshooting.rule",
+      "artifacts": [
+        "docs/troubleshooting/AGENTS.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/troubleshooting/AGENTS.md",
@@ -13,11 +37,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Troubleshooting AGENTS exists"
-  ],
-  "suggested_when": "Enable when troubleshooting notes should be first-class in docs.",
   "template_files_i18n": {
     "en": [
       {
@@ -25,5 +44,10 @@
         "dst": "docs/troubleshooting/AGENTS.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Troubleshooting AGENTS exists"
+  ],
+  "suggested_when": "Enable when troubleshooting notes should be first-class in docs."
 }
