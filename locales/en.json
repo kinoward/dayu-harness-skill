@@ -78,7 +78,7 @@
   "capability.github.release-please.title": "Release Please Automation",
   "capability.github.repository-settings.acceptance.1": "Repository pull request settings file exists",
   "capability.github.repository-settings.acceptance.2": "Repository settings guide exists",
-  "capability.github.repository-settings.acceptance.3": "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API during apply",
+  "capability.github.repository-settings.acceptance.3": "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API only during explicit remote sync",
   "capability.github.repository-settings.description": "Repository pull request automation settings",
   "capability.github.repository-settings.enforcer": "Apply repository settings through explicit manual or remote-sync steps.",
   "capability.github.repository-settings.rule": "Constrain PR auto-merge and branch cleanup options through repository setting policy files.",

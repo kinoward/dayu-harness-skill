@@ -29,7 +29,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 联动组件是治理能力部署出的文件、hook、CI、脚本等。
 新增治理能力优先更新能力清单；未启用的可选治理能力不会在目标项目生效。
-目标项目部署后的文档不依赖 Skill 内部文件路径；若后续需要未启用能力，需要重新安装 Skill，或手工引入对应模块。
+目标项目部署后的文档不依赖 Skill 内部文件路径；若后续需要未启用能力，优先重新安装 Skill 或使用已发布的 `dayu-harness` CLI 生成预览和部署计划，也可以手工引入对应模块并同步索引。
 
 ### 核心原则
 
@@ -93,7 +93,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 2. 修改文档内容
 3. 如涉及脚本变更，同步更新对应脚本
 4. 如涉及索引变更（文件增删），更新对应 `AGENTS.md`，并同步受影响的 `## 目录索引` 区块（及 `README.md` 的 `## 目录结构`）
-5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述：若有现有文件与目标文件对，可调用 `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>`；没有可配对文件时改为基于 `scaffold.sh --dry-run` 的人工复核，之后确认
+5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述：若有现有文件与目标文件对，可调用 `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>`；没有可配对文件时，优先用 `dayu-harness generate --target <project-root> --json` 或 `dayu-harness merge --target <project-root> --json` 生成预览，CLI 不可用时改为人工复核，之后确认
 6. 执行 `docs/harness/sensors/scripts/validate.sh` 验证（如可用）
 
 ### 删除约束
@@ -130,7 +130,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 3. **联动约束完整性**
    - 联动组件是否已按能力清单部署且可执行
    - 联动规则表中的约束是否都有对应文档和联动组件
-   - 部署完成报告中的 `capability-smoke` 是否覆盖了本次已部署能力；若缺少脚本入口，则手动抽查对应 hook、linter、PR/Issue/TDD/release helper 是否可运行
+   - CLI `diagnose` / `validate` / `status` 与部署完成报告是否覆盖了本次已部署能力；若缺少脚本入口，则手动抽查对应 hook、linter、PR/Issue/TDD/release helper 是否可运行
 
 4. **命名规范**
    - 文件名是否使用英文小写 + 连字符
@@ -207,7 +207,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 当需要修改已有配置时，按以下流程操作（本流程可由 AI 手动执行，也可由 `diff-helper.sh` 辅助）：
 
 1. **检测**：检查目标位置是否已有对应配置（如 `.husky/commit-msg`、`commitlint.config.cjs`）
-2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）先用 `scaffold.sh --dry-run` 获取差异；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 `scaffold.sh --dry-run` 人工复核
+2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）优先用 `dayu-harness merge --target <project-root> --json` 获取融合预览，或用 `dayu-harness generate --target <project-root> --json` 获取待写内容预览；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 CLI 预览或人工复核
 3. **生成变更描述**：用自然语言描述变更内容，例如「你的项目已有 commit-msg hook，包含 Conventional Commits 校验。新增内容与现有规则并存，不影响既有行为」
 4. **用户确认**：只对已有配置的处理策略提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项；默认能力本身不提供跳过选项
 5. **执行**：按用户选择处理

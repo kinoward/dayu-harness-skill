@@ -30,7 +30,7 @@ A target project defines capabilities by capability manifest and deploys them as
 
 Linked components are files, hooks, CI, and scripts deployed by governance capabilities.
 When adding governance capabilities, update the capability manifest first; optional capabilities not enabled are not effective in the target project.
-After deployment, target project behavior does not depend on internal Skill file paths; to add an uninstalled capability later, reinstall the Skill or manually bring in the corresponding module.
+After deployment, target project behavior does not depend on internal Skill file paths; to add an uninstalled capability later, prefer reinstalling the Skill or using the published `dayu-harness` CLI to generate previews and deployment plans, or manually bring in the corresponding module and sync indexes.
 
 ### Core Principles
 
@@ -94,7 +94,7 @@ Before writing to long-lived directories, summarize:
 2. Edit documentation content.
 3. If scripts change, update corresponding scripts too.
 4. If index changes (file add/remove), update affected `AGENTS.md` and synchronize the related `## Directory Index` sections (and `README.md` `## Structure`).
-5. Use `docs/harness/sensors/scripts/diff-helper.sh` to generate a change description: use `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>` when a source file exists. If there is no matching file, manually review against `scaffold.sh --dry-run`.
+5. Use `docs/harness/sensors/scripts/diff-helper.sh` to generate a change description: use `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>` when a source file exists. If there is no matching file, prefer `dayu-harness generate --target <project-root> --json` or `dayu-harness merge --target <project-root> --json` for a preview; if the CLI is unavailable, perform a manual review.
 6. Run `docs/harness/sensors/scripts/validate.sh` if available.
 
 ### Remove Constraint
@@ -131,7 +131,7 @@ Prefer `docs/harness/sensors/scripts/audit.sh` when present. If unavailable, per
 3. **Coupled Constraint Completeness**
    - Coupled components are deployed and executable according to capability manifest
    - Each rule in coupling tables maps to both documentation and coupled components
-   - The completion report's `capability-smoke` covers the capabilities deployed in this run; if no script entrypoint exists, manually spot-check the corresponding hooks, linters, PR/Issue/TDD/release helpers
+   - CLI `diagnose` / `validate` / `status` and the completion report cover the capabilities deployed in this run; if no script entrypoint exists, manually spot-check the corresponding hooks, linters, PR/Issue/TDD/release helpers
 
 4. **Naming Standards**
    - File names should be lowercase letters and hyphens
@@ -209,7 +209,7 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 When modifying existing configuration, use this flow (AI may drive this manually or with `diff-helper.sh`):
 
 1. **Detect**: Check whether target config already exists (for example, `.husky/commit-msg`, `commitlint.config.cjs`).
-2. **Analyze differences**: Evaluate coupled components one by one: for installer-backed components (for example, husky snippets and `.gitignore`), use the corresponding `--check` to get a structured merge plan; for static template/assets without an installer (for example, `commitlint.config.cjs`, `eslint.config.cjs`, `.prettierrc`, `.lintstagedrc.json`, GitHub workflows, and ruleset JSON), use `scaffold.sh --dry-run`; if an existing file can be paired with incoming config, add `diff-helper.sh merge-plan <existing> <incoming>`, otherwise continue manual review from `scaffold.sh --dry-run`.
+2. **Analyze differences**: Evaluate coupled components one by one: for installer-backed components (for example, husky snippets and `.gitignore`), use the corresponding `--check` to get a structured merge plan; for static template/assets without an installer (for example, `commitlint.config.cjs`, `eslint.config.cjs`, `.prettierrc`, `.lintstagedrc.json`, GitHub workflows, and ruleset JSON), prefer `dayu-harness merge --target <project-root> --json` for a merge preview, or `dayu-harness generate --target <project-root> --json` for a rendered-content preview; if an existing file can be paired with incoming config, add `diff-helper.sh merge-plan <existing> <incoming>`, otherwise continue from the CLI preview or a manual review.
 3. **Describe changes**: Provide human-readable change text. Example: “Your project already has `.husky/commit-msg` with Conventional Commits checks. New content can co-exist and does not alter existing behavior.”
 4. **User confirmation**: For existing config handling only offer [1] Keep existing [2] Replace [3] Merge [4] Skip. Default capabilities should not offer skip.
 5. **Execute**: Apply based on user choice.

@@ -2,7 +2,7 @@
 
 > 可选能力：`github.repository-settings`
 
-本文件说明仓库级 PR 设置如何和项目内治理资产保持一致。用户在 `/dayu-harness` 问答中选择启用后，`scaffold.sh --apply` 会直接调用 GitHub API 修改目标远端仓库设置；`--dry-run` 只预览，不修改远端。
+本文件说明仓库级 PR 设置如何和项目内治理资产保持一致。用户在 `/dayu-harness` 问答中选择启用后，Dayu CLI 只部署本地策略文件；远端 GitHub API 修改必须由用户明确确认后单独执行。dry-run、check、verify 和本地 CLI apply 都不修改远端。
 
 ## 部署文件
 
@@ -22,7 +22,7 @@
 
 ## 远端应用行为
 
-启用 `github.repository-settings` 后，脚手架会在 apply 阶段自动执行等价操作：
+启用 `github.repository-settings` 后，本地部署会写入策略文件，不会自动修改 GitHub 远端。确认要同步远端后，执行等价操作：
 
 ```bash
 gh api -X PATCH "repos/<owner>/<repo>" \
@@ -40,7 +40,7 @@ gh api -X PATCH "repos/<owner>/<repo>" \
 - release-please 或其他自动合并流程已经使用 GitHub auto-merge，而不是人工 label gate。
 - 默认分支 ruleset 仅允许 merge commit；仓库级 squash/rebase 入口应同步关闭，避免绕过 release-please 的 changelog 去重策略。
 
-脚手架按以下顺序识别目标仓库：
+远端同步流程按以下顺序识别目标仓库：
 
 1. `DAYU_HARNESS_GITHUB_REPOSITORY=owner/repo`
 2. 目标项目的 GitHub `origin` 远端

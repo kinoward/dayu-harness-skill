@@ -78,7 +78,7 @@
   "capability.github.release-please.title": "Release Please 发布自动化",
   "capability.github.repository-settings.acceptance.1": "Repository pull request settings file exists",
   "capability.github.repository-settings.acceptance.2": "Repository settings guide exists",
-  "capability.github.repository-settings.acceptance.3": "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API during apply",
+  "capability.github.repository-settings.acceptance.3": "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API only during explicit remote sync",
   "capability.github.repository-settings.description": "部署 GitHub 仓库 PR 设置策略，并记录可选远端同步动作。",
   "capability.github.repository-settings.enforcer": "通过明确的手动或远端同步步骤应用仓库设置。",
   "capability.github.repository-settings.rule": "通过仓库设置策略文件约束 PR 自动合并和分支清理选项。",

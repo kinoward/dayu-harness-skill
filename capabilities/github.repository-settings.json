@@ -3,7 +3,7 @@
   "schemaVersion": "2.0.0",
   "kind": "hard",
   "description": "Repository pull request automation settings",
-  "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置，并在 apply 阶段同步远端设置。",
+  "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置；远端设置只在用户明确确认远端同步后应用。",
   "default": false,
   "deployment_deps": [
     "core"
@@ -86,7 +86,7 @@
   "acceptance": [
     "Repository pull request settings file exists",
     "Repository settings guide exists",
-    "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API during apply"
+    "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API only during explicit remote sync"
   ],
   "suggested_when": "Enable when release automation requires deterministic PR merge behavior."
 }

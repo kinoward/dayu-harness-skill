@@ -2,7 +2,7 @@
 
 > Optional capability: `github.repository-settings`
 
-This file explains how repository-level PR settings stay aligned with project governance assets. After the user chooses Enable in the `/dayu-harness` Q&A flow, `scaffold.sh --apply` directly calls the GitHub API to modify the target remote repository settings; `--dry-run` only previews the operation.
+This file explains how repository-level PR settings stay aligned with project governance assets. After the user chooses Enable in the `/dayu-harness` Q&A flow, the Dayu CLI only deploys the local policy file; GitHub API changes must be applied separately after explicit user confirmation. dry-run, check, verify, and local CLI apply do not modify the remote.
 
 ## Deployed Files
 
@@ -22,7 +22,7 @@ The current policy is locked to:
 
 ## Remote Apply Behavior
 
-When `github.repository-settings` is enabled, the scaffold apply step automatically performs the equivalent operation:
+When `github.repository-settings` is enabled, local deployment writes the policy file and does not automatically modify the GitHub remote. After confirming remote sync, perform the equivalent operation:
 
 ```bash
 gh api -X PATCH "repos/<owner>/<repo>" \
@@ -40,7 +40,7 @@ Before applying, these requirements must be met:
 - release-please or other auto-merge flows use GitHub auto-merge instead of a manual label gate.
 - The default-branch ruleset allows merge commits only; repository-level squash/rebase entry points should stay disabled to avoid bypassing release-please changelog deduplication.
 
-The scaffold resolves the target repository in this order:
+The remote sync flow resolves the target repository in this order:
 
 1. `DAYU_HARNESS_GITHUB_REPOSITORY=owner/repo`
 2. The target project's GitHub `origin` remote
