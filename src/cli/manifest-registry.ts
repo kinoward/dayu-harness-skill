@@ -9,12 +9,12 @@ import {
   type ManifestV2
 } from "../schemas/index.js";
 import { CliError } from "./errors.js";
-import { SKILL_ROOT } from "./paths.js";
+import { resolveSkillRoot } from "./paths.js";
 import type { ManifestRegistry } from "./types.js";
 
 export const PHASE1D_CAPABILITY_IDS = ["core", "git.hooks", "git.commit-format", "ai.execution"] as const;
 
-export function loadPhase1dManifestRegistry(skillRoot: string = SKILL_ROOT): ManifestRegistry {
+export function loadPhase1dManifestRegistry(skillRoot: string = resolveSkillRoot()): ManifestRegistry {
   const manifests = PHASE1D_CAPABILITY_IDS.map((id) => readManifest(skillRoot, id));
   const manifestById = new Map<string, ManifestV2>();
 

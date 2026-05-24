@@ -7,6 +7,12 @@ import { CliError } from "./errors.js";
 export const SKILL_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 export const DEFAULT_CONFIG_FILE = "dayu.config.yaml";
 
+export function resolveSkillRoot(): string {
+  return process.env.NODE_ENV === "test" && process.env.DAYU_HARNESS_SKILL_ROOT
+    ? resolve(process.env.DAYU_HARNESS_SKILL_ROOT)
+    : SKILL_ROOT;
+}
+
 export function resolveTargetRoot(input?: string): string {
   return resolve(input ?? process.cwd());
 }
