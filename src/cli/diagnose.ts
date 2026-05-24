@@ -1,8 +1,11 @@
 import { buildApplyPlan } from "./apply.js";
+import { capabilityDisplay } from "./display.js";
 import { loadManifestRegistry } from "./manifest-registry.js";
+import { loadLocaleCatalog } from "./render.js";
 import { summarizeRse } from "./rse.js";
 import type {
   ApplyOptions,
+  CapabilityDisplaySummary,
   CapabilityDiagnosticSummary,
   DiagnoseReport,
   DiagnosticItem,
@@ -13,9 +16,11 @@ import type {
 export function diagnoseDayuProject(options: ApplyOptions = {}): DiagnoseReport {
   const plan = buildApplyPlan({ ...options, dryRun: true });
   const registry = loadManifestRegistry();
+  const localeCatalog = loadLocaleCatalog(registry.skillRoot, plan.locale);
+  const displayByCapability = new Map(plan.capabilitySummaries.map((capability) => [capability.capabilityId, capability]));
   const items: DiagnosticItem[] = [
-    ...plan.fileOperations.map(fileOperationToDiagnostic),
-    ...plan.installerOperations.map(installerOperationToDiagnostic)
+    ...plan.fileOperations.map((operation) => fileOperationToDiagnostic(operation, displayByCapability)),
+    ...plan.installerOperations.map((operation) => installerOperationToDiagnostic(operation, displayByCapability))
   ];
   const summary = {
     present: items.filter((item) => item.status === "present").length,
@@ -50,6 +55,8 @@ export function diagnoseDayuProject(options: ApplyOptions = {}): DiagnoseReport 
 
     return {
       capabilityId,
+      displayName: capabilityDisplay(capabilityId, registry, localeCatalog).displayName,
+      displaySummary: capabilityDisplay(capabilityId, registry, localeCatalog).summary,
       kind: manifest.kind,
       status: capabilityHealthy ? "healthy" : "unhealthy",
       rse: summarizeRse(manifest),
@@ -81,11 +88,16 @@ function summarizeDiagnosticItems(items: readonly DiagnosticItem[]) {
   };
 }
 
-function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
+function fileOperationToDiagnostic(
+  operation: FileOperation,
+  displayByCapability: ReadonlyMap<string, CapabilityDisplaySummary>
+): DiagnosticItem {
+  const display = displayForOperation(operation.capabilityId, displayByCapability);
   switch (operation.status) {
     case "skip":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "present",
         reason: operation.reason
@@ -93,12 +105,14 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
     case "create":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "missing"
       };
     case "chmod":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "wrong-mode",
         reason: operation.reason
@@ -107,6 +121,7 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
     case "overwrite":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "drift",
         reason: operation.reason
@@ -114,6 +129,7 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
     case "delete":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "drift",
         reason: operation.reason
@@ -121,6 +137,7 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
     case "missing-source":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "source-missing",
         reason: operation.reason
@@ -128,11 +145,16 @@ function fileOperationToDiagnostic(operation: FileOperation): DiagnosticItem {
   }
 }
 
-function installerOperationToDiagnostic(operation: InstallerOperation): DiagnosticItem {
+function installerOperationToDiagnostic(
+  operation: InstallerOperation,
+  displayByCapability: ReadonlyMap<string, CapabilityDisplaySummary>
+): DiagnosticItem {
+  const display = displayForOperation(operation.capabilityId, displayByCapability);
   switch (operation.status) {
     case "skip":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "present",
         reason: operation.reason
@@ -140,12 +162,14 @@ function installerOperationToDiagnostic(operation: InstallerOperation): Diagnost
     case "create":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "missing"
       };
     case "merge":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "needs-merge",
         reason: operation.reason
@@ -153,6 +177,7 @@ function installerOperationToDiagnostic(operation: InstallerOperation): Diagnost
     case "missing-source":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "source-missing",
         reason: operation.reason
@@ -160,9 +185,21 @@ function installerOperationToDiagnostic(operation: InstallerOperation): Diagnost
     case "unsupported":
       return {
         capabilityId: operation.capabilityId,
+        ...display,
         path: operation.dst,
         status: "unsupported",
         reason: operation.reason
       };
   }
+}
+
+function displayForOperation(
+  capabilityId: string,
+  displayByCapability: ReadonlyMap<string, CapabilityDisplaySummary>
+): Pick<DiagnosticItem, "displayName" | "displaySummary"> {
+  const display = displayByCapability.get(capabilityId);
+  return {
+    displayName: display?.displayName ?? capabilityId,
+    displaySummary: display?.summary ?? capabilityId
+  };
 }

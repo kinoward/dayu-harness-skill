@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { resolveDeploymentOrder } from "../architecture/index.js";
 import type { CapabilityId, DayuConfig, FileMapping, ManifestV2 } from "../schemas/index.js";
 import { createDefaultDayuConfig, enabledCapabilityIds, readDayuConfig, writeDayuConfig } from "./config.js";
+import { capabilityDisplay } from "./display.js";
 import { CliError } from "./errors.js";
 import { writeFileAtomically } from "./filesystem.js";
 import {
@@ -43,7 +44,7 @@ import type {
   RenderedFileMapping
 } from "./types.js";
 
-const DAYU_LOG_FILE = ".dayu-log.jsonl";
+const DAYU_LOG_FILE = ".dayu-harness/log.jsonl";
 const HUSKY_HOOK_BY_CAPABILITY: Readonly<Record<string, string>> = {
   "git.commit-format": "commit-msg",
   "quality.node-tooling": "pre-commit",
@@ -69,7 +70,11 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
     inputs.registry.manifests,
     requestedCapabilities
   ) as CapabilityId[];
+  const fullDeploymentOrder = resolveDeploymentOrder(inputs.registry.manifests, enabledCapabilities) as CapabilityId[];
   const context = createRenderContext(inputs.targetRoot, inputs.config, inputs.registry);
+  const capabilitySummaries = deploymentOrder.map((capabilityId) =>
+    capabilityDisplay(capabilityId, inputs.registry, context.localeCatalog)
+  );
   const fileOperations: FileOperation[] = [];
 
   for (const manifest of manifestsInOrder(inputs.registry, deploymentOrder)) {
@@ -81,11 +86,13 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
   const installerOperations = manifestsInOrder(inputs.registry, deploymentOrder).flatMap((manifest) =>
     planInstallerOperation(manifest, inputs.registry, inputs.targetRoot, options.force ?? false)
   );
-  const desiredManagedPaths = uniqueSorted([
+  const desiredManagedPaths = desiredManagedPathsForOrder(inputs.registry, fullDeploymentOrder, context, inputs.targetRoot, options.force ?? false);
+  const plannedManagedPaths = uniqueSorted([
     ...fileOperations.map((operation) => operation.dst),
     ...installerOperations.map((operation) => operation.dst)
   ]);
-  const orphanPaths = readManagedPaths(inputs.targetRoot).filter((managedPath) => !desiredManagedPaths.includes(managedPath));
+  const existingManagedPaths = readManagedPaths(inputs.targetRoot, { migrate: !options.dryRun });
+  const orphanPaths = existingManagedPaths.filter((managedPath) => !desiredManagedPaths.includes(managedPath));
 
   if (options.pruneOrphans) {
     for (const orphanPath of orphanPaths) {
@@ -102,7 +109,9 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
   }
 
   const managedPaths = uniqueSorted([
-    ...desiredManagedPaths,
+    ...existingManagedPaths.filter((managedPath) => desiredManagedPaths.includes(managedPath)),
+    ...plannedManagedPaths,
+    managedPathsFile(),
     DAYU_LOG_FILE
   ]);
 
@@ -115,6 +124,7 @@ export function buildApplyPlan(options: ApplyOptions = {}): ApplyPlan {
     requestedCapabilities,
     deploymentOrder,
     capabilities: deploymentOrder,
+    capabilitySummaries,
     fileOperations,
     installerOperations,
     managedPaths,
@@ -323,6 +333,22 @@ function manifestsInOrder(registry: ManifestRegistry, order: readonly Capability
     }
     return manifest;
   });
+}
+
+function desiredManagedPathsForOrder(
+  registry: ManifestRegistry,
+  order: readonly CapabilityId[],
+  context: RenderContext,
+  targetRoot: string,
+  force: boolean
+): string[] {
+  const filePaths = manifestsInOrder(registry, order)
+    .flatMap((manifest) => manifestFileMappings(manifest, context))
+    .map((item) => item.mapping.dst);
+  const installerPaths = manifestsInOrder(registry, order)
+    .flatMap((manifest) => planInstallerOperation(manifest, registry, targetRoot, force))
+    .map((operation) => operation.dst);
+  return uniqueSorted([...filePaths, ...installerPaths, managedPathsFile()]);
 }
 
 function resolveRequestedCapabilities(

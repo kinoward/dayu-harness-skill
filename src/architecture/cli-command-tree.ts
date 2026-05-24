@@ -1,6 +1,15 @@
 import type { ArchitectureLayerId } from "./layers.js";
 
-export type CliCommandName = "init" | "apply" | "diagnose" | "validate" | "merge" | "generate" | "status" | "repair";
+export type CliCommandName =
+  | "init"
+  | "apply"
+  | "diagnose"
+  | "validate"
+  | "merge"
+  | "generate"
+  | "status"
+  | "repair"
+  | "finalize";
 
 export interface CliCommandSpec {
   name: CliCommandName;
@@ -36,7 +45,7 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     purpose: "Read config, resolve the deployment DAG, render files, run installers, report drift, and record journaled writes.",
     mapsFromMode: "scaffold execution phase",
     reads: ["dayu.config.yaml", "manifest v2 registry", "templates", "assets", "target project state"],
-    writes: ["product artifacts", ".dayu-log.jsonl"],
+    writes: ["product artifacts", ".dayu-harness/managed-paths.json", ".dayu-harness/log.jsonl"],
     delegatesTo: [],
     supportsDryRun: true,
     supportsJson: true,
@@ -113,9 +122,22 @@ export const CLI_COMMAND_TREE: readonly CliCommandSpec[] = [
     layer: "tool",
     purpose: "Repair drift for one capability or the active deployment plan using journaled apply semantics.",
     mapsFromMode: "maintain repair",
-    reads: ["dayu.config.yaml", "manifest v2 registry", "target project state", ".dayu/journal.jsonl"],
-    writes: ["product artifacts", ".dayu/journal.jsonl"],
+    reads: ["dayu.config.yaml", "manifest v2 registry", "target project state", ".dayu-harness/journal.jsonl"],
+    writes: ["product artifacts", ".dayu-harness/journal.jsonl"],
     delegatesTo: ["apply"],
+    supportsDryRun: false,
+    supportsJson: true,
+    interactive: false,
+    phase1Slice: false
+  },
+  {
+    name: "finalize",
+    layer: "tool",
+    purpose: "Verify deployed governance, stage long-lived state, commit, sync GitHub remote settings, and run end-to-end checks.",
+    mapsFromMode: "post-apply completion",
+    reads: ["dayu.config.yaml", ".dayu-harness/managed-paths.json", "target project state", "GitHub remote state"],
+    writes: ["git index", "git commit", "GitHub remote repository/settings/check artifacts"],
+    delegatesTo: ["validate", "diagnose", "status"],
     supportsDryRun: false,
     supportsJson: true,
     interactive: false,

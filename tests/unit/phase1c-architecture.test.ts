@@ -33,7 +33,7 @@ function readTrialManifests(): ManifestV2[] {
 test("Phase 2 CLI command tree exposes product commands", () => {
   assert.deepEqual(
     CLI_COMMAND_TREE.map((command) => command.name),
-    ["init", "apply", "diagnose", "validate", "merge", "generate", "status", "repair"]
+    ["init", "apply", "diagnose", "validate", "merge", "generate", "status", "repair", "finalize"]
   );
 
   for (const command of CLI_COMMAND_TREE) {
@@ -47,6 +47,7 @@ test("Phase 2 CLI command tree exposes product commands", () => {
   assert.equal(getCliCommandSpec("apply").supportsDryRun, true);
   assert.deepEqual(getCliCommandSpec("status").delegatesTo, ["diagnose"]);
   assert.deepEqual(getCliCommandSpec("repair").delegatesTo, ["apply"]);
+  assert.deepEqual(getCliCommandSpec("finalize").delegatesTo, ["validate", "diagnose", "status"]);
 });
 
 test("architecture layer contracts preserve frontend, tool, and product separation", () => {

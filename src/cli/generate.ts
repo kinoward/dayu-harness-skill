@@ -1,5 +1,6 @@
 import { CliError } from "./errors.js";
 import { buildApplyPlan, createRenderContext, resolveApplyInputs } from "./apply.js";
+import { capabilityDisplay } from "./display.js";
 import { renderManifestFiles } from "./render.js";
 import type { GenerateOptions, GenerateReport, GeneratedFilePreview } from "./types.js";
 
@@ -23,9 +24,12 @@ export function generateDayuContent(options: GenerateOptions = {}): GenerateRepo
       throw new CliError("unknown-capability", `capability '${capabilityId}' is not loaded`);
     }
 
+    const display = capabilityDisplay(capabilityId, inputs.registry, context.localeCatalog);
     for (const rendered of renderManifestFiles(manifest, context)) {
       files.push({
         capabilityId,
+        displayName: display.displayName,
+        summary: display.summary,
         src: rendered.mapping.src,
         dst: rendered.mapping.dst,
         content: rendered.content.toString("utf8")

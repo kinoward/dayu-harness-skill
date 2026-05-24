@@ -122,6 +122,11 @@ emit_dayu_local_block() {
 # === Dayu Harness local exclusions ===
 .claude/
 skills-lock.json
+.dayu-harness/apply.lock
+.dayu-harness/journal.jsonl
+.dayu-harness/log.jsonl
+.dayu-harness/tmp/
+.dayu-harness/*.tmp
 EOF
 }
 

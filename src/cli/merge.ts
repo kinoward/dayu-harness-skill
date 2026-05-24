@@ -14,6 +14,7 @@ import type {
 export function planDayuMerge(options: MergeOptions = {}): MergeReport {
   const plan = buildApplyPlan({ ...options, dryRun: true });
   const registry = loadRegistryFromPlan();
+  const displayByCapability = new Map(plan.capabilitySummaries.map((capability) => [capability.capabilityId, capability]));
   const capabilities = plan.deploymentOrder.map((capabilityId): MergeCapabilityPlan => {
     const manifest = registry.manifestById.get(capabilityId);
     if (!manifest) {
@@ -33,6 +34,8 @@ export function planDayuMerge(options: MergeOptions = {}): MergeReport {
     if (hasError) {
       return {
         capabilityId,
+        displayName: displayByCapability.get(capabilityId)?.displayName ?? capabilityId,
+        displaySummary: displayByCapability.get(capabilityId)?.summary ?? capabilityId,
         kind: manifest.kind,
         status: "error",
         decisionGranularity: "capability",
@@ -48,6 +51,8 @@ export function planDayuMerge(options: MergeOptions = {}): MergeReport {
     if (hasConflict) {
       return {
         capabilityId,
+        displayName: displayByCapability.get(capabilityId)?.displayName ?? capabilityId,
+        displaySummary: displayByCapability.get(capabilityId)?.summary ?? capabilityId,
         kind: manifest.kind,
         status: "conflict",
         decisionGranularity: "capability",
@@ -63,6 +68,8 @@ export function planDayuMerge(options: MergeOptions = {}): MergeReport {
     if (!hasWork) {
       return {
         capabilityId,
+        displayName: displayByCapability.get(capabilityId)?.displayName ?? capabilityId,
+        displaySummary: displayByCapability.get(capabilityId)?.summary ?? capabilityId,
         kind: manifest.kind,
         status: "no-op",
         decisionGranularity: "capability",
@@ -77,6 +84,8 @@ export function planDayuMerge(options: MergeOptions = {}): MergeReport {
 
     return {
       capabilityId,
+      displayName: displayByCapability.get(capabilityId)?.displayName ?? capabilityId,
+      displaySummary: displayByCapability.get(capabilityId)?.summary ?? capabilityId,
       kind: manifest.kind,
       status: "clean",
       decisionGranularity: "capability",

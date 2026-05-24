@@ -4,6 +4,7 @@ import { isCliError } from "./errors.js";
 import type {
   ApplyReport,
   DiagnoseReport,
+  FinalizeReport,
   GenerateReport,
   InitReport,
   MergeReport,
@@ -11,7 +12,15 @@ import type {
   ValidationReport
 } from "./types.js";
 
-export type CliReport = ApplyReport | InitReport | DiagnoseReport | MergeReport | ValidationReport | GenerateReport | StatusReport;
+export type CliReport =
+  | ApplyReport
+  | InitReport
+  | DiagnoseReport
+  | MergeReport
+  | ValidationReport
+  | GenerateReport
+  | StatusReport
+  | FinalizeReport;
 
 export function writeReport(report: CliReport, json: boolean): void {
   if (json) {
@@ -40,7 +49,7 @@ function humanizeReport(report: CliReport): string {
       return [
         `${colorStatus("apply", report.status)}`,
         `target: ${report.targetRoot}`,
-        `order: ${report.deploymentOrder.join(" -> ")}`,
+        `order: ${report.capabilitySummaries.map((capability) => capability.displayName).join(" -> ")}`,
         `create=${report.summary.create} overwrite=${report.summary.overwrite} delete=${report.summary.delete} chmod=${report.summary.chmod} merge=${report.summary.merge} skip=${report.summary.skip} conflict=${report.summary.conflict} missing=${report.summary.missingSource}`,
         report.orphanPaths.length > 0 ? `orphans=${report.orphanPaths.join(", ")}` : "orphans=0"
       ].join("\n");
@@ -57,7 +66,7 @@ function humanizeReport(report: CliReport): string {
         `present=${report.summary.present} missing=${report.summary.missing} wrong-mode=${report.summary.wrongMode} drift=${report.summary.drift} needs-merge=${report.summary.needsMerge}`,
         ...report.capabilities.map(
           (capability) =>
-            `${capability.capabilityId}: ${capability.status} rule=${capability.rse.rule.present ? "yes" : "no"} sensor=${capability.rse.sensor.present ? "yes" : "no"} enforcer=${capability.rse.enforcer.present ? "yes" : "no"}`
+            `${capability.displayName}: ${capability.status} rule=${capability.rse.rule.present ? "yes" : "no"} sensor=${capability.rse.sensor.present ? "yes" : "no"} enforcer=${capability.rse.enforcer.present ? "yes" : "no"}`
         )
       ].join("\n");
     case "merge":
@@ -67,7 +76,7 @@ function humanizeReport(report: CliReport): string {
         `target: ${report.targetRoot}`,
         ...report.capabilities.map(
           (capability) =>
-            `${capability.capabilityId}: ${capability.status} default=${capability.defaultStrategy} choices=${capability.availableStrategies.join("/")}`
+            `${capability.displayName}: ${capability.status} default=${capability.defaultStrategy} choices=${capability.availableStrategies.join("/")}`
         )
       ].join("\n");
     case "validate":
@@ -79,8 +88,8 @@ function humanizeReport(report: CliReport): string {
     case "generate":
       return [
         `${colorStatus("generate", report.status)}`,
-        `order: ${report.deploymentOrder.join(" -> ")}`,
-        ...report.files.map((file) => `${file.capabilityId}: ${file.dst}`)
+        `order: ${[...new Set(report.files.map((file) => file.displayName))].join(" -> ")}`,
+        ...report.files.map((file) => `${file.displayName}: ${file.dst}`)
       ].join("\n");
     case "status":
       return [
@@ -89,15 +98,27 @@ function humanizeReport(report: CliReport): string {
         `healthy=${report.summary.healthy} unhealthy=${report.summary.unhealthy} hard=${report.summary.hard} soft=${report.summary.soft} infra=${report.summary.infra}`,
         ...report.groups.flatMap((group) => [
           `${group.kind}:`,
-          ...group.capabilities.map((capability) => `  ${capability.capabilityId}: ${capability.status}`)
+          ...group.capabilities.map((capability) => `  ${capability.displayName}: ${capability.status}`)
         ])
       ].join("\n");
+    case "finalize":
+      return [
+        `${colorStatus("finalize", report.status)}`,
+        `target: ${report.targetRoot}`,
+        report.commitSha ? `commit: ${report.commitSha}` : "commit: none",
+        `github-remote=${report.githubRemote} release-validation=${report.releaseValidation}`,
+        ...report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`),
+        report.issuePrE2e ? `Issue/PR E2E: ${report.issuePrE2e.status} - ${report.issuePrE2e.description}` : "",
+        report.releaseE2e ? `Release Please: ${report.releaseE2e.status} - ${report.releaseE2e.description}` : ""
+      ]
+        .filter(Boolean)
+        .join("\n");
   }
 }
 
 function colorStatus(command: string, status: string): string {
   const label = `${command}: ${status}`;
-  if (["healthy", "valid", "applied", "merged", "generated", "no-op", "repaired"].includes(status)) {
+  if (["healthy", "valid", "applied", "merged", "generated", "no-op", "repaired", "completed"].includes(status)) {
     return chalk.green(label);
   }
   if (["planned"].includes(status)) {

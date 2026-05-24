@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { applyDayuConfig, initDayuConfig } from "./apply.js";
 import { diagnoseDayuProject } from "./diagnose.js";
 import { CliError } from "./errors.js";
+import { finalizeDayuProject } from "./finalize.js";
 import { generateDayuContent } from "./generate.js";
 import { applyDayuMerge, planDayuMerge } from "./merge.js";
 import { writeError, writeReport, type CliReport } from "./output.js";
@@ -25,6 +26,9 @@ interface CommonOptions {
   pruneOrphans?: boolean;
   capability?: string;
   strategy?: "keep" | "replace" | "skip";
+  skillRoot?: string;
+  githubRemote?: "apply" | "skip";
+  releaseValidation?: "real" | "readiness";
 }
 
 export function buildProgram(): Command {
@@ -181,6 +185,27 @@ export function buildProgram(): Command {
       )
     );
 
+  program
+    .command("finalize")
+    .description("verify, commit, sync remote governance, and run end-to-end checks")
+    .option("--config <path>", "config path")
+    .option("--target <path>", "target project root")
+    .option("--skill-root <path>", "Dayu Harness skill root")
+    .option("--github-remote <mode>", "remote synchronization mode: apply or skip", "skip")
+    .option("--release-validation <mode>", "release validation depth: real or readiness", "readiness")
+    .option("--json", "emit JSON")
+    .action((options: CommonOptions, command: Command) =>
+      execute(command, () =>
+        finalizeDayuProject({
+          configPath: options.config,
+          targetRoot: options.target,
+          skillRoot: options.skillRoot,
+          githubRemote: parseGithubRemote(options.githubRemote),
+          releaseValidation: parseReleaseValidation(options.releaseValidation)
+        })
+      )
+    );
+
   return program;
 }
 
@@ -231,6 +256,8 @@ function exitCodeForReport(report: CliReport): number {
       return report.status === "generated" ? 0 : 1;
     case "status":
       return report.status === "healthy" ? 0 : 1;
+    case "finalize":
+      return report.status === "failed" ? 1 : 0;
   }
 }
 
@@ -244,6 +271,26 @@ function parseMergeStrategy(value: string | undefined): "keep" | "replace" | "sk
       code: "invalid-merge-strategy",
       message: `unsupported merge strategy '${value ?? ""}'`
     }
+  ]);
+}
+
+function parseGithubRemote(value: string | undefined): "apply" | "skip" {
+  if (value === "apply" || value === "skip" || value === undefined) {
+    return value ?? "skip";
+  }
+
+  throw new CliError("invalid-github-remote", "github remote mode must be apply or skip", [
+    { code: "invalid-github-remote", message: `unsupported github remote mode '${value}'` }
+  ]);
+}
+
+function parseReleaseValidation(value: string | undefined): "real" | "readiness" {
+  if (value === "real" || value === "readiness" || value === undefined) {
+    return value ?? "readiness";
+  }
+
+  throw new CliError("invalid-release-validation", "release validation mode must be real or readiness", [
+    { code: "invalid-release-validation", message: `unsupported release validation mode '${value}'` }
   ]);
 }
 

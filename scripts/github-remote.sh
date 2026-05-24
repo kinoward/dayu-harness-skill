@@ -613,7 +613,7 @@ assess_remote_sync_state() {
 }
 
 push_initialization_pr() {
-    local short_sha init_branch init_issue_url init_issue_number issue_body issue_output issue_rc pr_body push_output push_rc pr_output pr_rc
+    local short_sha init_branch init_issue_url init_issue_number issue_body issue_output issue_rc pr_body push_output push_rc pr_output pr_rc pr_url pr_number
 
     short_sha="$(git -C "$TARGET" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')"
     init_branch="dayu-harness/init-${short_sha}"
@@ -660,7 +660,9 @@ push_initialization_pr() {
     set -e
 
     if [ "$pr_rc" -eq 0 ]; then
-        add_item "{\"kind\":\"pull_request\",\"action\":\"create\",\"branch\":\"$(json_escape "$init_branch")\",\"base\":\"$(json_escape "$DEFAULT_BRANCH")\",\"status\":\"ok\",\"description_nl\":\"已基于 ${DEFAULT_BRANCH} 创建初始化 PR。\"}" "ok"
+        pr_url="$pr_output"
+        pr_number="${pr_url##*/}"
+        add_item "{\"kind\":\"pull_request\",\"action\":\"create\",\"branch\":\"$(json_escape "$init_branch")\",\"base\":\"$(json_escape "$DEFAULT_BRANCH")\",\"number\":\"$(json_escape "$pr_number")\",\"url\":\"$(json_escape "$pr_url")\",\"status\":\"ok\",\"description_nl\":\"已基于 ${DEFAULT_BRANCH} 创建初始化 PR #${pr_number}。\"}" "ok"
         return 0
     fi
 

@@ -3,6 +3,7 @@ export * from "./config.js";
 export * from "./diagnose.js";
 export * from "./errors.js";
 export * from "./filesystem.js";
+export * from "./finalize.js";
 export * from "./generate.js";
 export * from "./main.js";
 export * from "./manifest-registry.js";

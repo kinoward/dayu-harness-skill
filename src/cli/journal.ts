@@ -1,14 +1,30 @@
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync, fsyncSync, closeSync, unlinkSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  fsyncSync,
+  closeSync,
+  unlinkSync
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
 import { writeFileAtomically } from "./filesystem.js";
 import { resolveInsideRoot } from "./paths.js";
 
-const DAYU_DIR = ".dayu";
-const JOURNAL_FILE = ".dayu/journal.jsonl";
-const LOCK_FILE = ".dayu/apply.lock";
-const MANAGED_PATHS_FILE = ".dayu/managed-paths.json";
+export const DAYU_STATE_DIR = ".dayu-harness";
+export const LEGACY_DAYU_STATE_DIR = ".dayu";
+const JOURNAL_FILE = `${DAYU_STATE_DIR}/journal.jsonl`;
+const LOCK_FILE = `${DAYU_STATE_DIR}/apply.lock`;
+const MANAGED_PATHS_FILE = `${DAYU_STATE_DIR}/managed-paths.json`;
+const LEGACY_JOURNAL_FILE = `${LEGACY_DAYU_STATE_DIR}/journal.jsonl`;
+const LEGACY_LOCK_FILE = `${LEGACY_DAYU_STATE_DIR}/apply.lock`;
+const LEGACY_MANAGED_PATHS_FILE = `${LEGACY_DAYU_STATE_DIR}/managed-paths.json`;
 
 export interface JournalEntry {
   id: string;
@@ -28,10 +44,12 @@ export interface ApplyLock {
 
 export interface ManagedPathsRecord {
   managedPaths: string[];
+  previousManagedPaths?: string[];
   updatedAt: string;
 }
 
 export function acquireApplyLock(targetRoot: string): ApplyLock {
+  migrateLegacyDayuState(targetRoot);
   const lockPath = resolveInsideRoot(targetRoot, LOCK_FILE);
   mkdirSync(dirname(lockPath), { recursive: true });
 
@@ -59,6 +77,7 @@ export function acquireApplyLock(targetRoot: string): ApplyLock {
 }
 
 export function recoverInterruptedTransactions(targetRoot: string): string[] {
+  migrateLegacyDayuState(targetRoot);
   const journalFilePath = resolveInsideRoot(targetRoot, JOURNAL_FILE);
   if (!existsSync(journalFilePath)) {
     return [];
@@ -112,6 +131,7 @@ export function recoverInterruptedTransactions(targetRoot: string): string[] {
 }
 
 export function appendJournalEntry(targetRoot: string, entry: Omit<JournalEntry, "timestamp">): void {
+  migrateLegacyDayuState(targetRoot);
   const journalPath = resolveInsideRoot(targetRoot, JOURNAL_FILE);
   mkdirSync(dirname(journalPath), { recursive: true });
   const fd = openSync(journalPath, "a");
@@ -195,21 +215,49 @@ export function createTransactionId(): string {
   return randomUUID();
 }
 
-export function readManagedPaths(targetRoot: string): string[] {
+export function readManagedPaths(targetRoot: string, options: { migrate?: boolean } = {}): string[] {
+  if (options.migrate ?? true) {
+    migrateLegacyDayuState(targetRoot);
+  }
   const managedPathsPath = resolveInsideRoot(targetRoot, MANAGED_PATHS_FILE);
-  if (!existsSync(managedPathsPath)) {
-    return [];
+  if (existsSync(managedPathsPath)) {
+    return readManagedPathsFile(managedPathsPath);
   }
 
-  const parsed = JSON.parse(readFileSync(managedPathsPath, "utf8")) as Partial<ManagedPathsRecord>;
+  if (!(options.migrate ?? true)) {
+    const legacyManagedPathsPath = resolveInsideRoot(targetRoot, LEGACY_MANAGED_PATHS_FILE);
+    if (existsSync(legacyManagedPathsPath)) {
+      return readManagedPathsFile(legacyManagedPathsPath);
+    }
+  }
+
+  return [];
+}
+
+function readManagedPathsFile(path: string): string[] {
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Partial<ManagedPathsRecord>;
   return Array.isArray(parsed.managedPaths) ? parsed.managedPaths.filter((item): item is string => typeof item === "string") : [];
 }
 
 export function writeManagedPaths(targetRoot: string, managedPaths: readonly string[]): void {
+  migrateLegacyDayuState(targetRoot);
   const managedPathsPath = resolveInsideRoot(targetRoot, MANAGED_PATHS_FILE);
   mkdirSync(dirname(managedPathsPath), { recursive: true });
+  const nextManagedPaths = [...new Set(managedPaths)].sort();
+  let previousManagedPaths: string[] = [];
+  if (existsSync(managedPathsPath)) {
+    const existing = JSON.parse(readFileSync(managedPathsPath, "utf8")) as Partial<ManagedPathsRecord>;
+    const existingManagedPaths = Array.isArray(existing.managedPaths)
+      ? existing.managedPaths.filter((item): item is string => typeof item === "string").sort()
+      : [];
+    if (stringArraysEqual(existingManagedPaths, nextManagedPaths)) {
+      return;
+    }
+    previousManagedPaths = existingManagedPaths;
+  }
   const body: ManagedPathsRecord = {
-    managedPaths: [...new Set(managedPaths)].sort(),
+    managedPaths: nextManagedPaths,
+    previousManagedPaths,
     updatedAt: new Date().toISOString()
   };
   writeFileAtomically(managedPathsPath, `${JSON.stringify(body, null, 2)}\n`);
@@ -221,6 +269,46 @@ export function journalPath(): string {
 
 export function managedPathsFile(): string {
   return MANAGED_PATHS_FILE;
+}
+
+export function stateDirectory(): string {
+  return DAYU_STATE_DIR;
+}
+
+export function migrationIgnoredPaths(): string[] {
+  return [
+    `${DAYU_STATE_DIR}/apply.lock`,
+    `${DAYU_STATE_DIR}/journal.jsonl`,
+    `${DAYU_STATE_DIR}/log.jsonl`,
+    `${DAYU_STATE_DIR}/tmp/`,
+    `${DAYU_STATE_DIR}/*.tmp`
+  ];
+}
+
+export function migrateLegacyDayuState(targetRoot: string): string[] {
+  const migrated: string[] = [];
+  const legacyDir = resolveInsideRoot(targetRoot, LEGACY_DAYU_STATE_DIR);
+  if (!existsSync(legacyDir)) {
+    return migrated;
+  }
+
+  const legacyLock = resolveInsideRoot(targetRoot, LEGACY_LOCK_FILE);
+  if (existsSync(legacyLock) && !isStaleLock(legacyLock)) {
+    throw new Error("legacy .dayu/apply.lock is active; finish or stop the running apply before migrating to .dayu-harness");
+  }
+
+  const stateDir = resolveInsideRoot(targetRoot, DAYU_STATE_DIR);
+  mkdirSync(stateDir, { recursive: true });
+  copyLegacyFile(targetRoot, LEGACY_MANAGED_PATHS_FILE, MANAGED_PATHS_FILE, migrated);
+  copyLegacyFile(targetRoot, LEGACY_JOURNAL_FILE, JOURNAL_FILE, migrated);
+
+  if (existsSync(legacyLock)) {
+    unlinkSync(legacyLock);
+    migrated.push(LEGACY_LOCK_FILE);
+  }
+
+  removeLegacyDirIfEmpty(legacyDir);
+  return migrated;
 }
 
 function hashBuffer(content: Buffer): string {
@@ -252,4 +340,37 @@ function isStaleLock(lockPath: string): boolean {
   } catch {
     return true;
   }
+}
+
+function copyLegacyFile(targetRoot: string, legacyRelativePath: string, nextRelativePath: string, migrated: string[]): void {
+  const legacyPath = resolveInsideRoot(targetRoot, legacyRelativePath);
+  if (!existsSync(legacyPath)) {
+    return;
+  }
+
+  const nextPath = resolveInsideRoot(targetRoot, nextRelativePath);
+  if (!existsSync(nextPath)) {
+    mkdirSync(dirname(nextPath), { recursive: true });
+    copyFileSync(legacyPath, nextPath);
+    migrated.push(`${legacyRelativePath} -> ${nextRelativePath}`);
+  }
+  unlinkSync(legacyPath);
+}
+
+function removeLegacyDirIfEmpty(legacyDir: string): void {
+  if (!existsSync(legacyDir)) {
+    return;
+  }
+
+  const entries = readdirSync(legacyDir);
+  if (entries.length === 0) {
+    rmSync(legacyDir, { recursive: true, force: true });
+  }
+}
+
+function stringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((item, index) => item === right[index]);
 }

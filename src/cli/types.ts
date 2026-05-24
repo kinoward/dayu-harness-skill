@@ -1,6 +1,15 @@
 import type { DayuConfig, FileMapping, LocaleCode, ManifestV2 } from "../schemas/index.js";
 
-export type CliCommandName = "init" | "apply" | "diagnose" | "validate" | "merge" | "generate" | "status" | "repair";
+export type CliCommandName =
+  | "init"
+  | "apply"
+  | "diagnose"
+  | "validate"
+  | "merge"
+  | "generate"
+  | "status"
+  | "repair"
+  | "finalize";
 
 export type ApplyStatus = "planned" | "applied" | "no-op" | "conflict" | "error" | "repaired";
 
@@ -61,6 +70,7 @@ export interface ApplyPlan {
   requestedCapabilities: readonly string[];
   deploymentOrder: readonly string[];
   capabilities: readonly string[];
+  capabilitySummaries: readonly CapabilityDisplaySummary[];
   fileOperations: readonly FileOperation[];
   installerOperations: readonly InstallerOperation[];
   managedPaths: readonly string[];
@@ -76,6 +86,12 @@ export interface ApplyPlan {
     missingSource: number;
     unsupported: number;
   };
+}
+
+export interface CapabilityDisplaySummary {
+  capabilityId: string;
+  displayName: string;
+  summary: string;
 }
 
 export interface ApplyReport extends ApplyPlan {
@@ -95,6 +111,8 @@ export interface InitReport {
 
 export interface DiagnosticItem {
   capabilityId: string;
+  displayName: string;
+  displaySummary: string;
   path: string;
   status: "present" | "missing" | "wrong-mode" | "drift" | "needs-merge" | "source-missing" | "unsupported";
   reason?: string;
@@ -120,6 +138,8 @@ export interface RseSummary {
 
 export interface CapabilityDiagnosticSummary {
   capabilityId: string;
+  displayName: string;
+  displaySummary: string;
   kind: ManifestV2["kind"];
   status: "healthy" | "unhealthy";
   rse: RseSummary;
@@ -158,6 +178,8 @@ export type InstallerStrategy = "merge" | "replace" | "skip";
 
 export interface MergeCapabilityPlan {
   capabilityId: string;
+  displayName: string;
+  displaySummary: string;
   kind: ManifestV2["kind"];
   status: "clean" | "no-op" | "conflict" | "error";
   decisionGranularity: "capability";
@@ -232,9 +254,43 @@ export interface ValidationReport {
 
 export interface GeneratedFilePreview {
   capabilityId: string;
+  displayName: string;
+  summary: string;
   src: string;
   dst: string;
   content: string;
+}
+
+export interface FinalizeCheck {
+  name: string;
+  status: "passed" | "failed" | "skipped";
+  description: string;
+}
+
+export interface FinalizeReport {
+  command: "finalize";
+  status: "completed" | "partial" | "failed";
+  targetRoot: string;
+  configPath: string;
+  githubRemote: "apply" | "skip";
+  releaseValidation: "real" | "readiness";
+  stagedPaths: readonly string[];
+  commitSha?: string;
+  checks: readonly FinalizeCheck[];
+  remote?: {
+    applyStatus?: string;
+    verifyStatus?: string;
+    repository?: string;
+    initializationPullRequestMerged?: boolean;
+  };
+  issuePrE2e?: {
+    status: "passed" | "failed" | "skipped";
+    description: string;
+  };
+  releaseE2e?: {
+    status: "passed" | "failed" | "skipped";
+    description: string;
+  };
 }
 
 export interface GenerateReport {
@@ -255,6 +311,14 @@ export interface ApplyOptions {
   onlyCapabilityId?: string;
   force?: boolean;
   pruneOrphans?: boolean;
+}
+
+export interface FinalizeOptions {
+  configPath?: string;
+  targetRoot?: string;
+  skillRoot?: string;
+  githubRemote?: "apply" | "skip";
+  releaseValidation?: "real" | "readiness";
 }
 
 export interface InitOptions {
