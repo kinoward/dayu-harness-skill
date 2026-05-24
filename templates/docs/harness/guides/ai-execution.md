@@ -61,7 +61,7 @@ PR 创建后，主动按 `## Test plan` 清单逐条验证并汇报。Test plan 
 
 ## 5. Review 自检
 
-每完成一段实现后，对照 review checklist 自查。项目已启用 `github.pr`：清单位于 `docs/harness/sensors/reviews/code-review-checklist.md`。
+每完成一段实现后，对照 review checklist 自查。若已启用 `github.pr` 且文件存在，清单位于 `docs/harness/sensors/reviews/code-review-checklist.md`。
 
 高频问题：
 - 资源释放、输入校验、错误处理、并发安全

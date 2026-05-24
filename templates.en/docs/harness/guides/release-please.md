@@ -73,5 +73,5 @@ The current template supports only the `packages["."]` root package and requires
 
 ## Issue Closing
 
-Issue closing keywords belong in PR body only, not individual commit messages. For regular PRs, PR body validation checks `Closes #N` / `Fixes #N` / `Resolves #N`.
+Issue closing keywords belong in PR body only, not individual commit messages. `github.release-please` depends on `github.pr`: PR body validation checks `Closes #N` / `Fixes #N` / `Resolves #N`.
 For allowed release-please PRs that skip PR lint, release safety is enforced by the release workflow and `release-please-policy`.

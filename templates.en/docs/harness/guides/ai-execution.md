@@ -61,7 +61,7 @@ When reporting, include one line per checklist item and key evidence. Do not jus
 
 ## 5. Review Self-Check
 
-After each implementation segment, self-check against the review checklist. This project has enabled `github.pr`; the checklist is `docs/harness/sensors/reviews/code-review-checklist.md`.
+After each implementation segment, self-check against the review checklist. If `github.pr` is enabled and the file exists, the checklist is `docs/harness/sensors/reviews/code-review-checklist.md`.
 
 Common failure areas:
 - resource cleanup, input validation, error handling, concurrency safety

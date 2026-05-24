@@ -9,7 +9,7 @@ PR 标题是给人和工具的可读摘要，允许使用中文、英文或项�
 要求：
 - 长度至少 5 字符
 - 建议使用自然语言描述性标题
-- 如项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目；PR Lint 会拒绝 `feat:`、`fix:`、`docs:` 等 conventional commit 标题
+- 若项目使用 release-please 且采用 merge commit 策略，标题不得使用 conventional commit 格式，以避免 changelog 重复条目；PR Lint 会拒绝 `feat:`、`fix:`、`docs:` 等 conventional commit 标题
 
 ## PR 正文模板
 
@@ -85,8 +85,8 @@ PR body 不得包含 AI 工具的署名水印：
 
 ## 创建后
 
-- Test plan 执行：项目已启用 `ai.execution`，按 AI 执行规约中的 Test plan 规则逐项验证
-- 合并策略：项目已启用 `github.branch-protection`，按分支保护规约中的合并策略执行
+- Test plan 执行：若已启用 `ai.execution` 且文件存在，按 AI 执行规约中的 Test plan 规则逐项验证
+- 合并策略：若已启用 `github.branch-protection` 且文件存在，按分支保护规约中的合并策略执行
 
 ## PR 合并
 

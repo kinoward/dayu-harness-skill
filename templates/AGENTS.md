@@ -50,25 +50,25 @@
 ## 当你准备创建或修改 PR
 
 > 触发：创建 PR、修正文案、CI 反馈失败
-- 本项目已启用 `github.pr`，请读取 `docs/harness/guides/pr-guidelines.md`
-- 本项目已启用 `github.pr`，PR body 优先由 `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...` 生成，再通过 `gh pr create --body-file` 使用
+- 若已启用 `github.pr` 且文件存在，请读取 `docs/harness/guides/pr-guidelines.md`
+- 若已启用 `github.pr` 且脚本存在，PR body 优先由 `docs/harness/sensors/scripts/dayu-format.mjs pr-body ...` 生成，再通过 `gh pr create --body-file` 使用
 - 关闭 issue 使用 GitHub closing keyword trailer，例如 `Closes #123`
 
 ## 当你发布版本、审阅 PR、排查环境
 
 > 触发：分支发布、审阅变更、进程/端口问题
-- 本项目已启用 `github.branch-protection`，请读取 `docs/harness/guides/branch-protection.md`
-- 本项目已启用 `release.versioning`，请读取 `docs/harness/guides/release-versioning.md`
-- 本项目已启用 `github.release-please`，请读取 `docs/harness/guides/release-please.md`
-- 本项目已启用 `github.pr`，请读取 `docs/harness/sensors/reviews/code-review-checklist.md`
-- 本项目已启用 `quality.practices`，请读取 `docs/harness/guides/dev-hygiene.md`
+- 若已启用 `github.branch-protection` 且文件存在，请读取 `docs/harness/guides/branch-protection.md`
+- 若已启用 `release.versioning` 且文件存在，请读取 `docs/harness/guides/release-versioning.md`
+- 若已启用 `github.release-please` 且文件存在，请读取 `docs/harness/guides/release-please.md`
+- 若已启用 `github.pr` 且文件存在，请读取 `docs/harness/sensors/reviews/code-review-checklist.md`
+- 若已启用 `quality.practices` 且文件存在，请读取 `docs/harness/guides/dev-hygiene.md`
 
 ## 当你开始 AI 主导任务
 
 > 触发：AI 接手实现或执行
 - 读取 `docs/harness/guides/ai-execution.md`
 - 读取 `docs/harness/guides/ai-memory.md`
-- 本项目已启用 `quality.practices`，请读取 `docs/harness/guides/testing-strategy.md`
+- 若已启用 `quality.practices` 且文件存在，请读取 `docs/harness/guides/testing-strategy.md`
 
 ## 当你查阅知识库与项目上下文
 

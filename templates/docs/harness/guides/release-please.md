@@ -73,5 +73,5 @@ release workflow 对 release PR 的 clone/push 使用 Git credential helper 注�
 
 ## Issue 关闭位置
 
-Issue closing keyword 只放 PR body，不放单个 commit message。项目已启用 `github.pr`：PR body validator 会检查 `Closes #N` / `Fixes #N` / `Resolves #N` trailer。
+Issue closing keyword 只放 PR body，不放单个 commit message。`github.release-please` 依赖 `github.pr`：PR body validator 会检查 `Closes #N` / `Fixes #N` / `Resolves #N` trailer。
 对可跳过 PR lint 的 release-please PR，发布安全边界由 release workflow 与 `release-please-policy` 约束。
