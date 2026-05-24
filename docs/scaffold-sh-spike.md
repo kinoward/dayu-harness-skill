@@ -4,13 +4,15 @@
 
 ## 1. Manifest 解析与依赖展开
 
-入口：
+入口函数：
 
-- `scripts/scaffold.sh:667` 开始加载 `capabilities/*.json`。
-- `scripts/scaffold.sh:691` 的 `manifest_path_for_id` 通过内存数组查找 manifest。
-- `scripts/scaffold.sh:716` 的 legacy category mapping 把旧类别映射到新能力 ID。
-- `scripts/scaffold.sh:772` 的 `resolve_request_ids` 合并默认能力、`--enable` 和 `--only`。
-- `scripts/scaffold.sh:892` 的 `resolve_recursive` 展开依赖。
+- manifest 加载块读取 `capabilities/*.json`，建立内存数组。
+- `manifest_path_for_id` 通过内存数组查找 manifest。
+- legacy category mapping 把旧类别映射到新能力 ID。
+- `resolve_request_ids` 合并默认能力、`--enable` 和 `--only`。
+- `resolve_recursive` 展开依赖。
+
+> 说明：本文以函数名和语义为主，不把行号当成契约。`scaffold.sh` 仍在快速变化，行号会随 QA 修复和测试扩展漂移。
 
 当前语义：
 
@@ -27,12 +29,12 @@ TypeScript port 启示：
 
 ## 2. 文件收集
 
-入口：
+入口函数：
 
-- `scripts/scaffold.sh:838` 的 `get_template_items_json` 根据 locale 选择模板。
-- `scripts/scaffold.sh:871` 的 `get_kind_items_json` 统一读取 template/asset item。
-- `scripts/scaffold.sh:934` 的 `collect_file_entries` 生成 dry-run/apply 的文件 item。
-- `scripts/scaffold.sh:1043` 的 `collect_file_entries_blocked` 在策略未确认时生成 blocked item。
+- `get_template_items_json` 根据 locale 选择模板。
+- `get_kind_items_json` 统一读取 template/asset item。
+- `collect_file_entries` 生成 dry-run/apply 的文件 item。
+- `collect_file_entries_blocked` 在策略未确认时生成 blocked item。
 
 当前语义：
 
@@ -49,10 +51,10 @@ TypeScript port 启示：
 
 ## 3. 模板渲染与 i18n
 
-入口：
+入口函数：
 
-- `scripts/scaffold.sh:528` 的 `render_managed_file` 处理占位符并复制文件。
-- `scripts/scaffold.sh:838` 的 locale 选择承担当前 i18n 行为。
+- `render_managed_file` 处理占位符并复制文件。
+- `get_template_items_json` 的 locale 选择承担当前 i18n 行为。
 
 当前语义：
 
@@ -68,11 +70,11 @@ TypeScript port 启示：
 
 ## 4. 写入与 managed_paths
 
-入口：
+入口函数：
 
-- `scripts/scaffold.sh:244` 的 `add_managed_path` 去重并排除 `.claude` 与 `skills-lock.json`。
-- `scripts/scaffold.sh:304` 的 `collect_managed_paths_for_apply` 收集默认项目文件、template、asset 和 installer 管理路径。
-- `scripts/scaffold.sh:934` 的 `collect_file_entries` 在 apply 模式下执行 `mkdir`、copy/render、`chmod +x`。
+- `add_managed_path` 去重并排除 `.claude` 与 `skills-lock.json`。
+- `collect_managed_paths_for_apply` 收集默认项目文件、template、asset 和 installer 管理路径。
+- `collect_file_entries` 在 apply 模式下执行 `mkdir`、copy/render、`chmod +x`。
 
 当前语义：
 
@@ -87,14 +89,35 @@ TypeScript port 启示：
 - managed path registry 应来自 manifest + installer adapter，不能从实际 git diff 猜。
 - Phase 1d 至少实现幂等 no-op 和漂移警告，`--force` 留到 Phase 2。
 
-## 5. Git commit 与 remote 操作
+## 5. 临时目录与受限环境
 
-入口：
+入口函数：
 
-- `scripts/scaffold.sh:333` 的 `finalize_git_after_apply` 精确 stage managed paths 并创建初始化提交。
-- `scripts/scaffold.sh:545` 到 `scripts/scaffold.sh:622` 处理 remote action 选择与 GitHub remote 脚本调用。
-- `scripts/scaffold.sh:1721` 的 `run_post_apply_checks` 运行 validate、audit、check-consistency 和 capability-smoke。
-- `scripts/scaffold.sh:2280` / `2405` 分别是 dry-run 和 apply 主流程。
+- `dayu_tmp_candidates` 统一给出临时目录候选。
+- `make_writable_tmpfile` 为 smoke、remote stderr、PR/Issue body、policy 校验等场景创建可写临时文件。
+- `make_writable_tmpdir` 为 release/remote 验证创建可写临时目录。
+
+当前语义：
+
+- 不假设 `${TMPDIR:-/tmp}` 可写。
+- 回退顺序是 `DAYU_HARNESS_TMPDIR`、`TMPDIR`、`TARGET/.tmp`、`OUTPUT_BASE/.tmp`、`/tmp`。
+- 每个候选目录先 `mkdir -p`，再以 `mktemp` 的真实返回值判断是否可用。
+- pre-push snippet 自身也需要回退临时目录；它们共享 `DAYU_HARNESS_PRE_PUSH_INPUT`，避免多个 snippet 重复消费 stdin。
+
+TypeScript port 启示：
+
+- CLI 和脚手架都应允许调用方显式指定可写临时目录，尤其是在 Agent sandbox 和 CI 中。
+- 测试应覆盖不可写 `TMPDIR`，不能只靠默认开发机环境。
+- `.tmp/` 是本仓库维护者运行缓存，不是部署产物。
+
+## 6. Git commit 与 remote 操作
+
+入口函数：
+
+- `finalize_git_after_apply` 精确 stage managed paths 并创建初始化提交。
+- remote action 选择逻辑与 `run_github_remote` 负责 GitHub remote 脚本调用。
+- `run_post_apply_checks` 运行 validate、audit、check-consistency 和 capability-smoke。
+- dry-run 和 apply 主流程分别组织预览和写入。
 
 当前语义：
 
@@ -106,14 +129,34 @@ TypeScript port 启示：
 TypeScript port 启示：
 
 - Phase 1d 的 CLI apply 可以先不负责 Git finalization，把提交/远端同步留在后续阶段或通过 adapter 调用。
-- remote actions 不应阻塞本地 3-capability 垂直切片，除非 config 显式启用 GitHub 能力。
+- remote actions 不应阻塞本地 v2 试点能力垂直切片，除非 config 显式启用 GitHub 能力。
 - JSON 输出需要 schema 化，不能长期依赖手写字符串拼接。
+
+## 7. Hook installer 原子写入
+
+入口函数：
+
+- `scripts/install-husky.sh` 的 `hook_write_target` 解析普通 hook 文件与符号链接 hook。
+- `hook_file_mode` 保留既有 hook 的文件模式。
+- `write_hook_atomically` 写入同目录临时文件后 rename，失败时清理临时文件。
+
+当前语义：
+
+- merge 既有 hook 时保留原内容并追加 Dayu snippet。
+- 如果 `.husky/commit-msg` 是符号链接，写入目标是符号链接指向的实际文件，不替换 symlink。
+- 既有可执行位需要保留，避免安装 snippet 后破坏 hook 可执行性。
+
+TypeScript port 启示：
+
+- installer adapter 不能把 hook 文件当作普通文本覆盖。
+- 原子写入和 symlink/mode 保留应有专门测试，避免后续 CLI 化时退化。
 
 ## 主要风险
 
 - Bash 输出 JSON 是手写字符串，消费端必须处理非 JSON 或 partial JSON。
 - 当前 apply 不是事务型写入；Phase 1d 失败恢复只能做到可重试，不应承诺完整回滚。
 - `scaffold.sh` 对旧 manifest 依赖 `dependencies`；TS 读取 `deployment_deps` 时必须限制到 v2 试点能力。
+- 临时目录不可写是实际 QA 风险；新增 smoke 或脚本时必须使用 `make_writable_tmpfile` / `make_writable_tmpdir`，不要重新写 `${TMPDIR:-/tmp}` 假设。
 - 现有 Bats 对文件数量和能力输出有较多断言，任何默认能力变化都会放大测试影响。
 
 ## Phase 1d 建议

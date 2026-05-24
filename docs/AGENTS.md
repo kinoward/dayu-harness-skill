@@ -6,6 +6,8 @@ Skill 自身文档索引。
 
 - [AGENTS.md](AGENTS.md) - 当前索引
 - [plan.md](plan.md) - 完整设计计划和架构文档
+- [phase1-progress.md](phase1-progress.md) - Phase 1 当前进度、维护者计划和 QA 经验沉淀
+- [phase1b-schema.md](phase1b-schema.md) - Phase 1b schema、manifest v2、config、i18n 和路径安全契约
 - [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
 - [phase1d-cli.md](phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
@@ -20,6 +22,8 @@ Skill 自身文档索引。
 > 触发时机：需要理解 Skill 架构决策、设计原理时读取
 
 - [plan.md](plan.md)：完整设计计划和架构文档
+- [phase1-progress.md](phase1-progress.md)：Phase 1b-1e 当前进度、后续计划、验证基线和临时目录回退 QA 经验
+- [phase1b-schema.md](phase1b-schema.md)：Phase 1b schema、manifest v2、`dayu.config.yaml`、locale catalog 和路径安全契约
 - [optimization-2026-05.md](optimization-2026-05.md)：2026-05 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md)：Phase 1c CLI 命令树、DAG 和三层边界契约
 - [phase1d-cli.md](phase1d-cli.md)：Phase 1d TypeScript CLI 垂直切片实现边界、命令语义和验证方式

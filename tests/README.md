@@ -98,7 +98,7 @@ bats tests/unit/test-skill-interaction-e2e.bats
 单独运行 i18n 漂移契约检查：
 
 ```bash
-bash scripts/check-i18n-drift.sh --json
+TMPDIR=.tmp bash scripts/check-i18n-drift.sh --json
 ```
 
 该检查会验证英文镜像是否保持中文源的 Markdown 格式结构，包括 README、`templates/` 与 `templates.en/` 的文件树、标题层级、列表层级、表格、引用、代码块和链接行。
@@ -140,12 +140,14 @@ npx tsc --noEmit
 bats tests/unit
 ```
 
-当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。
+当前基线结果以本地实际运行输出为准；能力拆分后测试数量会随契约覆盖增减。2026-05-24 的本地基线：
 
-- `bats tests/unit/test-github-helper-scripts.bats`：34/34 通过。
-- `bats tests/unit/test-skill-interaction-e2e.bats`：17/17 通过。
-- `bash tests/smoke/dayu-harness-profile.sh --profile local-fast --json`：通过。
-- `bats tests/unit`：完整维护者测试套件按需运行；远端 profile 默认不纳入本地快速基线。
+- `npm run test:unit -- --test-reporter=spec`：33/33 通过。
+- `npx tsc --noEmit`：通过。
+- `TMPDIR=.tmp bash scripts/check-i18n-drift.sh --json`：8/8 通过。
+- `TMPDIR=.tmp bats tests/unit`：206/206 通过；真实 Claude CLI smoke 仍需显式设置 `RUN_CLAUDE_I18N_SMOKE=1`。
+- `npm run dayu -- init/diagnose/validate/apply` 的临时目标 smoke 通过，二次 `apply --dry-run` 无变更。
+- `TMPDIR` 指向不可写目录时，`scripts/scaffold.sh --dry-run` 能回退到目标内 `.tmp` 并正常输出计划。
 
 ## 迭代维护规则
 
@@ -157,3 +159,5 @@ bats tests/unit
 - 修改执行测试模板或测试流程时，同步更新 `tests/fixtures/skill-usage-test-results.md`。
 - 只有当目标项目实际部署内容发生产品层变化时，才修改 `templates/`、`assets/`、`capabilities/`；不要为了测试记录改动部署内容。
 - TypeScript/tsx 运行缓存写入根 `.tmp/`；Bats fixture 和临时项目运行实例写入 `tests/unit/.tmp/`。两个目录均通过 `.gitignore` 忽略运行产物，只保留忽略规则本身。
+- 受限 sandbox 或 CI 中不要假设 `/tmp` 可写。需要指定可写临时目录时，优先设置 `DAYU_HARNESS_TMPDIR=<repo>/.tmp`；`scaffold.sh` 的回退顺序是 `DAYU_HARNESS_TMPDIR`、`TMPDIR`、目标项目 `.tmp`、输出目录 `.tmp`、`/tmp`。
+- pre-push smoke 依赖多个 snippet 共享同一份 `DAYU_HARNESS_PRE_PUSH_INPUT`。修改 `branch-protection.sh` 或 `release-versioning.sh` 时，必须确认第一个 snippet 不会独占 stdin 导致后续 snippet 失效。

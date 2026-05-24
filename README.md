@@ -169,7 +169,7 @@ README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md
 
 - 入口与索引：`README.md`、`README.en.md`、`AGENTS.md`（含子目录索引）
 - 能力、schema、架构契约与部署引擎：`capabilities/`、`src/`、`locales/`、`templates/`、`templates.en/`、`assets/`、`scripts/`
-- 本地验证工具链：`package.json`、`tsconfig.json`、`tests/unit/phase1b-schema.test.ts`、`tests/unit/phase1c-architecture.test.ts`、`tests/unit/phase1d-cli.test.ts`、`tests/unit/phase1e-cli-scope.test.ts`
+- 维护者本地验证工具链：`package.json`、`tsconfig.json`、`tests/unit/phase1b-schema.test.ts`、`tests/unit/phase1c-architecture.test.ts`、`tests/unit/phase1d-cli.test.ts`、`tests/unit/phase1e-cli-scope.test.ts`
 - 输出与维护资料：`docs/`、`marketing/`、`tests/`
 - 发布与仓库自动化：`.github/workflows/update-contributors.yml` 负责 README 动态区块；GitHub 能力相关 workflow、ruleset 与策略模板位于 `assets/github/`
 
@@ -179,6 +179,7 @@ README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md
 
 - 想了解 Skill 的行为定义：看 [SKILL.md](SKILL.md)。
 - 想了解本仓库的维护规则、能力清单、脚本流程和测试基线：看 [AGENTS.md](AGENTS.md)。
+- 想了解当前 Phase 1b-1e 的计划、进度和 QA 经验：看 [docs/phase1-progress.md](docs/phase1-progress.md)。
 - 想了解不同 Agent 客户端的兼容方式：看 [references/agent-compatibility.md](references/agent-compatibility.md)。
 
 ## 📚 参考引用

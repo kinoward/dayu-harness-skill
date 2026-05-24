@@ -45,7 +45,7 @@ npm run dayu -- diagnose --config <target>/dayu.config.yaml --target <target> --
 Phase 1d 入口测试位于 [tests/unit/phase1d-cli.test.ts](../tests/unit/phase1d-cli.test.ts)，覆盖：
 
 - CLI `apply --dry-run --json` 确定性输出。
-- 真实 apply 写入 3 个选定能力和内部 `git.hooks` 依赖。
+- 真实 apply 写入 3 个用户可见默认能力，并带上内部 `git.hooks` 依赖。
 - 第二次 apply no-op。
 - 冲突文件不覆盖。
 - `init` 生成 config 后 apply 可消费。
