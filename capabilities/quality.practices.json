@@ -1,11 +1,38 @@
 {
   "id": "quality.practices",
+  "schemaVersion": "2.0.0",
+  "kind": "soft",
   "description": "General engineering quality and testing practices",
   "description_nl": "Deploy general development hygiene and testing strategy documents without installing Node.js tooling.",
   "default": false,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.quality.practices.title",
+    "description_key": "capability.quality.practices.description",
+    "acceptance_keys": [
+      "capability.quality.practices.acceptance.1",
+      "capability.quality.practices.acceptance.2",
+      "capability.quality.practices.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.quality.practices.rule",
+      "artifacts": [
+        "docs/harness/guides/dev-hygiene.md",
+        "docs/harness/guides/testing-strategy.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/dev-hygiene.md",
@@ -17,13 +44,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Development hygiene guide exists",
-    "Testing strategy guide exists",
-    "No Node.js tooling is installed by this capability"
-  ],
-  "suggested_when": "Enable for any code project that needs general development and testing practices.",
   "template_files_i18n": {
     "en": [
       {
@@ -35,5 +55,12 @@
         "dst": "docs/harness/guides/testing-strategy.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Development hygiene guide exists",
+    "Testing strategy guide exists",
+    "No Node.js tooling is installed by this capability"
+  ],
+  "suggested_when": "Enable for any code project that needs general development and testing practices."
 }

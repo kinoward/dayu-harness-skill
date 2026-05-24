@@ -1,11 +1,36 @@
 {
   "id": "ai.memory",
+  "schemaVersion": "2.0.0",
+  "kind": "soft",
   "description": "AI project-memory boundaries and experience capture",
   "description_nl": "Deploy project-memory boundaries and experience capture rules for AI collaboration.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.ai.memory.title",
+    "description_key": "capability.ai.memory.description",
+    "acceptance_keys": [
+      "capability.ai.memory.acceptance.1",
+      "capability.ai.memory.acceptance.2"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.ai.memory.rule",
+      "artifacts": [
+        "docs/harness/guides/ai-memory.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/ai-memory.md",
@@ -13,12 +38,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "AI memory practice document exists",
-    "Project memory boundaries are documented"
-  ],
-  "suggested_when": "Enable when reusable decisions, troubleshooting notes, and research findings should become repository-owned memory.",
   "template_files_i18n": {
     "en": [
       {
@@ -26,5 +45,11 @@
         "dst": "docs/harness/guides/ai-memory.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "AI memory practice document exists",
+    "Project memory boundaries are documented"
+  ],
+  "suggested_when": "Enable when reusable decisions, troubleshooting notes, and research findings should become repository-owned memory."
 }

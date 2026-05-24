@@ -1,11 +1,37 @@
 {
   "id": "project.context",
+  "schemaVersion": "2.0.0",
+  "kind": "infra",
   "description": "Product specs and project context scaffold",
   "description_nl": "Create product specs area for non-governance project content.",
   "default": true,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.project.context.title",
+    "description_key": "capability.project.context.description",
+    "acceptance_keys": [
+      "capability.project.context.acceptance.1",
+      "capability.project.context.acceptance.2"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "infrastructure",
+      "summary_key": "capability.project.context.rule",
+      "artifacts": [
+        "docs/product-specs/AGENTS.md",
+        "docs/product-specs/project-status.md"
+      ]
+    },
+    "sensor": null,
+    "enforcer": null
+  },
   "template_files": [
     {
       "src": "templates/docs/product-specs/AGENTS.md",
@@ -17,12 +43,6 @@
     }
   ],
   "asset_files": [],
-  "installer": null,
-  "acceptance": [
-    "Product specs AGENTS exists",
-    "Project status snapshot exists"
-  ],
-  "suggested_when": "Enable for repositories with durable product specs or project-specific documentation.",
   "template_files_i18n": {
     "en": [
       {
@@ -34,5 +54,11 @@
         "dst": "docs/product-specs/project-status.md"
       }
     ]
-  }
+  },
+  "installer": null,
+  "acceptance": [
+    "Product specs AGENTS exists",
+    "Project status snapshot exists"
+  ],
+  "suggested_when": "Enable for repositories with durable product specs or project-specific documentation."
 }

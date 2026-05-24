@@ -18,9 +18,9 @@
     "title_key": "capability.git.commit-format.title",
     "description_key": "capability.git.commit-format.description",
     "acceptance_keys": [
-      "capability.git.commit-format.acceptance.hook",
-      "capability.git.commit-format.acceptance.commitlint",
-      "capability.git.commit-format.acceptance.no-replace"
+      "capability.git.commit-format.acceptance.1",
+      "capability.git.commit-format.acceptance.2",
+      "capability.git.commit-format.acceptance.3"
     ]
   },
   "rse": {
@@ -28,23 +28,25 @@
       "type": "documentation",
       "summary_key": "capability.git.commit-format.rule",
       "artifacts": [
-        "docs/harness/guides/commit-guidelines.md"
+        "docs/harness/guides/commit-guidelines.md",
+        "commitlint.config.cjs",
+        ".husky/"
       ]
     },
     "sensor": {
       "type": "config",
-      "summary_key": "capability.git.commit-format.sensor",
       "checks": [
         "commitlint.config.cjs",
         ".husky/commit-msg"
-      ]
+      ],
+      "summary_key": "capability.git.commit-format.sensor"
     },
     "enforcer": {
       "type": "hook",
-      "summary_key": "capability.git.commit-format.enforcer",
       "mechanisms": [
         "commit-msg"
-      ]
+      ],
+      "summary_key": "capability.git.commit-format.enforcer"
     }
   },
   "template_files": [
@@ -59,6 +61,14 @@
       "dst": "commitlint.config.cjs"
     }
   ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/commit-guidelines.md",
+        "dst": "docs/harness/guides/commit-guidelines.md"
+      }
+    ]
+  },
   "installer": {
     "script": "install-husky.sh",
     "safe_strategies": [
@@ -75,13 +85,5 @@
   "requires": [
     "Git repository context"
   ],
-  "suggested_when": "Enable when project enforces git commit conventions.",
-  "template_files_i18n": {
-    "en": [
-      {
-        "src": "templates.en/docs/harness/guides/commit-guidelines.md",
-        "dst": "docs/harness/guides/commit-guidelines.md"
-      }
-    ]
-  }
+  "suggested_when": "Enable when project enforces git commit conventions."
 }

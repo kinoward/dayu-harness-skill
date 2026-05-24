@@ -1,12 +1,56 @@
 {
   "id": "quality.tdd",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Configurable Test-Driven Development policy check for pull requests.",
   "description_nl": "可配置的 PR TDD 检查，支持实现路径/测试路径策略和可替换策略文件。",
   "default": false,
+  "deployment_deps": [
+    "core",
+    "github.pr"
+  ],
+  "conceptual_deps": [
+    "quality.practices",
+    "github.pr"
+  ],
   "dependencies": [
     "core",
     "github.pr"
   ],
+  "i18n": {
+    "title_key": "capability.quality.tdd.title",
+    "description_key": "capability.quality.tdd.description",
+    "acceptance_keys": [
+      "capability.quality.tdd.acceptance.1",
+      "capability.quality.tdd.acceptance.2",
+      "capability.quality.tdd.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "configuration",
+      "summary_key": "capability.quality.tdd.rule",
+      "artifacts": [
+        ".github/scripts/pr_tdd_check.py",
+        ".github/dayu-harness/pr-tdd-policy.json"
+      ]
+    },
+    "sensor": {
+      "type": "script",
+      "checks": [
+        ".github/scripts/pr_tdd_check.py",
+        ".github/dayu-harness/pr-tdd-policy.json"
+      ],
+      "summary_key": "capability.quality.tdd.sensor"
+    },
+    "enforcer": {
+      "type": "ci",
+      "mechanisms": [
+        "pr_tdd_check.py via PR lint"
+      ],
+      "summary_key": "capability.quality.tdd.enforcer"
+    }
+  },
   "template_files": [],
   "asset_files": [
     {

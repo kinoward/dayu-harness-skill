@@ -1,11 +1,50 @@
 {
   "id": "github.repository-settings",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Repository pull request automation settings",
   "description_nl": "部署 GitHub 仓库 PR 自动合并策略配置，并在 apply 阶段同步远端设置。",
   "default": false,
+  "deployment_deps": [
+    "core"
+  ],
+  "conceptual_deps": [],
   "dependencies": [
     "core"
   ],
+  "i18n": {
+    "title_key": "capability.github.repository-settings.title",
+    "description_key": "capability.github.repository-settings.description",
+    "acceptance_keys": [
+      "capability.github.repository-settings.acceptance.1",
+      "capability.github.repository-settings.acceptance.2",
+      "capability.github.repository-settings.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.github.repository-settings.rule",
+      "artifacts": [
+        "docs/harness/guides/github-repository-settings.md",
+        ".github/repository/pull-request-settings.json"
+      ]
+    },
+    "sensor": {
+      "type": "config",
+      "checks": [
+        ".github/repository/pull-request-settings.json"
+      ],
+      "summary_key": "capability.github.repository-settings.sensor"
+    },
+    "enforcer": {
+      "type": "manual",
+      "mechanisms": [
+        "gh api repository settings sync"
+      ],
+      "summary_key": "capability.github.repository-settings.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/github-repository-settings.md",
@@ -18,6 +57,15 @@
       "dst": ".github/repository/pull-request-settings.json"
     }
   ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/github-repository-settings.md",
+        "dst": "docs/harness/guides/github-repository-settings.md"
+      }
+    ]
+  },
+  "installer": null,
   "remote_actions": [
     {
       "kind": "repository_settings",
@@ -35,19 +83,10 @@
       }
     }
   ],
-  "installer": null,
   "acceptance": [
     "Repository pull request settings file exists",
     "Repository settings guide exists",
     "Repository merge commit is enabled, squash/rebase merge are disabled, and auto-merge/delete-branch-on-merge are synchronized through GitHub API during apply"
   ],
-  "suggested_when": "Enable when release automation requires deterministic PR merge behavior.",
-  "template_files_i18n": {
-    "en": [
-      {
-        "src": "templates.en/docs/harness/guides/github-repository-settings.md",
-        "dst": "docs/harness/guides/github-repository-settings.md"
-      }
-    ]
-  }
+  "suggested_when": "Enable when release automation requires deterministic PR merge behavior."
 }

@@ -66,7 +66,7 @@ export const ManifestV2Schema = z
     deployment_deps: z.array(CapabilityIdSchema).default([]),
     conceptual_deps: z.array(CapabilityIdSchema).default([]),
 
-    // Compatibility bridge while Phase 1 keeps scaffold.sh on manifest v1.
+    // Compatibility bridge while scaffold.sh still reads the legacy field.
     dependencies: z.array(CapabilityIdSchema),
 
     i18n: I18nKeyRefSchema,
@@ -103,7 +103,7 @@ export const ManifestV2Schema = z
       ctx.addIssue({
         code: "custom",
         path: ["dependencies"],
-        message: "legacy dependencies must mirror deployment_deps during Phase 1"
+        message: "legacy dependencies must mirror deployment_deps during scaffold.sh compatibility"
       });
     }
 
@@ -129,7 +129,7 @@ export const ManifestV2Schema = z
         ctx.addIssue({
           code: "custom",
           path: ["rse"],
-          message: "soft capabilities must not declare sensor or enforcer in Phase 1"
+          message: "soft capabilities must not declare sensor or enforcer"
         });
       }
     }
@@ -138,7 +138,7 @@ export const ManifestV2Schema = z
       ctx.addIssue({
         code: "custom",
         path: ["rse"],
-        message: "infra capabilities must not declare sensor or enforcer in Phase 1"
+        message: "infra capabilities must not declare sensor or enforcer"
       });
     }
   });

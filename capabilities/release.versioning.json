@@ -1,12 +1,57 @@
 {
   "id": "release.versioning",
+  "schemaVersion": "2.0.0",
+  "kind": "hard",
   "description": "Release versioning and tag protection",
   "description_nl": "Deploy SemVer and release tag guidance, tag ruleset, and local pre-push release tag guard.",
   "default": false,
+  "deployment_deps": [
+    "core",
+    "git.hooks"
+  ],
+  "conceptual_deps": [
+    "git.commit-format"
+  ],
   "dependencies": [
     "core",
     "git.hooks"
   ],
+  "i18n": {
+    "title_key": "capability.release.versioning.title",
+    "description_key": "capability.release.versioning.description",
+    "acceptance_keys": [
+      "capability.release.versioning.acceptance.1",
+      "capability.release.versioning.acceptance.2",
+      "capability.release.versioning.acceptance.3"
+    ]
+  },
+  "rse": {
+    "rule": {
+      "type": "documentation",
+      "summary_key": "capability.release.versioning.rule",
+      "artifacts": [
+        "docs/harness/guides/release-versioning.md",
+        ".github/rulesets/protect-tags.json",
+        ".husky/"
+      ]
+    },
+    "sensor": {
+      "type": "config",
+      "checks": [
+        ".github/rulesets/protect-tags.json",
+        ".husky/pre-push"
+      ],
+      "summary_key": "capability.release.versioning.sensor"
+    },
+    "enforcer": {
+      "type": "hook",
+      "mechanisms": [
+        "pre-push release tag guard",
+        "GitHub tag ruleset"
+      ],
+      "summary_key": "capability.release.versioning.enforcer"
+    }
+  },
   "template_files": [
     {
       "src": "templates/docs/harness/guides/release-versioning.md",
@@ -19,6 +64,22 @@
       "dst": ".github/rulesets/protect-tags.json"
     }
   ],
+  "template_files_i18n": {
+    "en": [
+      {
+        "src": "templates.en/docs/harness/guides/release-versioning.md",
+        "dst": "docs/harness/guides/release-versioning.md"
+      }
+    ]
+  },
+  "installer": {
+    "script": "install-husky.sh",
+    "safe_strategies": [
+      "merge",
+      "skip"
+    ],
+    "notes": "Installs only the pre-push release tag protection snippet."
+  },
   "remote_actions": [
     {
       "kind": "ruleset",
@@ -32,26 +93,10 @@
       ]
     }
   ],
-  "installer": {
-    "script": "install-husky.sh",
-    "safe_strategies": [
-      "merge",
-      "skip"
-    ],
-    "notes": "Installs only the pre-push release tag protection snippet."
-  },
   "acceptance": [
     "Release versioning guide exists",
     "Tag ruleset exists",
     "Pre-push hook protects v* release tags"
   ],
-  "suggested_when": "Enable when release versioning and tag protection are required.",
-  "template_files_i18n": {
-    "en": [
-      {
-        "src": "templates.en/docs/harness/guides/release-versioning.md",
-        "dst": "docs/harness/guides/release-versioning.md"
-      }
-    ]
-  }
+  "suggested_when": "Enable when release versioning and tag protection are required."
 }
