@@ -6,7 +6,7 @@
 
 # Dayu Harness Skill（大禹治库.skill）
 
-### *“把一次性的 AI 协作提示，疏导成项目里长期可运行的治理体系。”*
+### *“把项目规则写进仓库，让治理在工具离开后继续生效。”*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-green)](https://agentskills.io)
@@ -26,99 +26,84 @@ English documentation is available in [README.en.md](README.en.md).
 <table>
 <tr><td align="left">
 
-🤖 &nbsp;你的项目已经开始让智能体参与开发、审查、排障和文档维护？<br>
-📚 &nbsp;你的规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？<br>
-🧭 &nbsp;你希望 Skill 删除之后，项目仍然知道怎么协作、怎么检查、怎么沉淀经验？
+🧭 &nbsp;你的项目规则还散在聊天记录、PR 评论、口头约定和旧文档里？<br>
+🧰 &nbsp;你希望提交、PR、Issue、发布和质量检查有统一入口？<br>
+📦 &nbsp;你希望工具跑完即可移除，规则仍留在项目里继续生效？
 
 </td></tr>
 </table>
 
-### ✨ 这些，大禹治库都能解决。
+### ✨ Dayu Harness 用来把这些规则部署进你的仓库。
 
 <br>
 
-从 **一次性提示升级成仓库级治理体系**，不再让规则只停留在某次对话里。
+[🧭 项目介绍](#-项目介绍) · [🧩 前置环境](#-前置环境) · [🚀 快速开始](#-快速开始) · [🛠️ 五类功能](#-五类功能)
 
-聊天记录 · PR 评论 · 团队口头约定 · 旧文档 · 排障经验，都可以被整理成可审查的项目资产。
+[🔁 CLI 框架](#-cli-框架) · [📦 写入内容](#-写入内容) · [🧭 怎么选择](#-怎么选择) · [🌐 双语与兼容](#-双语与兼容)
 
-**地图、指南、检查脚本和自动化反馈**各归其位，让项目自己知道怎么协作、怎么检查、怎么沉淀。
-
-<br>
-
-[🧭 前言](#-前言) · [🚀 快速开始与使用](#-快速开始与使用) · [📦 会生成什么](#-会生成什么) · [🌐 双语部署](#-双语部署)
-
-[📁 项目结构](#-项目结构) · [🔎 更多细节](#-更多细节) · [📚 参考引用](#-参考引用) · [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
+[📁 项目结构](#-项目结构) · [📚 更多文档](#-更多文档) · [🤝 参与贡献](#-参与贡献) · [⭐ Star History](#-star-history)
 
 </div>
 
 ---
 
-## 🧭 前言
+## 🧭 项目介绍
 
-你的项目已经开始让智能体参与开发、审查、排障和文档维护，但规则还散在聊天记录、PR 评论、团队口头约定和旧文档里？
+Dayu Harness Skill（大禹治库）是一个仓库治理部署工具。它会把项目规则、文档结构、检查脚本、Git hooks、GitHub Actions 和常用配置写入目标仓库，让这些规则跟随项目版本一起保存、审查和迁移。
 
-Dayu Harness Skill 面向 [Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/) 风格的项目治理而设计。它不是让某个 Agent 在某次对话里更听话，而是把长期规则部署进目标仓库，让 `AGENTS.md`、`docs/`、hooks、CI 和维护脚本成为项目协作的实际权威。
+它不是长期运行的服务，也不是只在某个聊天窗口里生效的提示词包。初始化或维护完成后，可以删除工具安装目录；真正长期生效的是目标项目里的 `AGENTS.md`、`docs/`、`.husky/`、`.github/`、配置文件和状态记录。
 
-“大禹”取自大禹治水：不把洪流堵在一处，而是疏导、分流并建立长期秩序。本 Skill 的目标也是如此：把一次性的提示词、约束和经验，整理成可版本化、可审查、可迁移的治理资产。
+适合这些场景：
 
-## 🎯 适合场景
+- 新项目想从第一天就有清晰的项目入口、文档骨架和基础 Git 约束。
+- 旧项目已有零散文档、hooks、CI 或提交规则，需要整理成一套可维护的结构。
+- 团队希望提交、PR、Issue、发布和质量检查有统一规则，而不是靠每次人工提醒。
+- 项目需要在 Claude Code、Codex、Cursor、Copilot 等工具之间保持同一套仓库规则。
 
-- 新项目希望从第一天就建立 `AGENTS.md` 根索引、文档分层和基础工程约束。
-- 旧项目已有零散文档、hooks、CI 或提交规则，需要融合成可维护的治理体系。
-- 团队希望 AI 协作经验能持续沉淀，而不是留在不可检索的聊天记录里。
-- 项目需要在 Claude Code、Codex 和通用 Agent Skills 客户端之间保持可迁移规则。
+## 🧩 前置环境
 
-## 🚀 快速开始与使用
+基础使用建议先准备：
 
-推荐只安装到需要治理的目标项目里，不做全局安装，也不建议把 Skill 安装目录提交进项目。Dayu Harness Skill 是一次性部署、融合、诊断和维护入口；使用完成后可以删除，长期生效的是目标项目内写入的 `AGENTS.md`、`docs/`、hooks、CI 和检查脚本。
+- Git：用于初始化仓库、安装 hooks、识别默认分支和提交治理文件。
+- Node.js LTS：用于运行 `npx dayu-harness` 和安装治理工具链。
+- npm / npx：随 Node.js 提供，用于执行 CLI 和安装必要的本地检查依赖。
+- jq：用于环境检查脚本读取 JSON 配置。
 
-### 🧰 Phase 2 CLI 引擎
+按需准备：
 
-如果只需要确定性执行层，npm 包发布后可以直接使用 CLI：
+- Python 3：启用 PR、Issue 或测试策略检查时会用到。
+- PyYAML：需要校验 GitHub workflow YAML 时会用到。
+- GitHub CLI `gh`：启用 GitHub 仓库、PR、Issue、分支保护或发布相关功能时需要，并需先完成 `gh auth login`。
+
+说明：Node/npm 主要用于运行治理工具和本地检查，不代表你的业务项目必须是 Node.js 应用。目标项目缺少 `package.json` 时，工具会在需要时提示初始化。
+
+## 🚀 快速开始
+
+如果只想使用 CLI：
 
 ```bash
 cd <target-project>
-npx dayu-harness init --target .          # 默认 dry-run
-npx dayu-harness init --target . --apply  # 写入配置并部署默认能力
-npx dayu-harness status --target .
+npx dayu-harness init --target .          # 默认只预览，不写入
+npx dayu-harness init --target . --apply  # 确认后写入默认治理内容
+npx dayu-harness status --target .        # 查看当前治理状态
 ```
 
-本仓库本地开发或发布前验证时，先构建再直接运行 dist 入口：
-
-```bash
-npm install --cache .npm-cache
-npm run build
-node dist/cli/main.js --help
-```
-
-CLI 支持 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。配置契约见 [docs/configuration.md](docs/configuration.md)，快速开始见 [docs/getting-started.md](docs/getting-started.md)。
-
-### ⚡ 推荐：Vercel skills CLI
+如果想通过 Skill 入口获得引导：
 
 ```bash
 cd <target-project>
 npx skills add kinoward/dayu-harness-skill
 ```
 
-如果希望明确指定客户端：
-
-```bash
-# Claude Code -> .claude/skills/
-npx skills add kinoward/dayu-harness-skill -a claude-code
-
-# Codex -> .agents/skills/
-npx skills add kinoward/dayu-harness-skill -a codex
-```
-
-安装完成后，在目标项目中打开你的 Agent 客户端，并输入：
+安装后，在支持 Skills 的客户端中输入：
 
 ```text
 /dayu-harness
 ```
 
-然后按提示选择初始化、融合已有规则、诊断项目完整性，或维护现有治理内容。Skill 会先分析项目现状，再通过同一个 Phase 2 CLI 执行本地确定性部署、融合、生成、修复和验证；已有 hooks、CI、lint 和发布配置会先提供合并方案，不会直接覆盖。
+工具会先分析目标项目，再引导你初始化、融合已有配置、诊断完整性或修复漂移。已有 hooks、CI、lint、发布配置默认不会被直接覆盖，会先给出预览或合并方案。
 
-使用完成后可删除：
+使用完成后可以移除 Skill 安装目录：
 
 ```bash
 npx skills remove dayu-harness
@@ -160,58 +145,103 @@ rm -rf .agents/skills/dayu-harness
 
 </details>
 
-## 📦 会生成什么
+## 🛠️ 五类功能
 
-Dayu Harness Skill 会把项目协作规则整理到目标仓库中，常见产物包括：
+| 功能 | 包含内容 | 适合什么时候启用 |
+| --- | --- | --- |
+| 初始化与部署 | 项目入口索引、文档骨架、维护脚本、`.gitignore`、项目状态快照 | 新项目起步，或旧项目需要建立统一入口 |
+| 规则落地 | 提交规范、PR/Issue 规范、分支保护、版本发布规则、测试策略 | 团队希望规则写进仓库，而不是只靠口头约定 |
+| 自动检查 | commit hook、pre-push hook、GitHub Actions、lint/format、固定格式生成器 | 希望在提交、推送、PR 或发布前发现问题 |
+| 融合与修复 | 已有配置差异预览、保留/替换/跳过策略、漂移诊断和修复 | 旧项目已有文档、hooks、CI 或 lint 配置 |
+| 状态与收尾 | 状态查看、一致性验证、精确提交、远端同步和测试产物清理 | 写入后需要确认治理体系可以正常工作 |
 
-- `AGENTS.md` 根治理入口，以及必要的子目录索引。
-- `docs/harness/` 下的协作指南、维护说明和检查脚本。
-- Git hooks、CI 工作流、提交规范、PR 指南和质量检查配置。
-- `dayu-format.mjs` 固定格式生成器，用于确定性生成 PR body、Issue body 和 commit message。
-- `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/` 等长期知识目录。
-- 仓库设置策略说明、Issue 依赖治理说明、可配置的 TDD 门禁策略文件，以及用户确认后才执行的 GitHub 远端设置同步。
-- `docs/product-specs/project-status.md` 及项目背景状态短快照入口。
+默认内容偏基础治理；GitHub、发布自动化和 Node.js 质量工具等内容按需启用。
 
-这些文件会留在目标项目中，成为后续协作的权威入口。
+## 🔁 CLI 框架
 
-## 🌐 双语部署
+CLI 负责确定性执行：读取配置、规划写入内容、部署文件、记录状态、检查结果。常用命令按用途分为四组：
 
-Dayu Harness Skill 以中文为源语言，并推荐默认中文部署；英文内容来自中文语义镜像，服务英文用户理解，不反向改写中文意图。
+| 分组 | 命令 | 用途 |
+| --- | --- | --- |
+| 配置与部署 | `init`、`apply` | 创建配置、预览内容、写入治理内容 |
+| 融合与生成 | `merge`、`generate` | 处理已有项目，或只生成内容预览 |
+| 修复与检查 | `repair`、`status`、`diagnose`、`validate` | 修复漂移，查看状态，检查完整性 |
+| 收尾 | `finalize` | 验证、提交、按需同步远端并清理临时产物 |
 
-运行 `/dayu-harness` 时，交互式问题和选项会中英双语展示，避免英文用户因为看不懂中文而无法选择。部署目标项目时只写入一种语言，默认中文；如果明确选择英文，则写入英文部署产物。
+整体流程：
 
-`templates/` 是中文源模板，`templates.en/` 是英文镜像模板，两个目录保持同构；维护者可以用漂移检查脚本确认 README 镜像、模板树、能力映射和双语问答保持一致。
+```mermaid
+flowchart TD
+  A["选择目标项目"] --> B["生成或读取 dayu.config.yaml"]
+  B --> C["预览将写入的治理内容"]
+  C --> D{"用户确认?"}
+  D -->|否| E["停止，不写入"]
+  D -->|是| F["写入 AGENTS.md、docs、hooks、CI 和配置"]
+  F --> G["记录托管路径和状态"]
+  G --> H["运行状态、诊断和验证检查"]
+  H --> I["按需提交、同步远端和清理"]
+  I --> J["输出完成报告"]
+```
 
-问答流程按阻塞节点分块输出，含版本冲突、远端仓库创建、`.husky`/workflow 合并、已跟踪 `.claude`、受保护分支等场景，均使用固定中英双语选项，不要求用户手工输入命令。
+更多命令细节见 [docs/getting-started.md](docs/getting-started.md) 和 [docs/configuration.md](docs/configuration.md)。
+
+## 📦 写入内容
+
+常见写入内容包括：
+
+- `AGENTS.md` 和必要的子目录索引：作为项目规则和文档的入口。
+- `docs/harness/`：维护说明、协作指南、检查脚本和审查材料。
+- `.husky/`：提交信息、推送保护、质量检查等本地 hook。
+- `.github/`：PR/Issue 检查、发布自动化、仓库策略和 ruleset 模板。
+- `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json` 等配置文件。
+- `docs/design-docs/`、`docs/troubleshooting/`、`docs/references/`、`docs/product-specs/`、`docs/archive/` 等长期文档目录。
+- `.dayu-harness/managed-paths.json`：记录工具托管过的长期路径，用于后续诊断、修复和精确提交。
+
+临时锁、运行日志和缓存不会作为长期治理资产提交。
+
+## 🧭 怎么选择
+
+Dayu Harness 借鉴了 gstack、Spec Kit 和 OpenSpec 等项目的思路，但目标不同。下面的对比用于帮助你判断什么时候需要它们。
+
+| 项目 | 更适合解决 | Dayu Harness 的区别 |
+| --- | --- | --- |
+| [gstack](https://github.com/garrytan/gstack) | 把 Claude Code 组织成产品、设计、审查、QA、发布等一组工作流工具 | Dayu 不提供完整工作流团队；它把项目规则和检查资产写进仓库，让规则长期跟随项目 |
+| [GitHub Spec Kit](https://github.github.com/spec-kit/index.html) | 围绕规格、规划、任务和实现组织功能开发 | Dayu 不替代规格驱动开发；它补充仓库入口、hooks、CI、健康检查和旧项目融合 |
+| [OpenSpec](https://openspec.dev/) | 用较轻量的规格和变更目录管理需求演进 | Dayu 不只管理需求规格；它部署可检查、可修复、可迁移的项目治理资产 |
+
+可以这样选择：
+
+- 你需要更强的个人或团队工作流编排：优先看 gstack。
+- 你需要围绕新功能建立完整规格流程：优先看 Spec Kit。
+- 你需要轻量记录需求变更并和代码一起审查：优先看 OpenSpec。
+- 你需要把规则、文档、hooks、CI 和检查脚本落到仓库里：使用 Dayu Harness。
+
+这些工具可以组合使用。Dayu Harness 更关注“项目自己的长期规则”，不要求你放弃已有开发流程。
+
+## 🌐 双语与兼容
+
+Dayu Harness 以中文为源语言，并提供英文镜像文档和英文部署模板。运行 `/dayu-harness` 时，关键问题和选项会中英双语展示；部署到目标项目时只写入一种语言，默认中文，明确选择英文时写入英文内容。
+
+它面向多种编码助手保持中立：目标项目里的长期资产是 Markdown、Shell hooks、YAML workflow 和常见配置文件。工具移除后，项目规则仍保留在仓库中。
 
 ## 📁 项目结构
 
-README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md 中，作为仓库治理的长期事实来源。
+README 只展示高层结构；完整目录树和维护规则见 [AGENTS.md](AGENTS.md)。
 
-- 入口与索引：`README.md`、`README.en.md`、`AGENTS.md`（含子目录索引）
-- 能力、schema、架构契约与部署引擎：`capabilities/`、`src/`、`locales/`、`templates/`、`templates.en/`、`assets/`、`scripts/`
-- 维护者本地验证工具链：`package.json`、`tsconfig.json`、`tsconfig.build.json`、`tests/unit/phase1b-schema.test.ts`、`tests/unit/phase1c-architecture.test.ts`、`tests/unit/phase1d-cli.test.ts`、`tests/unit/phase1e-cli-scope.test.ts`、`tests/unit/phase2-cli.test.ts`
-- 输出与维护资料：`docs/`、`marketing/`、`tests/`
-- 发布与仓库自动化：`.github/workflows/ci.yml`、`.github/workflows/release-please.yml`、`.github/workflows/npm-publish.yml`、`.github/workflows/update-contributors.yml`；GitHub 能力相关 workflow、ruleset 与策略模板位于 `assets/github/`
+- 入口与说明：`README.md`、`README.en.md`、`AGENTS.md`、`SKILL.md`
+- CLI 与配置：`src/`、`package.json`、`tsconfig.json`
+- 部署素材：`templates/`、`templates.en/`、`assets/`、`locales/`
+- 能力清单与脚本：`capabilities/`、`scripts/`
+- 使用与维护文档：`docs/`、`references/`
+- 测试与 fixture：`tests/`
 
-完整仓库目录树见 [AGENTS.md](AGENTS.md)。
+## 📚 更多文档
 
-## 🔎 更多细节
-
-- 想了解 Skill 的行为定义：看 [SKILL.md](SKILL.md)。
-- 想直接使用 CLI：看 [docs/getting-started.md](docs/getting-started.md) 和 [docs/configuration.md](docs/configuration.md)。
-- 想了解本仓库的维护规则、能力清单、脚本流程和测试基线：看 [AGENTS.md](AGENTS.md)。
-- 想了解当前 Phase 1b-1e 的计划、进度和 QA 经验：看 [docs/phase1-progress.md](docs/phase1-progress.md)。
-- 想了解不同 Agent 客户端的兼容方式：看 [references/agent-compatibility.md](references/agent-compatibility.md)。
-
-## 📚 参考引用
-
-- [微信公众号「浮之静」：《深度解析：Harness Engineering》](https://mp.weixin.qq.com/s/-mgf8K7XZrTKoD0pMOIn3w)：项目治理与 AI 协作理念参考。
-- [OpenAI: Harness Engineering](https://openai.com/zh-Hans-CN/index/harness-engineering/)：本 Skill 的设计哲学来源。
-- [deusyu/harness-engineering](https://github.com/deusyu/harness-engineering)：README 信息层次、概念先行叙事和 AGENTS.md 渐进式披露实践参考。
-- [Martin Fowler: Harness Engineering](https://martinfowler.com/articles/harness-engineering.html)：Guides 与 Sensors 控制论框架参考。
-- [agentsmd/agents.md](https://github.com/agentsmd/agents.md)：AGENTS.md 开放格式规范。
-- [microsoft/skills](https://github.com/microsoft/skills)：技能声明与客户端兼容实践。
+- [docs/getting-started.md](docs/getting-started.md)：CLI 快速开始。
+- [docs/configuration.md](docs/configuration.md)：`dayu.config.yaml` 配置说明。
+- [docs/troubleshooting.md](docs/troubleshooting.md)：常见问题排查。
+- [references/agent-compatibility.md](references/agent-compatibility.md)：不同客户端兼容说明。
+- [AGENTS.md](AGENTS.md)：本仓库的完整维护入口。
 
 ## 🤝 参与贡献
 
@@ -219,8 +249,7 @@ README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md
 
 > [!TIP]
 >
-> 我们希望这个仓库成为一个技术分享型项目：把 AI 协作中的好实践、失败经验、检查脚本和治理约束沉淀下来，让更多项目可以复用。
-> 同时欢迎联系我们提供产品功能和使用体验反馈，帮助我们将 Dayu Harness Skill 建设得更好。
+> 我们希望这个仓库成为一个可复用的项目治理工具：把规则、检查脚本、文档入口和长期维护经验沉淀下来，让更多项目可以直接安装、审查和调整。
 >
 > **组织维护者:** [@kinoward](https://github.com/kinoward)
 
@@ -259,6 +288,6 @@ README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md
 
 <p><strong>MIT License</strong> © <a href="https://github.com/kinoward">kinoward</a></p>
 
-<sub>Made with 🌊 for projects that want AI collaboration rules to keep flowing after the chat ends.</sub>
+<sub>Made for projects that want repository rules to keep working after setup is done.</sub>
 
 </div>
