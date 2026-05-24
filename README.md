@@ -72,6 +72,19 @@ Dayu Harness Skill 面向 [Harness Engineering](https://openai.com/zh-Hans-CN/in
 
 推荐只安装到需要治理的目标项目里，不做全局安装，也不建议把 Skill 安装目录提交进项目。Dayu Harness Skill 是一次性部署、融合、诊断和维护入口；使用完成后可以删除，长期生效的是目标项目内写入的 `AGENTS.md`、`docs/`、hooks、CI 和检查脚本。
 
+### 🧰 Phase 2 CLI 引擎
+
+如果只需要确定性执行层，可以直接使用 CLI：
+
+```bash
+cd <target-project>
+npx dayu-harness init --target .          # 默认 dry-run
+npx dayu-harness init --target . --apply  # 写入配置并部署默认能力
+npx dayu-harness status --target .
+```
+
+CLI 支持 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。配置契约见 [docs/configuration.md](docs/configuration.md)，快速开始见 [docs/getting-started.md](docs/getting-started.md)。
+
 ### ⚡ 推荐：Vercel skills CLI
 
 ```bash
@@ -169,15 +182,16 @@ README 只展示高层结构，完整目录树与职责边界维护在 AGENTS.md
 
 - 入口与索引：`README.md`、`README.en.md`、`AGENTS.md`（含子目录索引）
 - 能力、schema、架构契约与部署引擎：`capabilities/`、`src/`、`locales/`、`templates/`、`templates.en/`、`assets/`、`scripts/`
-- 本地验证工具链：`package.json`、`tsconfig.json`、`tests/unit/phase1b-schema.test.ts`、`tests/unit/phase1c-architecture.test.ts`、`tests/unit/phase1d-cli.test.ts`、`tests/unit/phase1e-cli-scope.test.ts`
+- 本地验证工具链：`package.json`、`tsconfig.json`、`tsconfig.build.json`、`tests/unit/phase1b-schema.test.ts`、`tests/unit/phase1c-architecture.test.ts`、`tests/unit/phase1d-cli.test.ts`、`tests/unit/phase1e-cli-scope.test.ts`、`tests/unit/phase2-cli.test.ts`
 - 输出与维护资料：`docs/`、`marketing/`、`tests/`
-- 发布与仓库自动化：`.github/workflows/update-contributors.yml` 负责 README 动态区块；GitHub 能力相关 workflow、ruleset 与策略模板位于 `assets/github/`
+- 发布与仓库自动化：`.github/workflows/ci.yml`、`.github/workflows/release-please.yml`、`.github/workflows/npm-publish.yml`、`.github/workflows/update-contributors.yml`；GitHub 能力相关 workflow、ruleset 与策略模板位于 `assets/github/`
 
 完整仓库目录树见 [AGENTS.md](AGENTS.md)。
 
 ## 🔎 更多细节
 
 - 想了解 Skill 的行为定义：看 [SKILL.md](SKILL.md)。
+- 想直接使用 CLI：看 [docs/getting-started.md](docs/getting-started.md) 和 [docs/configuration.md](docs/configuration.md)。
 - 想了解本仓库的维护规则、能力清单、脚本流程和测试基线：看 [AGENTS.md](AGENTS.md)。
 - 想了解不同 Agent 客户端的兼容方式：看 [references/agent-compatibility.md](references/agent-compatibility.md)。
 

@@ -178,7 +178,7 @@ Skill 完成任何写入类操作后，不能只告诉用户“已完成”。�
 
 ## 能力清单约定
 
-- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。Phase 1b 试点能力开始补充 `schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse` 字段；迁移期间旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。Phase 1c 将 CLI 命令树、部署 DAG、概念依赖图和三层分离约束记录在 `src/architecture/` 与 `docs/phase1c-architecture.md`；`deployment_deps` 阻塞部署，`conceptual_deps` 只影响说明和交互排序。Phase 1d/1e 在 `src/cli/` 提供 `core`、`git.hooks`、`git.commit-format`、`ai.execution` 的 TypeScript CLI 垂直切片，并将公开命令收敛为 `init`、`apply`、`diagnose`、`validate`。
+- `capabilities/*.json` 是治理能力的单一事实源，定义 `id`、依赖、模板文件、资产文件、installer、安全策略和 acceptance criteria。Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`；旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供现有 `scaffold.sh` 兼容使用。`deployment_deps` 阻塞部署，`conceptual_deps` 只影响说明和交互排序。`src/cli/` 公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。
 - `default=true` 的 manifest 是无须用户选择的必选部署集：`core`、Git 提交/.gitignore 约束、AI 执行/记忆规则和知识库/项目上下文目录。通用质量实践、GitHub CI、release-please、Node.js 工具和发布/分支保护类能力仍按 capability 显式启用。
 - Q&A、dry-run plan、安装清单和测试断言应从 manifest 字段生成或校验，避免手工维护重复计数。
 
@@ -191,10 +191,10 @@ Skill 目录中的其他文件按需加载：
 - **[docs/completion-report-template.md](docs/completion-report-template.md)**：Skill 执行完成后的验证流程和自然语言收尾模板。部署、融合、维护或生成操作完成后读取。
 - **[references/agent-compatibility.md](references/agent-compatibility.md)**：Claude、Codex 和通用 Agent Skills 客户端的兼容说明。需要安装、分发或调整触发策略时读取。
 - **[capabilities/](capabilities/)**：治理能力 manifest，作为脚手架、Q&A、部署清单、依赖关系和验收标准的单一事实源。
-- **[src/schemas/](src/schemas/)**：Phase 1 TypeScript/Zod schema，定义 manifest v2、`dayu.config.yaml`、locale catalog 和路径安全校验。
-- **[src/architecture/](src/architecture/)**：Phase 1c TypeScript 架构契约，定义 CLI 命令树、部署/概念依赖图和 Frontend/Tool/Product 三层边界。
-- **[src/cli/](src/cli/)**：Phase 1d/1e TypeScript CLI 垂直切片，公开提供 init/apply/diagnose/validate；merge/generate 原型留到 Phase 2。
-- **[locales/](locales/)**：key-based i18n 文案 catalog，Phase 1b 用于 schema 与试点能力的中英文本契约。
+- **[src/schemas/](src/schemas/)**：TypeScript/Zod schema，定义 manifest v2、`dayu.config.yaml`、locale catalog 和路径安全校验。
+- **[src/architecture/](src/architecture/)**：TypeScript 架构契约，定义 CLI 命令树、部署/概念依赖图和 Frontend/Tool/Product 三层边界。
+- **[src/cli/](src/cli/)**：Phase 2 TypeScript CLI 执行层，公开提供 init/apply/merge/generate/repair/status/diagnose/validate。
+- **[locales/](locales/)**：key-based i18n 文案 catalog，覆盖当前全部 manifest v2 能力的中英文本契约。
 - **[templates/](templates/)**：文档模板（CLAUDE.md、AGENTS.md、docs/ 完整层级结构），部署到目标项目的 `docs/` 目录。
 - **[assets/](assets/)**：脚本和配置资产（husky hooks、commitlint、GitHub workflows、ESLint、Prettier、lint-staged、gitignore），默认 Git 资产和用户选择的可选资产会部署到项目对应位置。
 - **[scripts/](scripts/)**：Skill 内部初始化脚本（`scaffold.sh`、`install-husky.sh`、`install-gitignore.sh`；其余能力按 manifest 指定 `installer.script` 调用），由各模式按需调用。`ensure-environment.sh` 负责环境依赖完整性与初始化确认。

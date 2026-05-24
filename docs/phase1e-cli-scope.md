@@ -2,6 +2,8 @@
 
 本文记录 Phase 1e 对 Phase 1 CLI 的最终公开契约。CEO Plan 早期条目曾把 `merge` 和 `generate` 放入 Phase 1，但最终关卡决议将 Phase 1 收敛为 4 个公开命令，并把完整融合和独立生成能力推迟到 Phase 2。
 
+Phase 2 后，当前 CLI 已扩展为 8 个公开命令，并迁移当前仓库全部 20 个 manifest。本文件保留 Phase 1e 收口决议；当前产品入口见 [phase2-product.md](phase2-product.md)。
+
 ## 目标
 
 - 公开 CLI 命令只保留 `init`、`apply`、`diagnose`、`validate`。
@@ -19,11 +21,11 @@
 | `diagnose` | 只读检查已部署文件、漂移、缺失执行位和 hook snippet 状态。 |
 | `validate` | 校验 manifest/config/DAG 与目标项目部署产物一致性。 |
 
-## 推迟到 Phase 2
+## Phase 2 交接项
 
-- `merge`：完整融合已有配置，按能力粒度确认 keep/replace/skip，并执行用户选择。
-- `generate`：独立内容生成和 maintain 修复内容生成。
-- `--force` 覆盖、孤儿文件清理、事务回滚、npm 发布和全 21 个能力。
+- `merge`：Phase 1e 推迟；Phase 2 已公开能力粒度 merge apply。
+- `generate`：Phase 1e 推迟；Phase 2 已公开内容生成入口。
+- `--force` 覆盖、孤儿文件清理、事务恢复、npm 发布和全量 manifest v2 迁移：Phase 2 已实现当前仓库 20 个 manifest 范围内的 CLI 支撑。
 
 ## 验证
 

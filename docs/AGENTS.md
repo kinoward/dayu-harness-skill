@@ -5,6 +5,10 @@ Skill 自身文档索引。
 ## 目录索引
 
 - [AGENTS.md](AGENTS.md) - 当前索引
+- [getting-started.md](getting-started.md) - Phase 2 CLI 快速开始与常用命令
+- [configuration.md](configuration.md) - `dayu.config.yaml` 配置契约与能力口径
+- [troubleshooting.md](troubleshooting.md) - CLI 常见问题与排查方式
+- [phase2-product.md](phase2-product.md) - Phase 2 CLI 状态机、目标目录树和产品化口径
 - [plan.md](plan.md) - 完整设计计划和架构文档
 - [optimization-2026-05.md](optimization-2026-05.md) - 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
@@ -20,6 +24,10 @@ Skill 自身文档索引。
 > 触发时机：需要理解 Skill 架构决策、设计原理时读取
 
 - [plan.md](plan.md)：完整设计计划和架构文档
+- [getting-started.md](getting-started.md)：Phase 2 CLI 安装、初始化、部署、检查和修复流程
+- [configuration.md](configuration.md)：`dayu.config.yaml` 字段、能力数量口径、依赖和全能力示例
+- [troubleshooting.md](troubleshooting.md)：npm cache、conflict、wrong-mode、lock、orphan、merge 等常见问题
+- [phase2-product.md](phase2-product.md)：Phase 2 CLI 状态机、目标项目目录树和事务语义
 - [optimization-2026-05.md](optimization-2026-05.md)：2026-05 优化记录和实施范围说明
 - [phase1c-architecture.md](phase1c-architecture.md)：Phase 1c CLI 命令树、DAG 和三层边界契约
 - [phase1d-cli.md](phase1d-cli.md)：Phase 1d TypeScript CLI 垂直切片实现边界、命令语义和验证方式

@@ -2,6 +2,8 @@
 
 本文把 CEO Plan 中的 Phase 1c 落成可执行契约，供 Phase 1d/1e TypeScript CLI 垂直切片直接引用。Phase 1c 不实现完整 CLI 写入流程；它先固定命令树、依赖图和三层边界，避免执行层重新解释架构。Phase 1e 按最终关卡决议将公开命令收敛为 4 个。
 
+Phase 2 后，当前 CLI 已扩展为 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，全量 20 个 manifest 均已迁移到 v2 字段。本文件保留 Phase 1 架构契约和历史边界；当前产品入口见 [phase2-product.md](phase2-product.md)。
+
 ## 目标
 
 - 固化 Phase 1 公开 CLI 命令的职责边界：`init`、`apply`、`diagnose`、`validate`。
@@ -30,7 +32,7 @@ CLI 属于 Tool 层。Skill 负责自然语言引导和问题选择，CLI 不做
 
 对应 TypeScript 契约位于 [src/architecture/cli-command-tree.ts](../src/architecture/cli-command-tree.ts)。
 
-`merge` 和 `generate` 的完整公开命令推迟到 Phase 2；Phase 1 不在 CLI help、命令树或公开测试入口暴露它们。
+`merge` 和 `generate` 的完整公开命令推迟到 Phase 2；Phase 1 不在 CLI help、命令树或公开测试入口暴露它们。Phase 2 已公开 `merge`、`generate`，并新增 `repair`、`status`。
 
 ## 依赖模型
 
@@ -66,7 +68,7 @@ core
 core -> git.hooks -> git.commit-format -> ai.execution
 ```
 
-当前 4 个 v2 试点能力的 `conceptual_deps` 为空。后续如果 `ai.execution` 概念上引用 `git.commit-format`，它只能影响说明排序，不能让只启用 `ai.execution` 的部署自动安装 commit hook。
+Phase 1d 当时 4 个 v2 试点能力的 `conceptual_deps` 为空。Phase 2 已按同一依赖模型迁移当前仓库的 20 个 manifest；概念依赖仍只能影响说明排序，不能扩大部署闭包。
 
 对应 TypeScript 契约位于 [src/architecture/dependency-graph.ts](../src/architecture/dependency-graph.ts)。
 
@@ -96,3 +98,4 @@ core -> git.hooks -> git.commit-format -> ai.execution
 - `scaffold.sh` spike 已记录现有 Bash 逻辑，TypeScript port 不重新猜测旧行为。
 - Phase 1d 只面向 4 个 v2 试点能力读取 `ManifestV2Schema`；legacy manifest 全量迁移留到 Phase 2。
 - Phase 1e 公开 CLI 只暴露 4 个命令；`init` 默认 dry-run，`apply --only` 可部署单能力闭包。
+- Phase 2 已完成全量 20 个 manifest v2 迁移，并在保留上述命令语义的基础上公开 `merge`、`generate`、`repair`、`status`。
