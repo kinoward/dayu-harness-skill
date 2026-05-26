@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { resolveDeploymentOrder } from "../architecture/index.js";
 import { enabledCapabilityIds, readDayuConfig } from "./config.js";
@@ -13,6 +13,19 @@ import { statusDayuProject } from "./status.js";
 import type { FinalizeCheck, FinalizeOptions, FinalizeReport } from "./types.js";
 import { validateDayuProject } from "./validate.js";
 import type { CapabilityId, ManifestV2 } from "../schemas/index.js";
+
+interface PackageJsonDependencies {
+  dependencies?: Record<string, unknown>;
+  devDependencies?: Record<string, unknown>;
+  optionalDependencies?: Record<string, unknown>;
+}
+
+interface ReleasePleasePolicy {
+  workflow?: {
+    push_paths?: unknown;
+    release_trigger_types?: unknown;
+  };
+}
 
 export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeReport {
   const targetRoot = options.targetRoot ? resolveTargetRoot(options.targetRoot) : resolveTargetRoot();
@@ -34,6 +47,7 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
   const checks: FinalizeCheck[] = [];
 
   runLocalChecks(targetRoot, configPath, checks);
+  runCapabilityPrerequisiteChecks(targetRoot, deployedCapabilityIds, checks);
   if (checks.some((check) => check.status === "failed")) {
     return finalizeReport({
       targetRoot,
@@ -270,6 +284,108 @@ function runLocalChecks(targetRoot: string, configPath: string, checks: Finalize
     }
     runCommandCheck(script, "bash", [scriptPath, "--json", targetRoot], checks);
   }
+}
+
+function runCapabilityPrerequisiteChecks(
+  targetRoot: string,
+  deployedCapabilityIds: ReadonlySet<CapabilityId>,
+  checks: FinalizeCheck[]
+): void {
+  const dependencyGroups: Array<{ capabilityId: CapabilityId; name: string; dependencies: readonly string[] }> = [
+    {
+      capabilityId: "git.commit-format",
+      name: "Git 提交工具依赖",
+      dependencies: ["@commitlint/cli", "@commitlint/config-conventional"]
+    },
+    {
+      capabilityId: "quality.node-tooling",
+      name: "Node 质量工具依赖",
+      dependencies: ["eslint", "@eslint/js", "prettier", "lint-staged"]
+    }
+  ];
+
+  for (const group of dependencyGroups) {
+    if (!deployedCapabilityIds.has(group.capabilityId)) {
+      continue;
+    }
+    const missing = missingPackageDependencies(targetRoot, group.dependencies);
+    checks.push({
+      name: group.name,
+      status: missing.length === 0 ? "passed" : "failed",
+      description:
+        missing.length === 0
+          ? "package.json 已声明所需 devDependencies。"
+          : `package.json 缺少所需 devDependencies：${missing.join(", ")}。请先运行 ensure-environment.sh --apply --capabilities。`
+    });
+  }
+
+  runGitHooksPathCheck(targetRoot, deployedCapabilityIds, checks);
+}
+
+function runGitHooksPathCheck(
+  targetRoot: string,
+  deployedCapabilityIds: ReadonlySet<CapabilityId>,
+  checks: FinalizeCheck[]
+): void {
+  const hookBackedCapabilities: Array<{ capabilityId: CapabilityId; hook: string }> = [
+    { capabilityId: "git.commit-format", hook: "commit-msg" },
+    { capabilityId: "quality.node-tooling", hook: "pre-commit" },
+    { capabilityId: "github.branch-protection", hook: "pre-push" },
+    { capabilityId: "release.versioning", hook: "pre-push" }
+  ];
+  const activeHooks = hookBackedCapabilities.filter((item) => deployedCapabilityIds.has(item.capabilityId));
+  if (activeHooks.length === 0) {
+    return;
+  }
+
+  const hooksPath = gitConfigValue(targetRoot, "core.hooksPath");
+  const expected = join(targetRoot, ".husky");
+  const configured = hooksPath ? resolve(targetRoot, hooksPath.trim()) : undefined;
+  const isExpected = normalizeHooksPath(hooksPath) === ".husky" || configured === expected;
+  checks.push({
+    name: "Git hooksPath",
+    status: isExpected ? "passed" : "failed",
+    description: isExpected
+      ? `Git hooks 已接入 .husky（${[...new Set(activeHooks.map((item) => item.hook))].join(", ")}）。`
+      : `Git hooks 未接入 .husky；当前 core.hooksPath=${hooksPath?.trim() || "<未设置>"}。请先运行 ensure-environment.sh --apply --capabilities 完成 Husky 接入。`
+  });
+}
+
+function gitConfigValue(targetRoot: string, key: string): string | undefined {
+  try {
+    return execFileSync("git", ["-C", targetRoot, "config", "--local", "--get", key], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeHooksPath(value: string | undefined): string | undefined {
+  const normalized = value?.trim().replace(/\\/g, "/").replace(/\/+$/, "").replace(/^\.\//, "");
+  return normalized || undefined;
+}
+
+function missingPackageDependencies(targetRoot: string, dependencies: readonly string[]): string[] {
+  const packageJsonPath = join(targetRoot, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return [...dependencies];
+  }
+
+  let packageJson: PackageJsonDependencies;
+  try {
+    packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageJsonDependencies;
+  } catch {
+    return [...dependencies];
+  }
+
+  return dependencies.filter(
+    (dependency) =>
+      packageJson.dependencies?.[dependency] === undefined &&
+      packageJson.devDependencies?.[dependency] === undefined &&
+      packageJson.optionalDependencies?.[dependency] === undefined
+  );
 }
 
 function runCommandCheck(name: string, command: string, args: string[], checks: FinalizeCheck[]): void {
@@ -730,10 +846,20 @@ function mergeCurrentBranchViaPullRequest(
   }
 }
 
-function runReleasePleaseReadiness(_targetRoot: string, repository?: string): NonNullable<FinalizeReport["releaseE2e"]> {
-  return repository
-    ? { status: "skipped", description: "已完成 Release Please 就绪检查，但未执行真实发版验证。" }
-    : { status: "failed", description: "缺少 GitHub 仓库信息，无法验证 Release Please。" };
+function runReleasePleaseReadiness(targetRoot: string, repository?: string): NonNullable<FinalizeReport["releaseE2e"]> {
+  if (!repository) {
+    return { status: "failed", description: "缺少 GitHub 仓库信息，无法验证 Release Please。" };
+  }
+
+  const issues = releasePleaseReadinessIssues(targetRoot);
+  if (issues.length > 0) {
+    return { status: "failed", description: `Release Please readiness 未通过：${issues.join("；")}。` };
+  }
+  const validationSpec = releaseValidationSpec(targetRoot);
+  return {
+    status: "passed",
+    description: `Release Please readiness 已通过；真实发版未执行。真实验证将使用 ${validationSpec.triggerType}: 提交触发 ${validationSpec.markerRelativePath}。`
+  };
 }
 
 function runReleasePleaseRealValidation(targetRoot: string, repository?: string): NonNullable<FinalizeReport["releaseE2e"]> {
@@ -743,7 +869,8 @@ function runReleasePleaseRealValidation(targetRoot: string, repository?: string)
   const base = currentBranchBase(targetRoot);
   const startedAt = new Date().toISOString();
   const releaseBranch = `dayu-harness/release-e2e-${Date.now()}`;
-  const markerRelativePath = `src/dayu-harness-release-e2e-${Date.now()}.ts`;
+  const validationSpec = releaseValidationSpec(targetRoot);
+  const markerRelativePath = validationSpec.markerRelativePath;
   const marker = join(targetRoot, markerRelativePath);
   let markerMerged = false;
   let releaseVersion = "";
@@ -754,7 +881,7 @@ function runReleasePleaseRealValidation(targetRoot: string, repository?: string)
     mkdirSync(dirname(marker), { recursive: true });
     writeFileSync(marker, "export const dayuHarnessReleaseValidation = true;\n", "utf8");
     execFileSync("git", ["-C", targetRoot, "add", relative(targetRoot, marker)], { stdio: ["ignore", "pipe", "pipe"] });
-    execFileSync("git", ["-C", targetRoot, "commit", "-m", "feat: validate Dayu Harness release automation"], {
+    execFileSync("git", ["-C", targetRoot, "commit", "-m", `${validationSpec.triggerType}: validate Dayu Harness release automation`], {
       stdio: ["ignore", "pipe", "pipe"]
     });
     const before = readVersion(targetRoot);
@@ -793,6 +920,147 @@ function runReleasePleaseRealValidation(targetRoot: string, repository?: string)
     };
   }
   return { status: "passed", description: `Release Please 已真实发布 v${releaseVersion}，tag/release 保留在目标仓库。` };
+}
+
+export function releaseValidationSpec(targetRoot: string): { markerRelativePath: string; triggerType: string } {
+  const policy = readReleasePleasePolicy(targetRoot);
+  const timestamp = Date.now();
+  const triggerType = firstString(policy?.workflow?.release_trigger_types, ["feat", "fix", "perf", "revert"]) ?? "feat";
+  const markerBaseName = `dayu-harness-release-e2e-${timestamp}.js`;
+  const markerDirectory = firstDirectoryGlob(targetRoot, policy?.workflow?.push_paths) ?? "src";
+  const markerRelativePath = validatedReleaseMarkerPath(targetRoot, markerDirectory, markerBaseName);
+
+  return { markerRelativePath, triggerType };
+}
+
+function releasePleaseReadinessIssues(targetRoot: string): string[] {
+  const issues: string[] = [];
+  const requiredFiles = [
+    ".github/workflows/release-please.yml",
+    "release-please-config.json",
+    ".release-please-manifest.json",
+    ".github/release-please-policy.json",
+    ".github/scripts/release_please_policy.py"
+  ];
+  for (const file of requiredFiles) {
+    if (!existsSync(join(targetRoot, file))) {
+      issues.push(`缺少 ${file}`);
+    }
+  }
+
+  const policyPath = join(targetRoot, ".github", "release-please-policy.json");
+  if (!existsSync(policyPath)) {
+    return issues;
+  }
+
+  let policy: ReleasePleasePolicy;
+  try {
+    policy = JSON.parse(readFileSync(policyPath, "utf8")) as ReleasePleasePolicy;
+  } catch {
+    issues.push(".github/release-please-policy.json 不是合法 JSON");
+    return issues;
+  }
+
+  if (!policy.workflow || typeof policy.workflow !== "object" || Array.isArray(policy.workflow)) {
+    issues.push("release policy 缺少 workflow 配置");
+    return issues;
+  }
+
+  const pushPaths = stringArray(policy.workflow.push_paths);
+  if (pushPaths.length === 0) {
+    issues.push("workflow.push_paths 必须是非空字符串数组");
+  } else if (!firstDirectoryGlob(targetRoot, pushPaths)) {
+    issues.push("workflow.push_paths 未包含可写目录通配符（例如 src/**）");
+  }
+
+  const triggerTypes = stringArray(policy.workflow.release_trigger_types);
+  if (triggerTypes.length === 0) {
+    issues.push("workflow.release_trigger_types 必须是非空字符串数组");
+  }
+
+  return issues;
+}
+
+function readReleasePleasePolicy(targetRoot: string): ReleasePleasePolicy | undefined {
+  const policyPath = join(targetRoot, ".github", "release-please-policy.json");
+  if (!existsSync(policyPath)) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(readFileSync(policyPath, "utf8")) as ReleasePleasePolicy;
+  } catch {
+    return undefined;
+  }
+}
+
+function firstString(value: unknown, preferred: readonly string[]): string | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const strings = value.filter((item): item is string => typeof item === "string");
+  return preferred.find((item) => strings.includes(item)) ?? strings[0];
+}
+
+function firstDirectoryGlob(targetRoot: string, value: unknown): string | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const dir = safePolicyDirectory(targetRoot, item);
+    if (dir) {
+      return dir;
+    }
+  }
+  return undefined;
+}
+
+function safePolicyDirectory(targetRoot: string, glob: string): string | undefined {
+  const trimmed = glob.trim();
+  if (!trimmed.endsWith("/**")) {
+    return undefined;
+  }
+  const dir = trimmed.slice(0, -3).replace(/\/+$/, "");
+  if (
+    !dir ||
+    dir.startsWith(".") ||
+    dir.includes("*") ||
+    dir.includes("\\") ||
+    dir.includes(":") ||
+    isAbsolute(dir)
+  ) {
+    return undefined;
+  }
+  const segments = dir.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === ".." || segment.startsWith("."))) {
+    return undefined;
+  }
+  const resolved = resolve(targetRoot, dir);
+  return isInsideRoot(targetRoot, resolved) ? segments.join("/") : undefined;
+}
+
+function validatedReleaseMarkerPath(targetRoot: string, markerDirectory: string, markerBaseName: string): string {
+  const markerRelativePath = `${markerDirectory.replace(/\/$/, "")}/${markerBaseName}`;
+  const resolved = resolve(targetRoot, markerRelativePath);
+  if (!isInsideRoot(targetRoot, resolved)) {
+    return `src/${markerBaseName}`;
+  }
+  return markerRelativePath;
+}
+
+function isInsideRoot(targetRoot: string, candidatePath: string): boolean {
+  const rel = relative(resolve(targetRoot), candidatePath);
+  return rel === "" || (Boolean(rel) && !rel.startsWith("..") && !isAbsolute(rel));
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+    : [];
 }
 
 function cleanupLocalReleaseMarker(targetRoot: string, markerRelativePath: string): string | undefined {
