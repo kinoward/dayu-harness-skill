@@ -11,23 +11,25 @@
 - 维护模式修改完成后
 - 生成特定文档或配置完成后
 
-CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，必须立即进入 `finalize`。`finalize` 要完成验证、精确 stage/commit、远端同步、Issue/PR E2E、release-please 真实验证、测试产物清理和一次性 Skill 安装目录清理询问；不得把这些命令作为后续建议交给用户。
+CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，必须立即进入 `finalize`。运行时优先调用 CLI `finalize`，并以它的 JSON 结果作为汇报依据；不得绕过 CLI 手工拼接 stage、commit、远端创建、PR 或 release 验证流程。
 
 ## Finalize 流程
 
-向用户汇报前，AI 需要先在目标项目中执行 `finalize`。能调用 `dayu-harness finalize --target <project-root> --json` 时优先调用；已启用 GitHub 远端能力、仓库设置、rulesets 或 release-please workflow permissions 时必须调用 `dayu-harness finalize --target <project-root> --github-remote apply --json`。当前环境没有该入口时，必须按以下步骤编排等价流程并形成同等结论。脚本不可用时，按已部署文档手动检查关键路径。
+向用户汇报前，AI 需要先执行 `finalize`。默认使用 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --json`；已启用 GitHub 远端同步或用户明确选择远端治理时，追加 `--github-remote apply`。Release Please 默认使用 `--release-validation readiness`；只有用户明确要求真实发版验收时，才追加 `--release-validation real`。`npx dayu-harness ...` 只作为已发布包 fallback，不作为源码或本地 Skill 安装目录的默认路径。
+
+当前环境没有 `finalize` 入口时，先说明 CLI 不可用和影响，再按以下清单做降级检查；降级路径不能汇报为完整成功，除非能证明与 CLI finalize 覆盖范围等价。
 
 推荐顺序：
 
-1. 运行 `docs/harness/sensors/scripts/validate.sh --json <project-root>`，确认已启用的自动检查、配置和协作流程能正常工作。
-2. 运行 `docs/harness/sensors/scripts/audit.sh --json <project-root>`，确认项目入口、文档索引和维护说明完整。
-3. 运行 `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>`，确认文档之间能互相找到，旧文档没有被遗漏。
-4. 运行 `dayu-harness diagnose --target <project-root> --json`、`dayu-harness validate --target <project-root> --json` 和 `dayu-harness status --target <project-root> --json`，确认所有已部署能力都被覆盖：manifest 文件存在性、漂移、执行位、依赖图、`.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy、release-please policy 等。CLI 或传感器没有直接覆盖的硬能力必须手动抽查对应命令或脚本；不要只抽查 GitHub 能力。
+1. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/validate.sh" --json "$TARGET_ROOT"`，确认已启用的自动检查、配置和协作流程能正常工作。
+2. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/audit.sh" --json "$TARGET_ROOT"`，确认项目入口、文档索引和维护说明完整。
+3. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/check-consistency.sh" --json "$TARGET_ROOT"`，确认文档之间能互相找到，旧文档没有被遗漏。
+4. 运行 `$CLI diagnose --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json`、`$CLI validate --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 和 `$CLI status --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json`，确认所有已部署能力都被覆盖：manifest 文件存在性、漂移、执行位、依赖图、`.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy、release-please policy 等。CLI 或传感器没有直接覆盖的硬能力必须手动抽查对应命令或脚本；不要只抽查 GitHub 能力。
 5. 基于 `.dayu-harness/managed-paths.json` 精确 stage 托管路径和长期状态，并创建初始化或维护提交。`.dayu-harness/managed-paths.json` 是长期状态，必须提交；`.dayu-harness/apply.lock`、`.dayu-harness/journal.jsonl` 和 `.dayu-harness/tmp/` 是临时/恢复用产物，必须忽略，不得提交。
-6. 如果启用了 GitHub/release 远端能力，必须先通过 `scripts/github-remote.sh --apply` 或 `finalize --github-remote apply` 应用远端动作，再回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。`.github/rulesets/*.json` 只是本地 payload，只有 GitHub Rulesets API 写入并回读后才能汇报为远端 ruleset 已应用。
-7. 如果启用了 GitHub Issue/PR 能力并完成远端同步，创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功；验证通过后关闭测试 PR、关闭测试 Issue 并删除测试分支，避免目标仓库残留测试产物。只有 disposable `remote-smoke` profile 才验证合并后自动关闭 Issue。
-8. 如果启用了自动化版本发布流程，必须做 release-please 真实验证：在目标仓库或 disposable `remote-release` 仓库中验证 `docs:`/`chore:` 不触发发布、`feat:` 正向触发 release PR 或等价真实 release-please 路径。文件存在性、语法检查、策略检查或 `workflow_dispatch` 不能替代真实验证。
-9. PR body、Issue body、commit message 等固定格式内容，优先用 `docs/harness/sensors/scripts/dayu-format.mjs`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；模型只提供结构化字段和错误解释。
+6. 如果启用了 GitHub/release 远端能力，必须先通过 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply` 或 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --github-remote apply --json` 应用远端动作，再回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。`.github/rulesets/*.json` 只是本地 payload，只有 GitHub Rulesets API 写入并回读后才能汇报为远端 ruleset 已应用。
+7. 如果 CLI finalize 已执行 GitHub Issue/PR E2E，转述其结果和清理状态。降级路径只有在用户明确授权远端 E2E 时，才创建测试 Issue、测试分支和测试 PR；验证通过后必须清理测试 PR、测试 Issue 和测试分支。只有 disposable `remote-smoke` profile 才验证合并后自动关闭 Issue。
+8. 如果启用了自动化版本发布流程，默认汇报 Release Please readiness 结果。真实 release 验证只在用户明确授权时执行：在目标仓库或 disposable `remote-release` 仓库中验证策略要求的触发路径和触发类型。文件存在性、语法检查、策略检查或 `workflow_dispatch` 不能替代真实验证；如果没有做真实验证，报告中必须写明未做真实发版。
+9. PR body、Issue body、commit message 等固定格式内容，优先用 `node "$TARGET_ROOT/docs/harness/sensors/scripts/dayu-format.mjs"`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；模型只提供结构化字段和错误解释。
 10. 负向测试只能说明门禁会拦截错误输入，不能替代合规 Issue/PR/release 流程通过；如果只观察到失败 workflow，不能汇报为远端 E2E 成功。
 11. 如果某项检查失败，先自行修复可确定的问题，再重新检查；只有需要用户取舍时才把问题交给用户确认。
 
@@ -38,7 +40,7 @@ CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，
 - 先告诉用户“是否已经可用”，再说明“启用了什么”和“还需要注意什么”。
 - 不把跳过的能力说成失败；只说明“这次没有启用，所以没有安装相关内容”。
 - 不把 `partial`、`failed`、`needs_user_action` 或已部署能力的 smoke 跳过项说成成功；必须说明影响和下一步。已启用远端动作但未执行 `--github-remote apply` 时，整体必须汇报为 partial/blocked，并列出未应用的远端动作。
-- 不把 `validate/audit/check-consistency`、YAML/Python 语法检查、workflow 文件存在或本地 ruleset JSON 存在说成 GitHub Actions 或 GitHub Rulesets 端到端测试；GitHub E2E 必须有测试 Issue/PR 和对应 workflow 成功记录，rulesets 必须有远端 API 回读结果。
+- 不把 `validate/audit/check-consistency`、YAML/Python 语法检查、workflow 文件存在或本地 ruleset JSON 存在说成 GitHub Actions 或 GitHub Rulesets 端到端测试；GitHub E2E 必须有 CLI finalize 结果，或测试 Issue/PR 和对应 workflow 成功记录。rulesets 必须有远端 API 回读结果。
 - 如果有剩余问题，说明影响和建议，不堆叠原始日志。
 - 不把完整测试输出写入用户项目；报告只在对话中呈现。
 - 完成报告不得把 `finalize` 中应执行的命令列为后续建议；如果没有完成，必须汇报为 `partial`、`failed` 或 `needs_user_action`。
@@ -64,7 +66,7 @@ CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，
 - {如启用质量工具：提交前质量与格式化配置已经就绪。}
 - {如启用 GitHub 能力：远端同步和仓库设置回读已经完成。}
 - {如启用 PR/Issue 能力：测试 Issue、测试分支和测试 PR 已经跑通，并已清理测试产物。}
-- {如启用自动化版本发布流程：release-please 的真实正向/负向验证已经完成。}
+- {如启用自动化版本发布流程：Release Please readiness 已通过；如用户明确授权真实发版验收，再写真实正向/负向验证结果。}
 
 这次没有启用：
 - {未启用能力的自然语言说明，例如“GitHub 发布自动化”，如果没有则省略本段。}
@@ -75,7 +77,7 @@ CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，
 后续你可以直接按 `AGENTS.md` 作为项目入口继续协作。以后如果要新增或调整约束，可以再次运行 `/dayu-harness`。
 ```
 
-完成报告之后，必须继续提出一次性 Skill 安装目录清理问题，不得省略：
+完成报告之后，仅当本次 Skill 安装目录是项目内临时一次性副本（例如 `<target>/.claude/skills/dayu-harness`）时，继续提出清理问题。若 Skill 来自 `$CODEX_HOME/skills`、插件缓存、共享安装目录或源码仓库，不默认询问删除；只说明本次未清理持久安装目录。
 
 ```markdown
 是否删除本次一次性 Skill 安装目录？
