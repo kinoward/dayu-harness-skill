@@ -12,6 +12,7 @@ import {
   createDefaultDayuConfig,
   finalizeDayuProject,
   loadManifestRegistry,
+  releaseValidationSpec,
   repairDayuCapability,
   statusDayuProject,
   stringifyDayuConfig
@@ -47,6 +48,23 @@ function writeConfig(target: string, capabilityIds: readonly string[]): string {
   );
   return configPath;
 }
+
+function writeTargetPackage(target: string, devDependencies: Record<string, string> = governanceDevDependencies): void {
+  writeFileSync(
+    join(target, "package.json"),
+    `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0", devDependencies }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
+const governanceDevDependencies: Record<string, string> = {
+  "@commitlint/cli": "0.0.0",
+  "@commitlint/config-conventional": "0.0.0",
+  "@eslint/js": "0.0.0",
+  eslint: "0.0.0",
+  prettier: "0.0.0",
+  "lint-staged": "0.0.0"
+};
 
 function runCli(args: string[]) {
   return spawnSync(process.execPath, ["--import", "tsx", cliPath, ...args], { cwd: repoRoot, encoding: "utf8" });
@@ -211,7 +229,7 @@ test("Phase 2 finalize stages managed deletions and commits after local checks p
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
 
@@ -235,6 +253,7 @@ test("Phase 2 finalize stages managed deletions and commits after local checks p
   writeFileSync(managedPathsPath, `${JSON.stringify(managedPaths, null, 2)}\n`, "utf8");
   rmSync(join(target, oldManagedPath), { force: true });
   writeFileSync(join(target, userOwnedOldPath), "user-owned edit\n", "utf8");
+  configureGitHooks(target);
   const report = finalizeDayuProject({ configPath, targetRoot: target });
 
   assert.equal(report.status, "partial");
@@ -254,12 +273,13 @@ test("Phase 2 finalize blocks unrelated pre-staged files before committing", (t)
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   mkdirSync(join(target, "src"), { recursive: true });
   writeFileSync(join(target, "src", "user-work.js"), "export const userWork = true;\n", "utf8");
   git(target, ["add", "src/user-work.js"]);
+  configureGitHooks(target);
 
   const report = finalizeDayuProject({ configPath, targetRoot: target });
 
@@ -268,6 +288,120 @@ test("Phase 2 finalize blocks unrelated pre-staged files before committing", (t)
   assert.ok(report.checks.some((check) => check.name === "Git 暂存区边界" && check.status === "failed"));
   assert.equal(spawnSync("git", ["-C", target, "rev-parse", "--verify", "HEAD"], { encoding: "utf8" }).status, 128);
   assert.match(git(target, ["diff", "--cached", "--name-only"]), /src\/user-work\.js/);
+});
+
+test("Phase 2 finalize fails fast when Node tooling dependencies are incomplete", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "git.commit-format", "quality.node-tooling"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target, {
+    "@commitlint/cli": "0.0.0",
+    "@commitlint/config-conventional": "0.0.0",
+    eslint: "0.0.0",
+    prettier: "0.0.0",
+    "lint-staged": "0.0.0"
+  });
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  configureGitHooks(target);
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  assert.equal(report.status, "failed");
+  assert.equal(report.commitSha, undefined);
+  assert.ok(
+    report.checks.some(
+      (check) => check.name === "Node 质量工具依赖" && check.status === "failed" && check.description.includes("@eslint/js")
+    )
+  );
+});
+
+test("Phase 2 finalize fails fast when hook-backed capabilities are not connected to .husky", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "git.commit-format"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target, {
+    "@commitlint/cli": "0.0.0",
+    "@commitlint/config-conventional": "0.0.0"
+  });
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  assert.equal(report.status, "failed");
+  assert.equal(report.commitSha, undefined);
+  assert.ok(report.checks.some((check) => check.name === "Git hooksPath" && check.status === "failed"));
+});
+
+test("Phase 2 finalize does not require Node quality dependencies unless the quality capability is enabled", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "git.commit-format"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target, {
+    "@commitlint/cli": "0.0.0",
+    "@commitlint/config-conventional": "0.0.0"
+  });
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  if (report.status !== "completed") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "completed");
+  assert.ok(report.checks.some((check) => check.name === "Git 提交工具依赖" && check.status === "passed"));
+  assert.equal(report.checks.some((check) => check.name === "Node 质量工具依赖"), false);
+});
+
+test("Phase 2 finalize does not require hooksPath for the internal hook carrier alone", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target);
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  if (report.status !== "completed") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "completed");
+  assert.equal(report.checks.some((check) => check.name === "Git hooksPath"), false);
+});
+
+test("Phase 2 finalize requires hooksPath for branch and release hook capabilities", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "github.branch-protection", "release.versioning"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target);
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  assert.equal(report.status, "failed");
+  assert.equal(report.commitSha, undefined);
+  assert.ok(report.checks.some((check) => check.name === "Git hooksPath" && check.status === "failed"));
 });
 
 test("Phase 2 finalize exposes remote apply/verify items from manifest-based remote actions", (t) => {
@@ -305,11 +439,12 @@ JSON
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const staleRuleset = join(target, ".github", "rulesets", "protect-stale.json");
   mkdirSync(dirname(staleRuleset), { recursive: true });
@@ -384,11 +519,12 @@ JSON
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const previousLog = process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
   process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = remoteActionLog;
@@ -410,6 +546,10 @@ JSON
   if (!report.remote) {
     console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
   }
+  assert.equal(report.status, "completed");
+  assert.equal(report.releaseValidation, "readiness");
+  assert.equal(report.releaseE2e?.status, "passed");
+  assert.match(report.releaseE2e?.description ?? "", /真实发版未执行/);
   assert.equal(report.remote?.applyStatus, "ok");
   assert.equal(report.remote?.verifyStatus, "ok");
   const logged = readFileSync(remoteActionLog, "utf8");
@@ -439,11 +579,12 @@ JSON
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const report = finalizeDayuProject({
     configPath,
@@ -477,11 +618,12 @@ exit 99
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const report = finalizeDayuProject({
     configPath,
@@ -516,11 +658,12 @@ JSON
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const report = finalizeDayuProject({
     configPath,
@@ -566,11 +709,12 @@ fi
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
-  writeFileSync(join(target, "package.json"), `${JSON.stringify({ name: "phase2-fixture", version: "0.1.0" }, null, 2)}\n`, "utf8");
+  writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
 
   const report = finalizeDayuProject({
     configPath,
@@ -590,6 +734,55 @@ fi
   assert.deepEqual(report.remote?.verifyItems?.[0]?.missing, ["protect-main"]);
   assert.ok(report.checks.some((check) => check.name === "GitHub 远端同步" && check.status === "skipped"));
   assert.ok(report.checks.some((check) => check.name === "GitHub 远端校验" && check.status === "skipped"));
+});
+
+test("Phase 2 release validation spec follows release policy paths and trigger types", (t) => {
+  const target = makeTarget(t);
+  mkdirSync(join(target, ".github"), { recursive: true });
+  writeFileSync(
+    join(target, ".github", "release-please-policy.json"),
+    `${JSON.stringify({ workflow: { push_paths: ["lib/**"], release_trigger_types: ["fix"] } }, null, 2)}\n`,
+    "utf8"
+  );
+
+  const spec = releaseValidationSpec(target);
+
+  assert.match(spec.markerRelativePath, /^lib\/dayu-harness-release-e2e-\d+\.js$/);
+  assert.equal(spec.triggerType, "fix");
+});
+
+test("Phase 2 release validation spec falls back when release policy is absent", (t) => {
+  const target = makeTarget(t);
+
+  const spec = releaseValidationSpec(target);
+
+  assert.match(spec.markerRelativePath, /^src\/dayu-harness-release-e2e-\d+\.js$/);
+  assert.equal(spec.triggerType, "feat");
+});
+
+test("Phase 2 release validation spec rejects unsafe release policy paths", (t) => {
+  const target = makeTarget(t);
+  mkdirSync(join(target, ".github"), { recursive: true });
+  writeFileSync(
+    join(target, ".github", "release-please-policy.json"),
+    `${JSON.stringify(
+      {
+        workflow: {
+          push_paths: ["foo/../../outside/**", "/tmp/**", "bad\\path/**", ".github/**", "src/.hidden/**", "src/foo/.bar/**"],
+          release_trigger_types: ["fix"]
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const spec = releaseValidationSpec(target);
+
+  assert.match(spec.markerRelativePath, /^src\/dayu-harness-release-e2e-\d+\.js$/);
+  assert.doesNotMatch(spec.markerRelativePath, /\.\.|outside|tmp|hidden|bar|\\/);
+  assert.equal(spec.triggerType, "fix");
 });
 
 test("Phase 2 dry-run apply does not migrate legacy state directory", (t) => {
@@ -949,4 +1142,27 @@ function seedDocsForIntegrityChecks(target: string): void {
 function configureGitIdentity(target: string): void {
   git(target, ["config", "user.email", "dayu@example.test"]);
   git(target, ["config", "user.name", "Dayu Test"]);
+}
+
+function configureGitHooks(target: string): void {
+  git(target, ["config", "core.hooksPath", ".husky"]);
+  for (const command of ["commitlint", "lint-staged", "eslint", "prettier"]) {
+    writeFakeNodeBin(target, command);
+  }
+}
+
+function writeFakeNodeBin(target: string, command: string): void {
+  const binPath = join(target, "node_modules", ".bin", command);
+  mkdirSync(dirname(binPath), { recursive: true });
+  writeFileSync(
+    binPath,
+    `#!/usr/bin/env sh
+if [ "\${1:-}" = "--version" ]; then
+  echo "0.0.0"
+fi
+exit 0
+`,
+    "utf8"
+  );
+  chmodSync(binPath, 0o755);
 }
