@@ -34,7 +34,7 @@ node dist/cli/main.js --help
    npx dayu-harness init --target . --apply
    ```
 
-4. 应用成功后立即执行 `finalize` 收尾。`finalize` 必须完成本地验证、精确提交、远端同步、Issue/PR E2E 和 release-please 真实验证中本次已启用的部分，不应把这些命令留作后续建议。
+4. 应用成功后立即执行 `finalize` 收尾。`finalize` 必须完成本地验证、精确提交、提交后复验、远端同步、Issue/PR E2E，以及 Release Please readiness 或用户明确授权的真实发版验证中本次已启用的部分，不应把这些命令留作后续建议。
 
    ```bash
    npx dayu-harness finalize --target . --json
@@ -46,7 +46,7 @@ node dist/cli/main.js --help
    npx dayu-harness finalize --target . --github-remote apply --json
    ```
 
-   远端 apply 会把已启用能力 manifest 中的 `remote_actions` 传给受控脚本。不要用 `gh repo create --push`、手写 `git push origin main` 或 API 手工创建默认分支替代它；本地 `.github/rulesets/*.json` 只有经过 GitHub Rulesets API 写入并回读后才算远端规则生效。若跳过远端 apply，报告必须保持 partial，不能宣称远端 E2E 成功。
+   远端 apply 会把已启用能力 manifest 中的 `remote_actions` 传给受控脚本。不要用 `gh repo create --push`、手写 `git push origin main`、API 手工创建默认分支或直接调用 `scripts/github-remote.sh --apply` 替代它；本地 `.github/rulesets/*.json` 只有经过 GitHub Rulesets API 写入并回读后才算远端规则生效。若跳过远端 apply，报告必须保持 partial，不能宣称远端 E2E 成功。默认 Release Please readiness 只证明配置和策略可验证，不代表 tag 或 GitHub Release 已真实产生。
 
    如果当前本地构建尚未暴露 `finalize` 子命令，`/dayu-harness` Skill 必须按完成报告模板调用等价脚本和 Git/GitHub 流程完成同等收尾。
 
@@ -72,7 +72,7 @@ node dist/cli/main.js --help
 | `merge` | 对已有项目做能力级 keep/replace/skip 融合预览，`--only <capability> --apply --strategy replace` 可执行单能力替换式融合。 |
 | `generate` | 只渲染内容预览，不写入目标项目。 |
 | `repair` | 对一个能力或当前配置执行强制修复。 |
-| `finalize` | apply 后的必需收尾阶段：本地验证、精确 stage/commit、远端同步、Issue/PR E2E、release-please 真实验证和测试产物清理。 |
+| `finalize` | apply 后的必需收尾阶段：本地验证、精确 stage/commit、提交后复验、远端同步、Issue/PR E2E、Release Please readiness 或用户授权的真实发版验证，以及测试产物清理。 |
 | `status` | 按 hard / soft / infra 分组显示治理能力状态。 |
 | `diagnose` | 检查已部署产物的缺失、漂移、执行位和 hook 合并状态。 |
 | `validate` | 校验 manifest、config、依赖图和部署产物一致性。 |

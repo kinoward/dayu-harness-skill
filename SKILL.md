@@ -131,7 +131,7 @@ npm run build
      --json
    ```
 
-   `finalize` 已负责本地检查、精确 stage/commit、远端创建/绑定、远端设置回读、Issue/PR E2E 和 Release Please readiness/real 验证。CLI 存在时不要手工执行 `git add`、`git commit`、`git push`、`gh repo create`、`gh pr merge` 或自写 E2E 流程。
+   `finalize` 已负责本地检查、精确 stage/commit、提交后复验、远端创建/绑定、远端设置回读、Issue/PR E2E 和 Release Please readiness/real 验证。CLI 存在时不要手工执行 `git add`、`git commit`、`git push`、`gh repo create`、`gh pr merge`、`scripts/github-remote.sh --apply` 或自写 E2E 流程；如果本地检查或提交后复验失败，必须停止，不能继续远端 apply。
 
 10. 根据 `finalize` JSON 汇报结果。只有 `SKILL_ROOT` 位于 `TARGET_ROOT/.claude/skills/dayu-harness` 这类项目内临时一次性副本时，才询问是否删除该目录；源码仓库、`$CODEX_HOME/skills`、插件缓存或共享安装目录默认不提示删除。用户选择删除时，只删除展示的 `SKILL_ROOT`，不删除目标项目治理体系。
 
