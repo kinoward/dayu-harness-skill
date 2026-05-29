@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -263,6 +263,197 @@ test("Phase 2 finalize stages managed deletions and commits after local checks p
   assert.doesNotMatch(nameStatus, new RegExp(userOwnedOldPath));
 });
 
+test("Phase 2 finalize skips target hooks for the managed initialization commit and revalidates afterwards", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "git.commit-format"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target, {
+    "@commitlint/cli": "0.0.0",
+    "@commitlint/config-conventional": "0.0.0"
+  });
+  writeFileSync(join(target, "README.md"), environmentBaselineReadmeContent(target), "utf8");
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
+  const fakeCommitlintPath = join(target, "node_modules", ".bin", "commitlint");
+  writeFileSync(
+    fakeCommitlintPath,
+    `#!/usr/bin/env sh
+printf '\\nformatter drift from hook\\n' >> AGENTS.md
+exit 0
+`,
+    "utf8"
+  );
+  chmodSync(fakeCommitlintPath, 0o755);
+  const agentsBefore = readFileSync(join(target, "AGENTS.md"), "utf8");
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  if (report.status !== "completed") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "completed");
+  assert.ok(report.commitSha);
+  assert.equal(readFileSync(join(target, "AGENTS.md"), "utf8"), agentsBefore);
+  assert.match(git(target, ["show", "--name-only", "--format=", "HEAD"]), /^README\.md$/m);
+  assert.equal(git(target, ["show", "HEAD:README.md"]), environmentBaselineReadmeContent(target));
+  assert.ok(report.checks.some((check) => check.name === "提交后 dayu-harness validate" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.name === "提交后 dayu-harness status" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.name === "提交后 Git 工作区边界" && check.status === "passed"));
+});
+
+test("Phase 2 finalize does not include user-owned README edits in the managed commit", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeFileSync(join(target, "README.md"), "# User project\n\nExisting documentation.\n", "utf8");
+  git(target, ["add", "README.md"]);
+  git(target, ["commit", "--no-verify", "-m", "docs: seed user readme"]);
+  writeFileSync(join(target, "README.md"), "# User project\n\nExisting documentation edited by user.\n", "utf8");
+  writeTargetPackage(target);
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  if (report.status !== "completed") {
+    console.error("CHECKS:\n" + report.checks.map((check) => `${check.name}: ${check.status} - ${check.description}`).join("\n"));
+  }
+  assert.equal(report.status, "completed");
+  assert.ok(report.commitSha);
+  assert.doesNotMatch(git(target, ["show", "--name-only", "--format=", "HEAD"]), /^README\.md$/m);
+  assert.match(git(target, ["diff", "--name-only", "HEAD", "--", "README.md"]), /^README\.md\n?$/);
+  assert.equal(readFileSync(join(target, "README.md"), "utf8"), "# User project\n\nExisting documentation edited by user.\n");
+});
+
+test("Phase 2 finalize stops remote work when post-commit validation catches drift", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "github.repository-settings"];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteCalledPath = join(target, "remote-called.log");
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+printf 'called\\n' > "\${DAYU_HARNESS_REMOTE_CALLED_PATH}"
+cat <<JSON
+{"status":"ok","repository":"acme/fake","default_branch":"main","description_nl":"ok","items":[]}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  mkdirSync(join(target, ".husky"), { recursive: true });
+  const postCommitPath = join(target, ".husky", "post-commit");
+  writeFileSync(
+    postCommitPath,
+    `#!/usr/bin/env sh
+printf '\\npost commit drift\\n' >> AGENTS.md
+exit 0
+`,
+    "utf8"
+  );
+  chmodSync(postCommitPath, 0o755);
+  git(target, ["add", ".husky/post-commit"]);
+  git(target, ["commit", "--no-verify", "-m", "chore: baseline post-commit hook"]);
+  writeTargetPackage(target);
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
+  const previousRemoteCalledPath = process.env.DAYU_HARNESS_REMOTE_CALLED_PATH;
+  process.env.DAYU_HARNESS_REMOTE_CALLED_PATH = remoteCalledPath;
+  t.after(() => {
+    if (previousRemoteCalledPath === undefined) {
+      delete process.env.DAYU_HARNESS_REMOTE_CALLED_PATH;
+    } else {
+      process.env.DAYU_HARNESS_REMOTE_CALLED_PATH = previousRemoteCalledPath;
+    }
+  });
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target, githubRemote: "apply", skillRoot });
+
+  assert.equal(report.status, "failed");
+  assert.ok(report.commitSha);
+  assert.equal(report.remote, undefined);
+  assert.equal(existsSync(remoteCalledPath), false);
+  assert.ok(report.checks.some((check) => check.name === "提交后 dayu-harness validate" && check.status === "failed"));
+  assert.equal(report.issuePrE2e?.status, "skipped");
+  assert.equal(report.releaseE2e?.status, "skipped");
+});
+
+test("Phase 2 finalize stops remote work when post-commit creates unrelated untracked files", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "github.repository-settings"];
+  const configPath = writeConfig(target, capabilityIds);
+  const remoteCalledPath = join(target, "remote-called.log");
+  const remoteScript = `#!/usr/bin/env bash
+set -euo pipefail
+printf 'called\\n' > "\${DAYU_HARNESS_REMOTE_CALLED_PATH}"
+cat <<JSON
+{"status":"ok","repository":"acme/fake","default_branch":"main","description_nl":"ok","items":[]}
+JSON
+`;
+  const skillRoot = makeFakeSkillRoot(t, capabilityIds, remoteScript);
+
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  mkdirSync(join(target, ".husky"), { recursive: true });
+  const postCommitPath = join(target, ".husky", "post-commit");
+  writeFileSync(
+    postCommitPath,
+    `#!/usr/bin/env sh
+mkdir -p src
+printf 'export const userWork = true;\\n' > src/user-work.js
+exit 0
+`,
+    "utf8"
+  );
+  chmodSync(postCommitPath, 0o755);
+  git(target, ["add", ".husky/post-commit"]);
+  git(target, ["commit", "--no-verify", "-m", "chore: baseline post-commit hook"]);
+  writeTargetPackage(target);
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
+  const previousRemoteCalledPath = process.env.DAYU_HARNESS_REMOTE_CALLED_PATH;
+  process.env.DAYU_HARNESS_REMOTE_CALLED_PATH = remoteCalledPath;
+  t.after(() => {
+    if (previousRemoteCalledPath === undefined) {
+      delete process.env.DAYU_HARNESS_REMOTE_CALLED_PATH;
+    } else {
+      process.env.DAYU_HARNESS_REMOTE_CALLED_PATH = previousRemoteCalledPath;
+    }
+  });
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target, githubRemote: "apply", skillRoot });
+
+  assert.equal(report.status, "failed");
+  assert.ok(report.commitSha);
+  assert.equal(report.remote, undefined);
+  assert.equal(existsSync(remoteCalledPath), false);
+  assert.ok(
+    report.checks.some(
+      (check) =>
+        check.name === "提交后 Git 工作区边界" &&
+        check.status === "failed" &&
+        check.description.includes("src/user-work.js")
+    )
+  );
+  assert.equal(report.issuePrE2e?.status, "skipped");
+  assert.equal(report.releaseE2e?.status, "skipped");
+});
+
 test("Phase 2 finalize blocks unrelated pre-staged files before committing", (t) => {
   const target = makeTarget(t);
   const registry = loadManifestRegistry(repoRoot);
@@ -285,9 +476,39 @@ test("Phase 2 finalize blocks unrelated pre-staged files before committing", (t)
 
   assert.equal(report.status, "failed");
   assert.equal(report.commitSha, undefined);
-  assert.ok(report.checks.some((check) => check.name === "Git 暂存区边界" && check.status === "failed"));
+  assert.ok(report.checks.some((check) => check.name === "Git 工作区边界" && check.status === "failed"));
   assert.equal(spawnSync("git", ["-C", target, "rev-parse", "--verify", "HEAD"], { encoding: "utf8" }).status, 128);
   assert.match(git(target, ["diff", "--cached", "--name-only"]), /src\/user-work\.js/);
+});
+
+test("Phase 2 finalize blocks unrelated untracked files before committing", (t) => {
+  const target = makeTarget(t);
+  const capabilityIds = ["core", "git.hooks", "git.commit-format"];
+  const configPath = writeConfig(target, capabilityIds);
+  git(target, ["init", "-b", "main"]);
+  configureGitIdentity(target);
+  writeTargetPackage(target, {
+    "@commitlint/cli": "0.0.0",
+    "@commitlint/config-conventional": "0.0.0"
+  });
+  writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
+  writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
+  assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
+  seedDocsForIntegrityChecks(target);
+  configureGitHooks(target);
+  mkdirSync(join(target, "src"), { recursive: true });
+  writeFileSync(join(target, "src", "user-work.js"), "export const userWork = true;\n", "utf8");
+
+  const report = finalizeDayuProject({ configPath, targetRoot: target });
+
+  assert.equal(report.status, "failed");
+  assert.equal(report.commitSha, undefined);
+  assert.ok(
+    report.checks.some(
+      (check) => check.name === "Git 工作区边界" && check.status === "failed" && check.description.includes("src/user-work.js")
+    )
+  );
+  assert.equal(spawnSync("git", ["-C", target, "rev-parse", "--verify", "HEAD"], { encoding: "utf8" }).status, 128);
 });
 
 test("Phase 2 finalize fails fast when Node tooling dependencies are incomplete", (t) => {
@@ -439,16 +660,17 @@ JSON
 
   git(target, ["init", "-b", "main"]);
   configureGitIdentity(target);
+  const staleRuleset = join(target, ".github", "rulesets", "protect-stale.json");
+  mkdirSync(dirname(staleRuleset), { recursive: true });
+  writeFileSync(staleRuleset, '{"name":"protect-stale","target":"tag"}', "utf8");
+  git(target, ["add", ".github/rulesets/protect-stale.json"]);
+  git(target, ["commit", "--no-verify", "-m", "chore: baseline stale ruleset"]);
   writeTargetPackage(target);
   writeFileSync(join(target, "VERSION"), "0.1.0\n", "utf8");
   writeFileSync(join(target, "CHANGELOG.md"), "# Changelog\n\n## 0.1.0 - 2026-05-24\n\n- Initial baseline.\n", "utf8");
   assert.equal(applyDayuConfig({ configPath, targetRoot: target }).status, "applied");
   seedDocsForIntegrityChecks(target);
   configureGitHooks(target);
-
-  const staleRuleset = join(target, ".github", "rulesets", "protect-stale.json");
-  mkdirSync(dirname(staleRuleset), { recursive: true });
-  writeFileSync(staleRuleset, '{"name":"protect-stale","target":"tag"}', "utf8");
 
   const previousLog = process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG;
   process.env.DAYU_HARNESS_REMOTE_ACTIONS_JSON_LOG = remoteActionLog;
@@ -1067,6 +1289,10 @@ function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
+function environmentBaselineReadmeContent(target: string): string {
+  return `# ${basename(target)}\n\nProject initialized with Dayu Harness governance.\n`;
+}
+
 function git(target: string, args: string[]): string {
   return execFileSync("git", ["-C", target, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -1133,10 +1359,28 @@ function seedDocsForIntegrityChecks(target: string): void {
     }
     writeFileSync(destinationPath, readFileSync(templatePath, "utf8"), "utf8");
   }
+  const seededPaths = files.map((file) => file.dst);
   const projectStatusPath = join(target, "docs/product-specs/project-status.md");
   if (!existsSync(projectStatusPath)) {
     writeFileSync(projectStatusPath, "# Project status\n\n- Baseline fixture status.\n", "utf8");
   }
+  seededPaths.push("docs/product-specs/project-status.md");
+  addManagedFixturePaths(target, seededPaths);
+}
+
+function addManagedFixturePaths(target: string, relativePaths: readonly string[]): void {
+  const managedPathsPath = join(target, stateDir, "managed-paths.json");
+  if (!existsSync(managedPathsPath)) {
+    return;
+  }
+  const managedPaths = JSON.parse(readFileSync(managedPathsPath, "utf8")) as {
+    managedPaths?: unknown;
+    previousManagedPaths?: unknown;
+    updatedAt?: unknown;
+  };
+  const current = Array.isArray(managedPaths.managedPaths) ? managedPaths.managedPaths.filter((item) => typeof item === "string") : [];
+  managedPaths.managedPaths = [...new Set([...current, ...relativePaths])].sort();
+  writeFileSync(managedPathsPath, `${JSON.stringify(managedPaths, null, 2)}\n`, "utf8");
 }
 
 function configureGitIdentity(target: string): void {

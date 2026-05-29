@@ -527,6 +527,7 @@ expected_agents_h1() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e 'has("status") and has("items") and ( .items | type == "array" ) and has("summary") and has("description_nl")'
+    echo "$output" | jq -e --arg target "$FIXTURE_EMPTY" 'has("targetRoot") and .targetRoot == $target and (.targetRoot | startswith("/"))'
     echo "$output" | jq -e 'has("missing_tools") and has("initializations") and has("installs") and has("user_actions") and has("errors")'
     echo "$output" | jq -e '.items | all(.status != null)'
     echo "$output" | jq -e '.status == "ok" or .status == "needs_initialization" or .status == "needs_install" or .status == "needs_user_action" or .status == "error"'
@@ -814,7 +815,7 @@ expected_agents_h1() {
     [ "$status" -eq 0 ]
 }
 
-@test "machine-readable reports use relative target paths" {
+@test "machine-readable reports keep relative display paths and expose absolute targetRoot" {
     local target="$WORK_DIR/relative-target-output"
     mkdir -p "$target"
 
@@ -822,12 +823,14 @@ expected_agents_h1() {
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.target | startswith("/") | not'
+    echo "$output" | jq -e --arg target "$target" '.targetRoot == $target and (.targetRoot | startswith("/"))'
 
     run_with_wrapper bash "$REPO_ROOT/scripts/scaffold.sh" "$target" --dry-run
 
     [ "$status" -eq 0 ]
     echo "$output" | jq -e '.target | startswith("/") | not'
     echo "$output" | jq -e '.environment.target | startswith("/") | not'
+    echo "$output" | jq -e --arg target "$target" '.environment.targetRoot == $target and (.environment.targetRoot | startswith("/"))'
 }
 
 @test "environment preflight reports package dependency gaps as install work" {
@@ -884,6 +887,19 @@ expected_agents_h1() {
     grep -q "缺失依赖" "$REPO_ROOT/templates/docs/harness/maintenance.md"
     grep -q "git init" "$REPO_ROOT/templates/docs/harness/maintenance.md"
     grep -q "npm init -y" "$REPO_ROOT/templates/docs/harness/maintenance.md"
+}
+
+@test "runtime docs keep finalize as the primary remote path and distinguish release readiness" {
+    grep -Fq 'CLI 存在时不要手工执行' "$REPO_ROOT/SKILL.md"
+    grep -Fq 'scripts/github-remote.sh --apply' "$REPO_ROOT/SKILL.md"
+    grep -Fq '不得手工执行 `scripts/github-remote.sh --apply` 替代远端 apply' "$REPO_ROOT/docs/completion-report-template.md"
+    grep -Fq '只有当前环境没有 `finalize` 入口时，降级路径才允许调用' "$REPO_ROOT/docs/completion-report-template.md"
+    grep -Fq '不要用 `gh repo create --push`、手写 `git push origin main`、API 手工创建默认分支或直接调用 `scripts/github-remote.sh --apply` 替代它' "$REPO_ROOT/docs/getting-started.md"
+    grep -Fq '不要用 `gh repo create --push`、手写 `git push origin main`、API 手工创建默认分支或直接调用 `scripts/github-remote.sh --apply` 替代 `finalize --github-remote apply`' "$REPO_ROOT/docs/troubleshooting.md"
+    grep -Fq '默认 Release Please readiness 只证明配置和策略可验证，不代表 tag 或 GitHub Release 已真实产生' "$REPO_ROOT/docs/getting-started.md"
+    grep -Fq '默认 Release Please readiness 不能汇报为真实 tag/release 通过' "$REPO_ROOT/docs/troubleshooting.md"
+    ! grep -Fq 'release-please 真实验证' "$REPO_ROOT/docs/getting-started.md"
+    ! grep -Fq 'release-please 真实验证' "$REPO_ROOT/docs/troubleshooting.md"
 }
 
 @test "Q&A starts with deployment locale and never asks user to classify project language" {
