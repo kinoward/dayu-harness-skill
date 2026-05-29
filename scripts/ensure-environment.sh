@@ -626,6 +626,7 @@ if [ "$MISSING_TOOLS" -gt 0 ]; then
 {
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
+  "targetRoot":"$(json_escape "$TARGET")",
   "status":"needs_install",
   "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
   "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
@@ -648,6 +649,7 @@ if detect_version_conflict; then
 {
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
+  "targetRoot":"$(json_escape "$TARGET")",
   "status":"needs_user_action",
   "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
   "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},
@@ -873,6 +875,7 @@ cat <<JSONEOF
 {
   "mode":"$MODE",
   "target":"$(json_escape "$TARGET_DISPLAY")",
+  "targetRoot":"$(json_escape "$TARGET")",
   "status":"$TOP_STATUS",
   "default_branch":"$(json_escape "$DEFAULT_BRANCH")",
   "project_baseline":{"version":"$(json_escape "$PROJECT_VERSION")"},

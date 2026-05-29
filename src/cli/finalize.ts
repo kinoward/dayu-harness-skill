@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { resolveDeploymentOrder } from "../architecture/index.js";
 import { enabledCapabilityIds, readDayuConfig } from "./config.js";
@@ -68,12 +68,16 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
   }
 
   const finalizePaths = collectFinalizePathSet(targetRoot, configPath);
-  const unrelatedStagedPaths = stagedFiles(targetRoot).filter((path) => !finalizePaths.has(path));
-  if (unrelatedStagedPaths.length > 0) {
+  const boundary = gitBoundaryViolations(targetRoot, finalizePaths);
+  if (boundary.unrelatedStagedPaths.length > 0 || boundary.unrelatedUntrackedPaths.length > 0) {
+    const details = [
+      boundary.unrelatedStagedPaths.length > 0 ? `非 Dayu 暂存文件：${boundary.unrelatedStagedPaths.join(", ")}` : "",
+      boundary.unrelatedUntrackedPaths.length > 0 ? `非 Dayu 未跟踪文件：${boundary.unrelatedUntrackedPaths.join(", ")}` : ""
+    ].filter(Boolean);
     checks.push({
-      name: "Git 暂存区边界",
+      name: "Git 工作区边界",
       status: "failed",
-      description: `暂存区已有非 Dayu 托管文件，已停止提交：${unrelatedStagedPaths.join(", ")}`
+      description: `${details.join("；")}。已停止提交。`
     });
     return finalizeReport({
       targetRoot,
@@ -84,18 +88,40 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
       checks,
       issuePrE2e: {
         status: "skipped",
-        description: "暂存区存在非 Dayu 托管文件，已停止远端同步和 E2E。"
+        description: "工作区存在非 Dayu staged/untracked 文件，已停止远端同步和 E2E。"
       },
       releaseE2e: {
         status: "skipped",
-        description: "暂存区存在非 Dayu 托管文件，已停止 Release Please 验证。"
+        description: "工作区存在非 Dayu staged/untracked 文件，已停止 Release Please 验证。"
       }
     });
   }
-  checks.push({ name: "Git 暂存区边界", status: "passed", description: "暂存区没有非 Dayu 托管文件。" });
+  checks.push({ name: "Git 工作区边界", status: "passed", description: "暂存区和未跟踪文件没有非 Dayu 托管内容。" });
 
   const stagedPaths = stageFinalizePaths(targetRoot, finalizePaths);
   const commitSha = commitIfNeeded(targetRoot, checks);
+  if (commitSha) {
+    runPostCommitValidation(targetRoot, configPath, finalizePaths, checks);
+    if (checks.some((check) => check.status === "failed")) {
+      return finalizeReport({
+        targetRoot,
+        configPath,
+        githubRemote,
+        releaseValidation,
+        stagedPaths,
+        commitSha,
+        checks,
+        issuePrE2e: {
+          status: "skipped",
+          description: "提交后验证未通过，已停止远端同步和 E2E。"
+        },
+        releaseE2e: {
+          status: "skipped",
+          description: "提交后验证未通过，已停止 Release Please 验证。"
+        }
+      });
+    }
+  }
 
   let remote: FinalizeReport["remote"] | undefined;
   let issuePrE2e: FinalizeReport["issuePrE2e"];
@@ -132,7 +158,7 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
           ? runReleasePleaseRealValidation(targetRoot, remote?.repository)
           : runReleasePleaseReadiness(targetRoot, remote?.repository);
       checks.push({
-        name: "Release Please",
+        name: releaseValidation === "real" ? "Release Please real validation" : "Release Please readiness",
         status: releaseE2e.status === "passed" ? "passed" : releaseE2e.status === "skipped" ? "skipped" : "failed",
         description: releaseE2e.description
       });
@@ -142,7 +168,7 @@ export function finalizeDayuProject(options: FinalizeOptions = {}): FinalizeRepo
         description: "GitHub 远端未完成，已暂停 Release Please 验证。"
       };
       checks.push({
-        name: "Release Please",
+        name: releaseValidation === "real" ? "Release Please real validation" : "Release Please readiness",
         status: "skipped",
         description: releaseE2e.description
       });
@@ -437,6 +463,7 @@ function collectFinalizePathSet(targetRoot: string, configPath: string): Set<str
   for (const extra of [DEFAULT_CONFIG_FILE, "package.json", "package-lock.json", "VERSION", "CHANGELOG.md"]) {
     addIfPresentOrTracked(paths, targetRoot, join(targetRoot, extra));
   }
+  addIfEnvironmentBaselineReadme(paths, targetRoot);
 
   for (const legacyPath of deletedLegacyStatePaths(targetRoot)) {
     paths.add(legacyPath);
@@ -458,6 +485,21 @@ function addIfTrackedDeletion(paths: Set<string>, targetRoot: string, relativePa
   }
 }
 
+function addIfEnvironmentBaselineReadme(paths: Set<string>, targetRoot: string): void {
+  const readmePath = join(targetRoot, "README.md");
+  if (!existsSync(readmePath)) {
+    return;
+  }
+  const content = readFileSync(readmePath, "utf8");
+  if (content === environmentBaselineReadmeContent(targetRoot)) {
+    paths.add("README.md");
+  }
+}
+
+function environmentBaselineReadmeContent(targetRoot: string): string {
+  return `# ${basename(targetRoot)}\n\nProject initialized with Dayu Harness governance.\n`;
+}
+
 function isTracked(targetRoot: string, relativePath: string): boolean {
   try {
     execFileSync("git", ["-C", targetRoot, "ls-files", "--error-unmatch", "--", relativePath], { stdio: ["ignore", "pipe", "pipe"] });
@@ -474,6 +516,39 @@ function stagedFiles(targetRoot: string): string[] {
   })
     .split(/\r?\n/)
     .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function gitBoundaryViolations(
+  targetRoot: string,
+  finalizePaths: ReadonlySet<string>
+): { unrelatedStagedPaths: string[]; unrelatedUntrackedPaths: string[] } {
+  const unrelatedStagedPaths = stagedFiles(targetRoot).filter((path) => !finalizePaths.has(path));
+  const unrelatedUntrackedPaths = gitUntrackedFiles(targetRoot).filter((path) => !finalizePaths.has(path) && !isBoundaryIgnoredPath(path));
+  return { unrelatedStagedPaths, unrelatedUntrackedPaths };
+}
+
+function isBoundaryIgnoredPath(relativePath: string): boolean {
+  return (
+    relativePath === "node_modules" ||
+    relativePath.startsWith("node_modules/") ||
+    relativePath === ".dayu-harness/journal.jsonl" ||
+    relativePath === ".dayu-harness/log.jsonl" ||
+    relativePath === ".dayu-harness/apply.lock" ||
+    relativePath.startsWith(".dayu-harness/tmp/")
+  );
+}
+
+function gitUntrackedFiles(targetRoot: string): string[] {
+  return execFileSync("git", ["-C", targetRoot, "status", "--porcelain=v1", "--untracked-files=all"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  })
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.startsWith("?? "))
+    .map((line) => line.slice(3).trim())
     .filter(Boolean)
     .sort();
 }
@@ -499,7 +574,7 @@ function commitIfNeeded(targetRoot: string, checks: FinalizeCheck[]): string | u
     return undefined;
   }
 
-  execFileSync("git", ["-C", targetRoot, "commit", "-m", "chore: initialize Dayu Harness governance"], {
+  execFileSync("git", ["-C", targetRoot, "commit", "--no-verify", "-m", "chore: initialize Dayu Harness governance"], {
     stdio: ["ignore", "pipe", "pipe"]
   });
   const sha = execFileSync("git", ["-C", targetRoot, "rev-parse", "--short=12", "HEAD"], {
@@ -508,6 +583,50 @@ function commitIfNeeded(targetRoot: string, checks: FinalizeCheck[]): string | u
   }).trim();
   checks.push({ name: "Git 初始化提交", status: "passed", description: `已创建初始化提交 ${sha}。` });
   return sha;
+}
+
+function runPostCommitValidation(
+  targetRoot: string,
+  configPath: string,
+  finalizePaths: ReadonlySet<string>,
+  checks: FinalizeCheck[]
+): void {
+  const validate = validateDayuProject({ targetRoot, configPath });
+  checks.push({
+    name: "提交后 dayu-harness validate",
+    status: validate.status === "valid" ? "passed" : "failed",
+    description: validate.status === "valid" ? "检查通过。" : validate.issues.join("; ")
+  });
+  const diagnose = diagnoseDayuProject({ targetRoot, configPath });
+  checks.push({
+    name: "提交后 dayu-harness diagnose",
+    status: diagnose.status === "healthy" ? "passed" : "failed",
+    description: diagnose.status === "healthy" ? "检查通过。" : "治理文件存在缺失、漂移或冲突。"
+  });
+  const status = statusDayuProject({ targetRoot, configPath });
+  checks.push({
+    name: "提交后 dayu-harness status",
+    status: status.status === "healthy" ? "passed" : "failed",
+    description: status.status === "healthy" ? "检查通过。" : "治理能力未全部健康。"
+  });
+  const boundary = gitBoundaryViolations(targetRoot, finalizePaths);
+  if (boundary.unrelatedStagedPaths.length > 0 || boundary.unrelatedUntrackedPaths.length > 0) {
+    const details = [
+      boundary.unrelatedStagedPaths.length > 0 ? `非 Dayu 暂存文件：${boundary.unrelatedStagedPaths.join(", ")}` : "",
+      boundary.unrelatedUntrackedPaths.length > 0 ? `非 Dayu 未跟踪文件：${boundary.unrelatedUntrackedPaths.join(", ")}` : ""
+    ].filter(Boolean);
+    checks.push({
+      name: "提交后 Git 工作区边界",
+      status: "failed",
+      description: `${details.join("；")}。已停止远端同步。`
+    });
+  } else {
+    checks.push({
+      name: "提交后 Git 工作区边界",
+      status: "passed",
+      description: "提交后暂存区和未跟踪文件没有非 Dayu 托管内容。"
+    });
+  }
 }
 
 function applyAndVerifyRemote(
