@@ -3,6 +3,8 @@
 !.tmp/.gitignore
 tests/unit/.tmp/*
 !tests/unit/.tmp/.gitignore
+archive/tests/unit/.tmp/*
+!archive/tests/unit/.tmp/.gitignore
 __pycache__/
 *.pyc
 node_modules/
