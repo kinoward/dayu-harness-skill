@@ -22,9 +22,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Update README dynamic blocks
-        run: node scripts/update-readme-contributors.mjs
+        run: npm ci && npm run update-readme-contributors
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -5,12 +5,15 @@ import { fileURLToPath } from "node:url";
 
 import { applyDayuConfig, initDayuConfig } from "./apply.js";
 import { diagnoseDayuProject } from "./diagnose.js";
+import { checkEnvironment } from "./environment.js";
 import { CliError } from "./errors.js";
 import { finalizeDayuProject } from "./finalize.js";
 import { generateDayuContent } from "./generate.js";
+import { checkI18nDrift } from "./i18n-drift.js";
 import { applyDayuMerge, planDayuMerge } from "./merge.js";
 import { writeError, writeReport, type CliReport } from "./output.js";
 import { repairDayuCapability } from "./repair.js";
+import { runAuditSensor, runConsistencySensor, runDiffHelper, runValidateSensor } from "./sensors.js";
 import { statusDayuProject } from "./status.js";
 import { validateDayuProject } from "./validate.js";
 
@@ -29,6 +32,8 @@ interface CommonOptions {
   skillRoot?: string;
   githubRemote?: "apply" | "skip";
   releaseValidation?: "real" | "readiness";
+  capabilities?: string;
+  check?: boolean;
 }
 
 export function buildProgram(): Command {
@@ -206,6 +211,49 @@ export function buildProgram(): Command {
       )
     );
 
+  program
+    .command("sensor <name> [args...]")
+    .description("run deployed governance sensor logic from the TypeScript CLI")
+    .option("--target <path>", "target project root")
+    .option("--json", "emit JSON")
+    .action((name: string, args: string[] | undefined, options: CommonOptions, command: Command) =>
+      executeSensor(command, name, args ?? [], options)
+    );
+
+  program
+    .command("environment [target]")
+    .description("check or prepare the target project environment using the TypeScript CLI")
+    .option("--check", "check only")
+    .option("--apply", "apply safe initialization")
+    .option("--capabilities <ids>", "comma-separated capability ids")
+    .option("--json", "emit JSON")
+    .action((target: string | undefined, options: CommonOptions, command: Command) => {
+      const json = Boolean(command.optsWithGlobals().json);
+      const mode = options.apply ? "apply" : "check";
+      const report = checkEnvironment({ targetRoot: target, mode, capabilities: options.capabilities });
+      if (json) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      }
+      process.exitCode = report.status === "error" || report.status === "needs_install" ? 1 : 0;
+    });
+
+  program
+    .command("i18n-drift [target]")
+    .description("check README and template i18n drift")
+    .option("--json", "emit JSON")
+    .action((target: string | undefined, options: CommonOptions, command: Command) => {
+      const json = Boolean(command.optsWithGlobals().json);
+      const report = checkI18nDrift(target);
+      if (json) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      }
+      process.exitCode = report.status === "pass" ? 0 : 1;
+    });
+
   return program;
 }
 
@@ -238,6 +286,59 @@ async function execute(command: Command, action: () => CliReport): Promise<void>
     writeError(error, json);
     process.exitCode = 1;
   }
+}
+
+function executeSensor(command: Command, name: string, args: readonly string[], options: CommonOptions): void {
+  const json = Boolean(command.optsWithGlobals().json);
+  try {
+    if (name === "diff-helper" || name === "diff") {
+      process.stdout.write(runDiffHelper(args));
+      return;
+    }
+
+    const report =
+      name === "audit"
+        ? runAuditSensor({ targetRoot: options.target ?? inferSensorTarget(args), json })
+        : name === "validate"
+          ? runValidateSensor({ targetRoot: options.target ?? inferSensorTarget(args), json })
+          : name === "check-consistency" || name === "consistency"
+            ? runConsistencySensor({ targetRoot: options.target ?? inferSensorTarget(args), json })
+            : undefined;
+
+    if (!report) {
+      throw new CliError("unknown-sensor", `unknown sensor '${name}'`, [
+        { code: "unknown-sensor", message: "supported sensors: audit, validate, check-consistency, diff-helper" }
+      ]);
+    }
+
+    if (json) {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    } else {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    }
+    const summary = "summary" in report ? report.summary : undefined;
+    process.exitCode =
+      typeof summary === "object" &&
+      summary !== null &&
+      "failed" in summary &&
+      typeof summary.failed === "number" &&
+      summary.failed > 0
+        ? 1
+        : 0;
+  } catch (error) {
+    writeError(error, json);
+    process.exitCode = 1;
+  }
+}
+
+function inferSensorTarget(args: readonly string[]): string | undefined {
+  for (let index = args.length - 1; index >= 0; index -= 1) {
+    const arg = args[index];
+    if (arg && !arg.startsWith("-")) {
+      return arg;
+    }
+  }
+  return undefined;
 }
 
 function exitCodeForReport(report: CliReport): number {

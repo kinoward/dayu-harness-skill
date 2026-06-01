@@ -66,7 +66,7 @@ export const ManifestV2Schema = z
     deployment_deps: z.array(CapabilityIdSchema).default([]),
     conceptual_deps: z.array(CapabilityIdSchema).default([]),
 
-    // Compatibility bridge while scaffold.sh still reads the legacy field.
+    // Compatibility bridge for manifests created before the TypeScript-only CLI.
     dependencies: z.array(CapabilityIdSchema),
 
     i18n: I18nKeyRefSchema,
@@ -103,7 +103,7 @@ export const ManifestV2Schema = z
       ctx.addIssue({
         code: "custom",
         path: ["dependencies"],
-        message: "legacy dependencies must mirror deployment_deps during scaffold.sh compatibility"
+        message: "legacy dependencies must mirror deployment_deps during manifest compatibility"
       });
     }
 

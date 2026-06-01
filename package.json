@@ -11,7 +11,6 @@
     "assets/",
     "capabilities/",
     "locales/",
-    "scripts/",
     "templates/",
     "templates.en/",
     "README.md",
@@ -23,15 +22,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "npm run typecheck",
-    "test": "npm run test:unit",
-    "test:unit": "TMPDIR=.tmp node --import tsx --test tests/unit/*.test.ts",
-    "test:governance:logic": "TMPDIR=.tmp node --import tsx --test tests/unit/governance-deterministic.test.ts",
-    "test:governance:bats": "TMPDIR=.tmp BATS_TMPDIR=.tmp bats tests/unit/test-github-helper-scripts.bats tests/unit/test-audit.bats tests/unit/test-github-remote.bats tests/unit/test-architecture-contracts.bats",
-    "test:governance": "npm run test:governance:logic && npm run test:governance:bats",
-    "test:phase1b": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1b-schema.test.ts",
-    "test:phase1c": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1c-architecture.test.ts",
-    "test:phase1d": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1d-cli.test.ts",
-    "test:phase1e": "TMPDIR=.tmp node --import tsx --test tests/unit/phase1e-cli-scope.test.ts"
+    "i18n:check": "TMPDIR=.tmp tsx src/cli/main.ts i18n-drift --json",
+    "update-readme-contributors": "TMPDIR=.tmp tsx src/maintenance/update-readme-contributors.ts"
   },
   "dependencies": {
     "chalk": "^5.6.2",

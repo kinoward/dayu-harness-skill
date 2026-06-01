@@ -1,22 +1,27 @@
 #!/usr/bin/env node
-
-import { readFile, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 
 const README_PATHS = ["README.md", "README.en.md"];
 const CONTRIBUTORS_START = "<!-- contributors:start -->";
 const CONTRIBUTORS_END = "<!-- contributors:end -->";
 const DEFAULT_REPOSITORY = "kinoward/dayu-harness-skill";
 
-function resolveRepository() {
+interface GitHubContributor {
+  login?: string;
+  html_url?: string;
+  avatar_url?: string;
+}
+
+function resolveRepository(): string {
   if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
 
   try {
     const remote = execFileSync("git", ["config", "--get", "remote.origin.url"], {
-      encoding: "utf8",
+      encoding: "utf8"
     }).trim();
     const match = remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
-    if (match) return match[1];
+    if (match?.[1]) return match[1];
   } catch {
     // Fall back to this repository when git metadata is unavailable.
   }
@@ -24,9 +29,9 @@ function resolveRepository() {
   return DEFAULT_REPOSITORY;
 }
 
-async function fetchContributors(repository) {
+async function fetchContributors(repository: string): Promise<GitHubContributor[]> {
   const headers = githubHeaders();
-  const contributors = [];
+  const contributors: GitHubContributor[] = [];
   for (let page = 1; page <= 10; page += 1) {
     const url = `https://api.github.com/repos/${repository}/contributors?per_page=100&page=${page}`;
     const response = await fetch(url, { headers });
@@ -34,7 +39,7 @@ async function fetchContributors(repository) {
       throw new Error(`GitHub contributors API returned ${response.status} for ${url}`);
     }
 
-    const pageContributors = await response.json();
+    const pageContributors = (await response.json()) as GitHubContributor[];
     contributors.push(...pageContributors);
     if (pageContributors.length < 100) break;
   }
@@ -42,10 +47,10 @@ async function fetchContributors(repository) {
   return contributors;
 }
 
-function githubHeaders() {
-  const headers = {
+function githubHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "dayu-harness-skill-readme-updater",
+    "User-Agent": "dayu-harness-skill-readme-updater"
   };
 
   if (process.env.GITHUB_TOKEN) {
@@ -55,11 +60,9 @@ function githubHeaders() {
   return headers;
 }
 
-function renderContributors(contributors, readmePath) {
+function renderContributors(contributors: readonly GitHubContributor[], readmePath: string): string {
   if (!contributors.length) {
-    const emptyMessage = readmePath.endsWith(".en.md")
-      ? "No contributor data available yet."
-      : "暂无贡献者数据。";
+    const emptyMessage = readmePath.endsWith(".en.md") ? "No contributor data available yet." : "暂无贡献者数据。";
     return `${CONTRIBUTORS_START}\n\n${emptyMessage}\n\n${CONTRIBUTORS_END}`;
   }
 
@@ -76,11 +79,11 @@ function renderContributors(contributors, readmePath) {
         `        <img src="${avatarUrl}" width="64" height="64" alt="${login}"><br>`,
         `        <sub><b>${login}</b></sub>`,
         "      </a>",
-        "    </td>",
+        "    </td>"
       ].join("\n");
     });
 
-  const rows = [];
+  const rows: string[] = [];
   for (let index = 0; index < cells.length; index += 6) {
     rows.push(["  <tr>", ...cells.slice(index, index + 6), "  </tr>"].join("\n"));
   }
@@ -88,20 +91,12 @@ function renderContributors(contributors, readmePath) {
   return `${CONTRIBUTORS_START}\n<table>\n${rows.join("\n")}\n</table>\n${CONTRIBUTORS_END}`;
 }
 
-function escapeRegex(value) {
+function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-async function updateReadme(readmePath, contributorsBlock) {
-  let readme;
-  try {
-    readme = await readFile(readmePath, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      throw new Error(`Missing target file: ${readmePath}`);
-    }
-    throw error;
-  }
+async function updateReadme(readmePath: string, contributorsBlock: string): Promise<boolean> {
+  const readme = await readFile(readmePath, "utf8");
 
   for (const marker of [CONTRIBUTORS_START, CONTRIBUTORS_END]) {
     if (!readme.includes(marker)) {
@@ -111,7 +106,7 @@ async function updateReadme(readmePath, contributorsBlock) {
 
   const nextReadme = readme.replace(
     new RegExp(`${escapeRegex(CONTRIBUTORS_START)}[\\s\\S]*?${escapeRegex(CONTRIBUTORS_END)}`),
-    contributorsBlock,
+    contributorsBlock
   );
 
   if (nextReadme !== readme) {
@@ -122,7 +117,7 @@ async function updateReadme(readmePath, contributorsBlock) {
   return false;
 }
 
-function escapeHtml(value) {
+function escapeHtml(value: unknown): string {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

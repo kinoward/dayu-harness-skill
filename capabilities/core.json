@@ -33,10 +33,10 @@
         "docs/harness/guides/AGENTS.md",
         "docs/harness/sensors/AGENTS.md",
         "docs/harness/sensors/scripts/AGENTS.md",
-        "docs/harness/sensors/scripts/audit.sh",
-        "docs/harness/sensors/scripts/check-consistency.sh",
-        "docs/harness/sensors/scripts/diff-helper.sh",
-        "docs/harness/sensors/scripts/validate.sh",
+        "docs/harness/sensors/scripts/audit.mjs",
+        "docs/harness/sensors/scripts/check-consistency.mjs",
+        "docs/harness/sensors/scripts/diff-helper.mjs",
+        "docs/harness/sensors/scripts/validate.mjs",
         "docs/harness/sensors/scripts/dayu-format.mjs",
         "docs/harness/sensors/reviews/AGENTS.md",
         "docs/exec-plans/AGENTS.md",
@@ -82,23 +82,23 @@
       "dst": "docs/harness/sensors/scripts/AGENTS.md"
     },
     {
-      "src": "templates/docs/harness/sensors/scripts/audit.sh",
-      "dst": "docs/harness/sensors/scripts/audit.sh",
+      "src": "templates/docs/harness/sensors/scripts/audit.mjs",
+      "dst": "docs/harness/sensors/scripts/audit.mjs",
       "executable": true
     },
     {
-      "src": "templates/docs/harness/sensors/scripts/check-consistency.sh",
-      "dst": "docs/harness/sensors/scripts/check-consistency.sh",
+      "src": "templates/docs/harness/sensors/scripts/check-consistency.mjs",
+      "dst": "docs/harness/sensors/scripts/check-consistency.mjs",
       "executable": true
     },
     {
-      "src": "templates/docs/harness/sensors/scripts/diff-helper.sh",
-      "dst": "docs/harness/sensors/scripts/diff-helper.sh",
+      "src": "templates/docs/harness/sensors/scripts/diff-helper.mjs",
+      "dst": "docs/harness/sensors/scripts/diff-helper.mjs",
       "executable": true
     },
     {
-      "src": "templates/docs/harness/sensors/scripts/validate.sh",
-      "dst": "docs/harness/sensors/scripts/validate.sh",
+      "src": "templates/docs/harness/sensors/scripts/validate.mjs",
+      "dst": "docs/harness/sensors/scripts/validate.mjs",
       "executable": true
     },
     {
@@ -163,23 +163,23 @@
         "dst": "docs/harness/sensors/scripts/AGENTS.md"
       },
       {
-        "src": "templates.en/docs/harness/sensors/scripts/audit.sh",
-        "dst": "docs/harness/sensors/scripts/audit.sh",
+        "src": "templates.en/docs/harness/sensors/scripts/audit.mjs",
+        "dst": "docs/harness/sensors/scripts/audit.mjs",
         "executable": true
       },
       {
-        "src": "templates.en/docs/harness/sensors/scripts/check-consistency.sh",
-        "dst": "docs/harness/sensors/scripts/check-consistency.sh",
+        "src": "templates.en/docs/harness/sensors/scripts/check-consistency.mjs",
+        "dst": "docs/harness/sensors/scripts/check-consistency.mjs",
         "executable": true
       },
       {
-        "src": "templates.en/docs/harness/sensors/scripts/diff-helper.sh",
-        "dst": "docs/harness/sensors/scripts/diff-helper.sh",
+        "src": "templates.en/docs/harness/sensors/scripts/diff-helper.mjs",
+        "dst": "docs/harness/sensors/scripts/diff-helper.mjs",
         "executable": true
       },
       {
-        "src": "templates.en/docs/harness/sensors/scripts/validate.sh",
-        "dst": "docs/harness/sensors/scripts/validate.sh",
+        "src": "templates.en/docs/harness/sensors/scripts/validate.mjs",
+        "dst": "docs/harness/sensors/scripts/validate.mjs",
         "executable": true
       },
       {

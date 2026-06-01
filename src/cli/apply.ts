@@ -8,6 +8,8 @@ import { createDefaultDayuConfig, enabledCapabilityIds, readDayuConfig, writeDay
 import { capabilityDisplay } from "./display.js";
 import { CliError } from "./errors.js";
 import { writeFileAtomically } from "./filesystem.js";
+import { applyGitignoreInstaller, gitignoreAlreadyManaged } from "./installers/gitignore.js";
+import { applyHuskyInstaller, canMergeHuskyHook, huskyHookForCapability, huskyMarker } from "./installers/husky.js";
 import {
   acquireApplyLock,
   appendJournalEntry,
@@ -45,12 +47,7 @@ import type {
 } from "./types.js";
 
 const DAYU_LOG_FILE = ".dayu-harness/log.jsonl";
-const HUSKY_HOOK_BY_CAPABILITY: Readonly<Record<string, string>> = {
-  "git.commit-format": "commit-msg",
-  "quality.node-tooling": "pre-commit",
-  "github.branch-protection": "pre-push",
-  "release.versioning": "pre-push"
-};
+const SUPPORTED_INSTALLERS = new Set(["husky", "gitignore"]);
 
 interface ResolvedApplyInputs {
   targetRoot: string;
@@ -495,7 +492,7 @@ function planInstallerOperation(
     return [];
   }
 
-  if (!["install-husky.sh", "install-gitignore.sh"].includes(manifest.installer.script)) {
+  if (!SUPPORTED_INSTALLERS.has(manifest.installer.script)) {
     return [
       {
         capabilityId: manifest.id,
@@ -507,20 +504,7 @@ function planInstallerOperation(
     ];
   }
 
-  const scriptPath = join(registry.skillRoot, "scripts", manifest.installer.script);
   const dst = installerDestination(manifest);
-  if (!existsSync(scriptPath)) {
-    return [
-      {
-        capabilityId: manifest.id,
-        script: manifest.installer.script,
-        dst,
-        status: "missing-source",
-        reason: `installer script '${manifest.installer.script}' does not exist`
-      }
-    ];
-  }
-
   const targetPath = join(targetRoot, dst);
   if (!existsSync(targetPath)) {
     return [
@@ -535,9 +519,9 @@ function planInstallerOperation(
   }
 
   if (
-    manifest.installer.script === "install-gitignore.sh" &&
+    manifest.installer.script === "gitignore" &&
     !force &&
-    readFileSync(targetPath, "utf8").includes("Dayu Harness local exclusions")
+    gitignoreAlreadyManaged(targetRoot)
   ) {
     return [
       {
@@ -550,7 +534,7 @@ function planInstallerOperation(
     ];
   }
 
-  if (manifest.installer.script === "install-husky.sh" && readFileSync(targetPath, "utf8").includes(huskyMarker(manifest.id))) {
+  if (manifest.installer.script === "husky" && readFileSync(targetPath, "utf8").includes(huskyMarker(manifest.id))) {
     return [
       {
         capabilityId: manifest.id,
@@ -558,6 +542,18 @@ function planInstallerOperation(
         dst,
         status: "skip",
         reason: `${dst} already contains the dayu-harness ${manifest.id} snippet`
+      }
+    ];
+  }
+
+  if (manifest.installer.script === "husky" && !force && !canMergeHuskyHook(targetPath)) {
+    return [
+      {
+        capabilityId: manifest.id,
+        script: manifest.installer.script,
+        dst,
+        status: "unsupported",
+        reason: `existing ${dst} is not a Node hook; use --force to replace it`
       }
     ];
   }
@@ -596,24 +592,31 @@ function renderFileByPlan(plan: ApplyPlan, operation: FileOperation): RenderedFi
 }
 
 function applyInstallerOperation(targetRoot: string, operation: InstallerOperation): void {
-  if (!["install-husky.sh", "install-gitignore.sh"].includes(operation.script)) {
+  if (!SUPPORTED_INSTALLERS.has(operation.script)) {
     throw new CliError("unsupported-installer", `unsupported installer '${operation.script}'`);
   }
 
-  const scriptPath = join(loadManifestRegistry().skillRoot, "scripts", operation.script);
-  execFileSync("bash", [scriptPath, targetRoot, "--apply", operation.strategy ?? "merge"], {
-    env: {
-      ...process.env,
-      DAYU_HARNESS_CAPABILITY: operation.capabilityId
-    },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
+  const registry = loadManifestRegistry();
+  if (operation.script === "gitignore") {
+    applyGitignoreInstaller({
+      targetRoot,
+      skillRoot: registry.skillRoot,
+      strategy: operation.strategy ?? "merge"
+    });
+  } else {
+    applyHuskyInstaller({
+      targetRoot,
+      capabilityId: operation.capabilityId,
+      defaultBranch: detectDefaultBranch(targetRoot),
+      strategy: operation.strategy ?? "merge"
+    });
+  }
 
   const hookPath = join(targetRoot, operation.dst);
   if (!existsSync(hookPath)) {
     throw new CliError("installer-failed", `installer '${operation.script}' did not create ${operation.dst}`);
   }
-  if (operation.script === "install-husky.sh" && !readFileSync(hookPath, "utf8").includes(huskyMarker(operation.capabilityId))) {
+  if (operation.script === "husky" && !readFileSync(hookPath, "utf8").includes(huskyMarker(operation.capabilityId))) {
     throw new CliError("installer-failed", `installer '${operation.script}' did not create ${operation.dst}`);
   }
 }
@@ -627,20 +630,16 @@ function installerStrategy(manifest: ManifestV2, force: boolean): "merge" | "rep
 }
 
 function installerDestination(manifest: ManifestV2): string {
-  if (manifest.installer?.script === "install-gitignore.sh") {
+  if (manifest.installer?.script === "gitignore") {
     return ".gitignore";
   }
 
-  if (manifest.installer?.script === "install-husky.sh") {
-    const hook = HUSKY_HOOK_BY_CAPABILITY[manifest.id];
+  if (manifest.installer?.script === "husky") {
+    const hook = huskyHookForCapability(manifest.id);
     return hook ? `.husky/${hook}` : ".husky";
   }
 
   return ".dayu-installer";
-}
-
-function huskyMarker(capabilityId: string): string {
-  return `# >>> dayu-harness:${capabilityId} >>>`;
 }
 
 function blockingApplyStatus(plan: ApplyPlan): "conflict" | "error" | undefined {

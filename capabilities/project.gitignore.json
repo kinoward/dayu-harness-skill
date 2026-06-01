@@ -34,7 +34,7 @@
   "template_files": [],
   "asset_files": [],
   "installer": {
-    "script": "install-gitignore.sh",
+    "script": "gitignore",
     "safe_strategies": [
       "merge",
       "replace",

@@ -71,7 +71,7 @@
     }
   ],
   "installer": {
-    "script": "install-husky.sh",
+    "script": "husky",
     "safe_strategies": [
       "merge",
       "skip"

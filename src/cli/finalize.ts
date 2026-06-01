@@ -6,6 +6,7 @@ import { resolveDeploymentOrder } from "../architecture/index.js";
 import { enabledCapabilityIds, readDayuConfig } from "./config.js";
 import { diagnoseDayuProject } from "./diagnose.js";
 import { CliError } from "./errors.js";
+import { runGithubRemote } from "./github-remote.js";
 import { managedPathsFile } from "./journal.js";
 import { loadManifestRegistry } from "./manifest-registry.js";
 import { DEFAULT_CONFIG_FILE, resolveConfigPath, resolveTargetRoot } from "./paths.js";
@@ -298,7 +299,7 @@ function runLocalChecks(targetRoot: string, configPath: string, checks: Finalize
     description: status.status === "healthy" ? "检查通过。" : "治理能力未全部健康。"
   });
 
-  for (const script of ["validate.sh", "audit.sh", "check-consistency.sh"]) {
+  for (const script of ["validate.mjs", "audit.mjs", "check-consistency.mjs"]) {
     const scriptPath = join(targetRoot, "docs/harness/sensors/scripts", script);
     if (!existsSync(scriptPath)) {
       checks.push({
@@ -308,7 +309,7 @@ function runLocalChecks(targetRoot: string, configPath: string, checks: Finalize
       });
       continue;
     }
-    runCommandCheck(script, "bash", [scriptPath, "--json", targetRoot], checks);
+    runCommandCheck(script, "node", [scriptPath, "--json", targetRoot], checks);
   }
 }
 
@@ -341,7 +342,7 @@ function runCapabilityPrerequisiteChecks(
       description:
         missing.length === 0
           ? "package.json 已声明所需 devDependencies。"
-          : `package.json 缺少所需 devDependencies：${missing.join(", ")}。请先运行 ensure-environment.sh --apply --capabilities。`
+          : `package.json 缺少所需 devDependencies：${missing.join(", ")}。请先运行 dayu-harness environment --apply --capabilities。`
     });
   }
 
@@ -373,7 +374,7 @@ function runGitHooksPathCheck(
     status: isExpected ? "passed" : "failed",
     description: isExpected
       ? `Git hooks 已接入 .husky（${[...new Set(activeHooks.map((item) => item.hook))].join(", ")}）。`
-      : `Git hooks 未接入 .husky；当前 core.hooksPath=${hooksPath?.trim() || "<未设置>"}。请先运行 ensure-environment.sh --apply --capabilities 完成 Husky 接入。`
+      : `Git hooks 未接入 .husky；当前 core.hooksPath=${hooksPath?.trim() || "<未设置>"}。请先运行 dayu-harness environment --apply --capabilities 完成 Husky 接入。`
   });
 }
 
@@ -636,19 +637,15 @@ function applyAndVerifyRemote(
   remoteActions: ReadonlyArray<Record<string, unknown>>,
   checks: FinalizeCheck[]
 ): FinalizeReport["remote"] {
-  const scriptPath = join(skillRoot, "scripts/github-remote.sh");
-  if (!existsSync(scriptPath)) {
-    checks.push({ name: "GitHub 远端同步", status: "failed", description: "缺少 scripts/github-remote.sh。" });
-    return { applyStatus: "error" };
-  }
-
-  const apply = runRemoteScript(scriptPath, targetRoot, "--apply", remoteActionsJson);
+  void skillRoot;
+  void remoteActionsJson;
+  const apply = runRemoteScript(targetRoot, "apply", remoteActions);
   checks.push({
     name: "GitHub 远端同步",
     status: remoteScriptCheckStatus(apply.status),
     description: apply.description
   });
-  let verify = runRemoteScript(scriptPath, targetRoot, "--verify", remoteActionsJson);
+  let verify = runRemoteScript(targetRoot, "verify", remoteActions);
   checks.push({
     name: "GitHub 远端校验",
     status: remoteScriptCheckStatus(verify.status),
@@ -667,7 +664,7 @@ function applyAndVerifyRemote(
     });
     if (merged) {
       syncLocalDefaultBranch(targetRoot, verify.defaultBranch || apply.defaultBranch);
-      verify = runRemoteScript(scriptPath, targetRoot, "--verify", remoteActionsJson);
+      verify = runRemoteScript(targetRoot, "verify", remoteActions);
       checks.push({
         name: "初始化 PR 后远端校验",
         status: remoteScriptCheckStatus(verify.status),
@@ -706,25 +703,16 @@ interface RemoteScriptResult {
 }
 
 function runRemoteScript(
-  scriptPath: string,
   targetRoot: string,
-  mode: "--apply" | "--verify",
-  remoteActionsJson: string
+  mode: "apply" | "verify",
+  remoteActions: ReadonlyArray<Record<string, unknown>>
 ): RemoteScriptResult {
-  const output = execFileSync("bash", [scriptPath, targetRoot, mode], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      DAYU_HARNESS_REMOTE_ACTIONS_JSON: remoteActionsJson
-    }
-  });
-  const parsed = JSON.parse(output) as { status?: string; repository?: string; default_branch?: string; description_nl?: string; items?: unknown };
+  const parsed = runGithubRemote({ targetRoot, mode, remoteActions });
   return {
     status: parsed.status ?? "error",
     repository: parsed.repository,
-    defaultBranch: parsed.default_branch,
-    description: parsed.description_nl ?? "",
+    defaultBranch: parsed.defaultBranch,
+    description: parsed.description ?? "",
     items: Array.isArray(parsed.items) ? (parsed.items as Array<Record<string, unknown>>) : []
   };
 }
