@@ -93,8 +93,8 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 2. 修改文档内容
 3. 如涉及脚本变更，同步更新对应脚本
 4. 如涉及索引变更（文件增删），更新对应 `AGENTS.md`，并同步受影响的 `## 目录索引` 区块（及 `README.md` 的 `## 目录结构`）
-5. 使用 `docs/harness/sensors/scripts/diff-helper.sh` 生成变更描述：若有现有文件与目标文件对，可调用 `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>`；没有可配对文件时，优先用 `dayu-harness generate --target <project-root> --json` 或 `dayu-harness merge --target <project-root> --json` 生成预览，CLI 不可用时改为人工复核，之后确认
-6. 执行 `docs/harness/sensors/scripts/validate.sh` 验证（如可用）
+5. 使用 `docs/harness/sensors/scripts/diff-helper.mjs` 生成变更描述：若有现有文件与目标文件对，可调用 `docs/harness/sensors/scripts/diff-helper.mjs merge-plan <existing> <incoming>`；没有可配对文件时，优先用 `dayu-harness generate --target <project-root> --json` 或 `dayu-harness merge --target <project-root> --json` 生成预览，CLI 不可用时改为人工复核，之后确认
+6. 执行 `docs/harness/sensors/scripts/validate.mjs` 验证（如可用）
 
 ### 删除约束
 
@@ -111,7 +111,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 ### 自动诊断
 
-优先执行 `docs/harness/sensors/scripts/audit.sh`（如存在）。若不可用，AI 按以下检查清单手动逐项执行。
+优先执行 `docs/harness/sensors/scripts/audit.mjs`（如存在）。若不可用，AI 按以下检查清单手动逐项执行。
 
 ### 检查清单
 
@@ -169,7 +169,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 | capability | 约束 | 实施方式 | 联动组件 | 适用条件 |
 |---|------|---------|---------|---------|
-| `quality.practices` | 开发环境纪律 | 文档指引 + validate.sh | — | 含代码项目 |
+| `quality.practices` | 开发环境纪律 | 文档指引 + validate.mjs | — | 含代码项目 |
 | `ai.execution` | AI 执行风格 | 文档约定 | — | 默认启用 |
 | `ai.memory` | AI 记忆边界 | 文档约定 | — | 默认启用 |
 
@@ -198,16 +198,16 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 | `project.gitignore` | .gitignore installer | 从 `github/gitignore` 快照按项目内容选择 Node/Python/Go/Rust/Java/Dotnet 等模板，并追加 Dayu 本地排除段 |
 | `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | 仅 GitHub 项目；依赖 `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`；使用 `GITHUB_TOKEN` 与 workflow permissions |
 | 固定格式内容 | `dayu-format.mjs` | 确定性生成 PR body、Issue body 和 commit message；配合 GitHub CLI、commitlint、PR/Issue validators 使用 |
-| 诊断 | audit.sh + check-consistency.sh + validate.sh | 文档完整性与部署后状态自动检查 |
+| 诊断 | audit.mjs + check-consistency.mjs + validate.mjs | 文档完整性与部署后状态自动检查 |
 
 > 默认纯文档能力（如 `ai.execution`、`ai.memory`、知识库目录）由 `default=true` manifest 强制部署，不通过用户问答决定；可选能力仍由 manifest 控制。
 
 ## 兼容化处理参考
 
-当需要修改已有配置时，按以下流程操作（本流程可由 AI 手动执行，也可由 `diff-helper.sh` 辅助）：
+当需要修改已有配置时，按以下流程操作（本流程可由 AI 手动执行，也可由 `diff-helper.mjs` 辅助）：
 
 1. **检测**：检查目标位置是否已有对应配置（如 `.husky/commit-msg`、`commitlint.config.cjs`）
-2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）优先用 `dayu-harness merge --target <project-root> --json` 获取融合预览，或用 `dayu-harness generate --target <project-root> --json` 获取待写内容预览；若有现有文件与目标文件对，可补充 `diff-helper.sh merge-plan <existing> <incoming>`，否则继续基于 CLI 预览或人工复核
+2. **差异分析**：按联动组件逐项判断：有 installer-backed 组件（如 husky snippet、`.gitignore`）先用对应 `--check` 获取结构化 merge plan；无 installer 的静态模板/资产组件（如 `commitlint.config.cjs`、`eslint.config.cjs`、`.prettierrc`、`.lintstagedrc.json`、GitHub workflow、ruleset JSON）优先用 `dayu-harness merge --target <project-root> --json` 获取融合预览，或用 `dayu-harness generate --target <project-root> --json` 获取待写内容预览；若有现有文件与目标文件对，可补充 `diff-helper.mjs merge-plan <existing> <incoming>`，否则继续基于 CLI 预览或人工复核
 3. **生成变更描述**：用自然语言描述变更内容，例如「你的项目已有 commit-msg hook，包含 Conventional Commits 校验。新增内容与现有规则并存，不影响既有行为」
 4. **用户确认**：只对已有配置的处理策略提供 [1] 保留现有 [2] 替换 [3] 合并 [4] 跳过 四个选项；默认能力本身不提供跳过选项
 5. **执行**：按用户选择处理
@@ -221,7 +221,7 @@ docs/子目录/AGENTS.md   → 子目录级索引：本目录职责 + 文件列�
 
 提问前必须先分析项目现状：
 
-1. 首先执行 `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"`，确认环境依赖与初始化状态；未确定可选能力时不传 `--capabilities`，按默认必选能力检查
+1. 首先执行 `dayu-harness environment <project-root> --check --capabilities "<resolved capability ids>"`，确认环境依赖与初始化状态；未确定可选能力时不传 `--capabilities`，按默认必选能力检查
 2. 检查是否存在 `CLAUDE.md`、`AGENTS.md`、`docs/` 目录
 3. 检查 `.husky/`、`commitlint.config.cjs`、`.github/workflows/` 等已有配置
 4. 基于检测结果适配提问——默认能力不问「是否启用」；已有配置只问「检测到已有 X，是否保留/增强/跳过」

@@ -1,6 +1,6 @@
 # 计划：构建渐进式披露的 AI 管理和约束文档体系
 
-> 当前说明：本文保留早期设计追溯和历史语境，不再承担当前进度看板职责。Phase 1b-1e 的实际落地状态、验证结果和后续计划见 [phase1-progress.md](phase1-progress.md)。
+> 当前说明：本文保留早期设计追溯和历史语境，不再承担当前进度看板职责。文中的 Bash 脚本、测试目录和旧路径均为历史方案描述；当前实现以 `src/` 内 TypeScript CLI、`capabilities/*.json`、模板 `.mjs` 传感器和 [phase1-progress.md](phase1-progress.md) 为准。
 
 ## Context
 

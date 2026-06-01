@@ -19,7 +19,7 @@ PR body 属于固定格式内容。AI 不应自由生成整段 Markdown；应先
 docs/harness/sensors/scripts/dayu-format.mjs pr-body \
   --summary "用户可读的变更摘要" \
   --implementation "关键实现说明" \
-  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --test-command "docs/harness/sensors/scripts/validate.mjs --json ." \
   --issue 123 \
   --final yes > /tmp/pr-body.md
 

@@ -2,7 +2,7 @@
 
 本文记录 Phase 1b 的 schema 与配置契约。它服务 Skill 维护者，不属于部署到目标项目的治理产物。
 
-Phase 1b 的目标不是替换 `scripts/scaffold.sh`，而是先把能力清单、配置文件、i18n 文案和路径安全规则固化为可测试的 TypeScript/Zod 契约，给 Phase 1c/1d/1e 的 CLI 实现提供稳定输入。
+Phase 1b 的目标是先把能力清单、配置文件、i18n 文案和路径安全规则固化为 TypeScript/Zod 契约，给 Phase 1c/1d/1e 以及后续 CLI 实现提供稳定输入。历史上它没有立即替换 Bash 脚手架；当前 CLI 已收缩为 `src/` 内 TypeScript 实现。
 
 ## 范围
 
@@ -35,7 +35,7 @@ Phase 1b 只迁移 4 个试点 manifest：
 | `i18n` | 文案 key 声明，要求 locale catalog 有对应条目。 |
 | `rse` | Rule-Sensor-Enforcer 链路描述，说明能力由规则、传感器和执行器中的哪些部分组成。 |
 
-迁移期要求：旧 `dependencies` 字段必须继续保留，并且与 `deployment_deps` 完全一致。原因是 legacy `scripts/scaffold.sh` 兼容入口仍会读取 `dependencies`；Phase 2 本地部署主路径读取 `deployment_deps`。
+当前要求：旧 `dependencies` 字段必须继续保留，并且与 `deployment_deps` 完全一致。它作为历史兼容字段和人工审阅线索存在；当前 TypeScript CLI 主路径读取 `deployment_deps`。
 
 ## RSE 约束
 
@@ -73,8 +73,8 @@ Phase 1b 引入 key-based i18n catalog，用于把能力说明、错误信息和
 
 当前边界：
 
-- legacy Bash `scaffold.sh` 仍主要依赖 `templates/` 与 `templates.en/` 双模板树。
-- `{{dayu:key}}` token 属于 schema/token 契约，尚未接入完整 Bash 渲染。
+- 当前 TypeScript CLI 仍主要依赖 `templates/` 与 `templates.en/` 双模板树。
+- `{{dayu:key}}` token 属于 schema/token 契约，尚未接入完整渲染。
 - Phase 1d/1e TypeScript CLI 继续保留双模板树语义，避免一次迁移过多行为。
 
 ## 路径安全
@@ -91,7 +91,7 @@ Phase 1b 引入 key-based i18n catalog，用于把能力说明、错误信息和
 
 ## 验证
 
-Phase 1b 入口测试位于 [tests/unit/phase1b-schema.test.ts](../tests/unit/phase1b-schema.test.ts)，覆盖：
+历史 Phase 1b 入口测试已归档到 `archive/tests/`。当时覆盖：
 
 - 试点能力 manifest v2 校验。
 - 缺少 `schemaVersion` 时的可读错误路径。
@@ -101,10 +101,9 @@ Phase 1b 入口测试位于 [tests/unit/phase1b-schema.test.ts](../tests/unit/ph
 - `dayu.config.yaml` 解析和未知能力报告。
 - locale catalog key 覆盖和占位符格式。
 
-运行：
+当前不执行也不新增测试。修改 manifest v2 字段、`dayu.config.yaml`、locale key、路径校验或能力列表后，至少执行非测试验证：
 
 ```bash
-npm run test:phase1b -- --test-reporter=spec
+npm run lint
+npm run build
 ```
-
-如果修改 manifest v2 字段、`dayu.config.yaml`、locale key、路径校验或试点能力列表，必须先更新本测试，再继续改 CLI 或脚手架逻辑。

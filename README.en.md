@@ -222,7 +222,7 @@ These tools can be combined. Dayu Harness focuses on the project’s own long-li
 
 Dayu Harness uses Chinese as the source language and provides mirrored English documentation and English deployment templates. When running `/dayu-harness`, key questions and options are shown in Chinese and English; deployment writes one language into the target project, defaults to Chinese, and writes English content only when explicitly selected.
 
-It stays neutral across coding assistants: the long-lived target-project assets are Markdown, Shell hooks, YAML workflows, and common configuration files. After the tool is removed, project rules remain in the repository.
+It stays neutral across coding assistants: the long-lived target-project assets are Markdown, Node hooks, YAML workflows, and common configuration files. After the tool is removed, project rules remain in the repository.
 
 ## 📁 Project Structure
 
@@ -231,9 +231,9 @@ The README only shows a high-level structure; the full directory tree and mainte
 - Entry points and descriptions: `README.md`, `README.en.md`, `AGENTS.md`, `SKILL.md`
 - CLI and config: `src/`, `package.json`, `tsconfig.json`
 - Deployment materials: `templates/`, `templates.en/`, `assets/`, `locales/`
-- Governance list and scripts: `capabilities/`, `scripts/`
+- Governance list and TypeScript CLI: `capabilities/`, `src/`
 - Usage and maintenance docs: `docs/`, `references/`
-- Tests and fixtures: `tests/`
+- Archived tests and fixtures: `archive/tests/`
 
 ## 📚 More Docs
 

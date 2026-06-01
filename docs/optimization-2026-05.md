@@ -3,7 +3,7 @@
 > **日期**: 2026-05-13
 > **实施状态**: 已完成
 
-> 范围说明：本文是 2026-05 优化记录，不是当前部署清单；是否部署以 `capabilities/*.json` 和 installer 行为为准。
+> 范围说明：本文是 2026-05 优化记录，不是当前部署清单；是否部署以 `capabilities/*.json` 和 `src/` 内 TypeScript installer 行为为准。文中的 Bash 脚本、fixture 和测试入口属于历史语境。
 
 ## 用户确认的决策
 
@@ -150,7 +150,7 @@
 
 ## 验证方式
 
-1. **单元测试**：`tests/unit/` 下 bats 测试确保 audit.sh / diff-helper.sh 行为不变
-2. **fixture 测试**：对 5 个 fixture 项目分别 dry-run 验证
-3. **端到端**：空项目 scaffold.sh --apply，验证 issue 引用拦截与 AI 署名剥离。`CJK` 拦截为该阶段历史行为，当前已退役。
+1. **历史单元测试**：当时使用 `tests/unit/` 下 bats 测试确保 audit / diff-helper 行为不变。
+2. **历史 fixture 测试**：当时对 5 个 fixture 项目分别 dry-run 验证。
+3. **历史端到端**：当时使用空项目脚手架 apply，验证 issue 引用拦截与 AI 署名剥离。`CJK` 拦截为该阶段历史行为，当前已退役。
 4. **渐进式披露验证**：确认 AI 读取 AGENTS.md 后对不同任务只加载对应文档子集

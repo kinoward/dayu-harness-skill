@@ -2,7 +2,7 @@
 
 本文记录 Phase 1e 对 Phase 1 CLI 的最终公开契约。CEO Plan 早期条目曾把 `merge` 和 `generate` 放入 Phase 1，但最终关卡决议将 Phase 1 收敛为 4 个公开命令，并把完整融合和独立生成能力推迟到 Phase 2。
 
-Phase 2 后，当前 CLI 已扩展为 8 个公开命令，并迁移当前仓库全部 20 个 manifest。本文件保留 Phase 1e 收口决议；当前产品入口见 [phase2-product.md](phase2-product.md)。
+Phase 2 后，当前 CLI 已扩展为 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`、`finalize`、`environment`、`i18n-drift` 和 `sensor`，并迁移当前仓库全部 20 个 manifest。本文件保留 Phase 1e 收口决议；当前产品入口见 [phase2-product.md](phase2-product.md)。
 
 ## 目标
 
@@ -29,17 +29,18 @@ Phase 2 后，当前 CLI 已扩展为 8 个公开命令，并迁移当前仓库�
 
 ## 验证
 
-Phase 1e 入口测试位于 [tests/unit/phase1e-cli-scope.test.ts](../tests/unit/phase1e-cli-scope.test.ts)，并在 Phase 2 后继续承担 CLI 公开面回归，覆盖：
+历史 Phase 1e 入口测试已归档到 `archive/tests/`。当时覆盖：
 
-- Phase 2 public CLI 展示 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`。
+- Phase 2 public CLI 展示 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate` 等公开命令。
 - `init` 默认 dry-run，`init --apply` 才写入。
 - `apply --only git.commit-format` 部署 `core`、`git.hooks` 和 `git.commit-format`，不部署 `ai.execution`。
 - `diagnose` JSON 输出包含 capability RSE summary。
 - husky installer 的原子写入保留既有 hook symlink 和文件模式。
 - 原子写入失败时清理临时文件。
 
-运行：
+当前不执行也不新增测试。修改公开 CLI 面后，至少执行非测试验证：
 
 ```bash
-npm run test:phase1e -- --test-reporter=spec
+npm run lint
+npm run build
 ```

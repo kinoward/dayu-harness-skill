@@ -27,9 +27,9 @@
 
 ## 机械化检查
 
-- 文档治理完整性诊断：`docs/harness/sensors/scripts/audit.sh`
-- 变更后状态校验：`docs/harness/sensors/scripts/validate.sh`
-- AGENTS 索引一致性检查：`docs/harness/sensors/scripts/check-consistency.sh`
+- 文档治理完整性诊断：`docs/harness/sensors/scripts/audit.mjs`
+- 变更后状态校验：`docs/harness/sensors/scripts/validate.mjs`
+- AGENTS 索引一致性检查：`docs/harness/sensors/scripts/check-consistency.mjs`
 
 ## 使用顺序
 

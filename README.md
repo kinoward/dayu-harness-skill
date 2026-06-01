@@ -222,7 +222,7 @@ Dayu Harness 借鉴了 gstack、Spec Kit 和 OpenSpec 等项目的思路，但�
 
 Dayu Harness 以中文为源语言，并提供英文镜像文档和英文部署模板。运行 `/dayu-harness` 时，关键问题和选项会中英双语展示；部署到目标项目时只写入一种语言，默认中文，明确选择英文时写入英文内容。
 
-它面向多种编码助手保持中立：目标项目里的长期资产是 Markdown、Shell hooks、YAML workflow 和常见配置文件。工具移除后，项目规则仍保留在仓库中。
+它面向多种编码助手保持中立：目标项目里的长期资产是 Markdown、Node hook、YAML workflow 和常见配置文件。工具移除后，项目规则仍保留在仓库中。
 
 ## 📁 项目结构
 
@@ -231,9 +231,9 @@ README 只展示高层结构；完整目录树和维护规则见 [AGENTS.md](AGE
 - 入口与说明：`README.md`、`README.en.md`、`AGENTS.md`、`SKILL.md`
 - CLI 与配置：`src/`、`package.json`、`tsconfig.json`
 - 部署素材：`templates/`、`templates.en/`、`assets/`、`locales/`
-- 能力清单与脚本：`capabilities/`、`scripts/`
+- 能力清单与 TypeScript CLI：`capabilities/`、`src/`
 - 使用与维护文档：`docs/`、`references/`
-- 测试与 fixture：`tests/`
+- 归档测试与 fixture：`archive/tests/`
 
 ## 📚 更多文档
 

@@ -19,7 +19,7 @@ PR bodies are fixed-format content. AI should not freely compose the full Markdo
 docs/harness/sensors/scripts/dayu-format.mjs pr-body \
   --summary "Readable change summary" \
   --implementation "Key implementation note" \
-  --test-command "docs/harness/sensors/scripts/validate.sh --json ." \
+  --test-command "docs/harness/sensors/scripts/validate.mjs --json ." \
   --issue 123 \
   --final yes > /tmp/pr-body.md
 

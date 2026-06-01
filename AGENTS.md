@@ -8,19 +8,20 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [SKILL.md](SKILL.md) - Skill 行为定义
 - [README.md](README.md) - 使用者阅读概述与安装指南
 - [README.en.md](README.en.md) - 英文镜像说明文档
-- [.gitignore](.gitignore) - 本仓库临时测试产物忽略规则
-- [.tmp/](.tmp/) - 仓库内测试临时目录占位与运行时缓存承载
+- [.gitignore](.gitignore) - 本仓库临时产物和归档测试缓存忽略规则
+- [.tmp/](.tmp/) - 仓库内运行时缓存承载
 - [package.json](package.json) - 本地 TypeScript schema 与验证工具链入口
 - [package-lock.json](package-lock.json) - Node 依赖锁定文件
-- [tsconfig.json](tsconfig.json) - TypeScript 编译与测试配置
+- [tsconfig.json](tsconfig.json) - TypeScript 编译配置
 - [tsconfig.build.json](tsconfig.build.json) - npm 发布构建用 TypeScript 配置
-- [.github/workflows/ci.yml](.github/workflows/ci.yml) - CLI lint、测试和构建 CI
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) - CLI 类型检查、i18n 漂移检查和构建 CI
 - [.github/workflows/release-please.yml](.github/workflows/release-please.yml) - npm 发布版本 PR 自动化
 - [.github/workflows/npm-publish.yml](.github/workflows/npm-publish.yml) - GitHub Release 触发的 npm provenance 发布工作流
 - [.github/workflows/update-contributors.yml](.github/workflows/update-contributors.yml) - README 动态区块自动更新工作流
 - [Q&A-TEMPLATE.md](Q&A-TEMPLATE.md) - 初始化与融合问答参考
 - [LICENSE](LICENSE) - MIT 许可文件
-- [src/](src/) - TypeScript schema、架构契约、Phase 2 CLI 部署引擎与本地验证源码
+- [src/](src/) - TypeScript schema、架构契约、CLI 部署引擎、installer、sensor、远端和环境检查源码
+- [src/maintenance/update-readme-contributors.ts](src/maintenance/update-readme-contributors.ts) - README 贡献者与 Star 数量更新入口
 - [locales/](locales/) - key-based i18n 文案 catalog
 - [agents/](agents/) - Codex UI 与触发策略元数据
 - [references/agent-compatibility.md](references/agent-compatibility.md) - 跨 Agent 兼容说明
@@ -29,9 +30,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [templates.en/](templates.en/) - 英文部署模板镜像树
 - [assets/](assets/) - README 展示资产，以及按能力部署的 hook、CI、配置资产
 - [marketing/](marketing/) - 独立对外传播物料，不参与 Skill 功能或部署产物
-- [scripts/](scripts/) - Skill 内部环境前置、初始化与安装脚本
-- [scripts/check-i18n-drift.sh](scripts/check-i18n-drift.sh) - README 与部署模板镜像漂移检查
-- [scripts/github-remote.sh](scripts/github-remote.sh) - GitHub 远端检查、创建/绑定、推送与远端能力验证脚本
+- [archive/tests/](archive/tests/) - 已归档的历史测试、fixture 和 smoke 资料；当前不作为执行入口
 - [docs/AGENTS.md](docs/AGENTS.md) - Skill 自身文档入口
 - [docs/phase1b-schema.md](docs/phase1b-schema.md) - Phase 1b schema、manifest v2、config、i18n 和路径安全契约
 - [docs/phase1c-architecture.md](docs/phase1c-architecture.md) - Phase 1c CLI 命令树、依赖图和三层分离架构契约
@@ -42,12 +41,7 @@ Skill 自身入口。本 Skill 帮助项目建立以 AGENTS.md 为根的渐进�
 - [docs/phase2-product.md](docs/phase2-product.md) - Phase 2 CLI 状态机、目标目录树和产品化口径
 - [docs/phase1d-cli.md](docs/phase1d-cli.md) - Phase 1d TypeScript CLI 垂直切片命令语义、边界和验证方式
 - [docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md) - Phase 1e CLI 公开范围收口、init/apply 行为和验证方式
-- [docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md) - `scaffold.sh` 内部逻辑 spike 与 TypeScript port 风险记录
-- [tests/](tests/) - Skill 自身测试和 fixture 项目
-- [tests/README.md](tests/README.md) - Skill 自身执行测试基线
-- [tests/unit/phase2-cli.test.ts](tests/unit/phase2-cli.test.ts) - Phase 2 全量 manifest、apply、status、repair 和 orphan 清理测试
-- [tests/unit/governance-deterministic.test.ts](tests/unit/governance-deterministic.test.ts) - dayu-format、Git hooks、GitHub validators、release policy 和 ruleset contract 确定性治理测试
-- [tests/smoke/dayu-harness-profile.sh](tests/smoke/dayu-harness-profile.sh) - local-fast / remote-smoke / remote-release 分层测试入口
+- [docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md) - 历史 `scaffold.sh` 行为 spike 与 TypeScript port 风险记录
 
 目录索引变化时，必须同步更新本区块。README 面向使用者，不维护完整仓库目录树；如目录变化影响使用方式或对外说明，再同步更新 [README.md](README.md) 的简版介绍。
 
@@ -76,11 +70,11 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 
 3. **能力清单是单一事实源**
 
-   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为可测试 schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，供 legacy `scaffold.sh` 兼容使用。Phase 2 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。当前 `/dayu-harness` 本地部署、融合、生成、修复、诊断和验证应以该 CLI 为主执行层。
+   `capabilities/*.json` 定义能力 ID、依赖、模板、资产、installer、安全策略和验收标准。Phase 1b 先将试点能力的 manifest v2、`dayu.config.yaml`、i18n 和路径安全契约固化为 TypeScript schema；Phase 2 已将当前 20 个 manifest 全部迁移到 v2 字段：`schemaVersion`、`kind`、`deployment_deps`、`conceptual_deps`、`i18n` 和 `rse`。旧 `dependencies` 字段必须继续保留，并与 `deployment_deps` 保持一致，作为兼容字段和人工审阅线索。当前 CLI 动态加载全量 manifest，公开 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`、`finalize`、`environment`、`i18n-drift` 和 `sensor`，并支持 journal、lock、`--force`、orphan 清理和 npm 构建发布链路。当前 `/dayu-harness` 本地部署、融合、生成、修复、诊断、验证和收尾应以 `src/` 内 TypeScript CLI 为主执行层。
 
 4. **机械化检查优先于文字承诺**
 
-   文档可以描述规则，但 `validate.sh`、`audit.sh`、`check-consistency.sh`、Git hooks 和 CI 才负责持续反馈。
+   文档可以描述规则，但 TypeScript CLI、目标项目内的 `validate.mjs`、`audit.mjs`、`check-consistency.mjs`、Git hooks 和 CI 才负责持续反馈。
 
 5. **已有配置默认不覆盖**
 
@@ -121,7 +115,7 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 读取目标项目
 -> 解析已有 AGENTS.md、docs、hooks、CI 和配置
 -> 解析默认能力与可选能力
--> 执行 scripts/ensure-environment.sh 前置检查
+-> 执行 dayu-harness environment 前置检查
 -> 展示 dry-run 或 merge plan
 -> 按用户确认应用变更
 -> 运行 validate / audit / check-consistency
@@ -131,8 +125,8 @@ Dayu Harness：人类把约束写入仓库 -> Agent 读取地图 -> 脚本检查
 前置检查命令：
 
 ```bash
-scripts/ensure-environment.sh <project-root> --check
-scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"
+dayu-harness environment <project-root> --check --json
+dayu-harness environment <project-root> --check --capabilities "<resolved capability ids>" --json
 ```
 
 常见状态：
@@ -157,12 +151,16 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 | `dayu-harness merge --target <project-root> --json` | 对已有项目预览能力级 keep/replace/skip 融合方案。 |
 | `dayu-harness generate --target <project-root> --json` | 渲染托管内容预览，不写入目标项目。 |
 | `dayu-harness repair <capability> --target <project-root> --json` | 修复单个能力或当前部署计划的漂移。 |
-| `scripts/scaffold.sh ...` | legacy 兼容与远端 E2E 辅助入口；本地部署默认使用 Phase 2 CLI。 |
-| `docs/harness/sensors/scripts/validate.sh --json <project-root>` | 在目标项目中检查启用的 hooks、配置和工作流。 |
-| `docs/harness/sensors/scripts/audit.sh --json <project-root>` | 检查入口文件、文档索引和治理结构完整性。 |
-| `docs/harness/sensors/scripts/check-consistency.sh --json <project-root>` | 检查文档链接、索引同步和孤儿文档。 |
+| `dayu-harness environment <project-root> --check --json` | 检查本地工具链、Git、npm 和能力依赖状态。 |
+| `dayu-harness i18n-drift --json` | 检查 README 与部署模板镜像漂移。 |
+| `dayu-harness sensor validate --json <project-root>` | 在目标项目中检查启用的 hooks、配置和工作流。 |
+| `dayu-harness sensor audit --json <project-root>` | 检查入口文件、文档索引和治理结构完整性。 |
+| `dayu-harness sensor check-consistency --json <project-root>` | 检查文档链接、索引同步和孤儿文档。 |
+| `docs/harness/sensors/scripts/validate.mjs --json <project-root>` | 目标项目内的验证传感器入口。 |
+| `docs/harness/sensors/scripts/audit.mjs --json <project-root>` | 目标项目内的完整性诊断传感器入口。 |
+| `docs/harness/sensors/scripts/check-consistency.mjs --json <project-root>` | 目标项目内的一致性检查传感器入口。 |
 | `docs/harness/sensors/scripts/dayu-format.mjs pr-body|issue-body|commit-message ...` | 确定性生成 PR、Issue、commit 等固定格式内容。 |
-| `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>` | 为已有文件和即将写入文件生成结构化合并建议。 |
+| `docs/harness/sensors/scripts/diff-helper.mjs merge-plan <existing> <incoming>` | 为已有文件和即将写入文件生成结构化合并建议。 |
 
 ## 目标项目产物
 
@@ -194,11 +192,11 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 │   │       ├── AGENTS.md
 │   │       ├── scripts/
 │   │       │   ├── AGENTS.md
-│   │       │   ├── audit.sh
-│   │       │   ├── check-consistency.sh
+│   │       │   ├── audit.mjs
+│   │       │   ├── check-consistency.mjs
 │   │       │   ├── dayu-format.mjs
-│   │       │   ├── diff-helper.sh
-│   │       │   └── validate.sh
+│   │       │   ├── diff-helper.mjs
+│   │       │   └── validate.mjs
 │   │       └── reviews/
 │   │           ├── AGENTS.md
 │   │           └── code-review-checklist.md  # 可选：github.pr
@@ -254,18 +252,18 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 ## 依赖兼容
 
-- 核心依赖由 `scripts/ensure-environment.sh` 检查。
-- 文档与脚本依赖 `jq`、`git`、`node`、`npm`、`npx`，以及能力相关的 GitHub/Node 工具链。
+- 核心依赖由 `dayu-harness environment` 检查，具体实现位于 `src/cli/environment.ts`。
+- 文档与传感器依赖 `git`、`node`、`npm`、`npx`，以及能力相关的 GitHub/Node 工具链。
 - GitHub 能力需要 `gh` 登录与认证上下文。
-- 目标项目的运行与安装不依赖 `bats`；`bats` 只服务本仓库维护者测试。
+- 历史测试代码已归档到 `archive/tests/`，当前不作为安装、运行或维护验证入口。
 - Claude、Codex 和通用 Agent Skills 客户端的兼容说明见 [references/agent-compatibility.md](references/agent-compatibility.md)。
 
 ## 运行边界
 
 - 运行时检索系统、向量库、上下文缓存或外部智能体记忆可以提升效率，但不能替代仓库内可审查的治理事实。
 - 外部知识有价值时，应整理成决策、排障、研究、项目上下文或约束文档后回写项目，并同步对应 `AGENTS.md` 索引。
-- README 面向使用者，只保留安装、使用方式和基本解释；项目内部规则、能力 ID、测试流程和维护说明放在 AGENTS 体系内。
-- 英文镜像文档只能翻译中文源文档的文本语义，不得重排原有 Markdown/HTML 格式结构；标题层级、列表层级、表格、引用、代码块、链接行、动态区块和目录树展示需与中文源保持同版式，并用 `scripts/check-i18n-drift.sh --json` 检查。
+- README 面向使用者，只保留安装、使用方式和基本解释；项目内部规则、能力 ID、归档测试状态和维护说明放在 AGENTS 体系内。
+- 英文镜像文档只能翻译中文源文档的文本语义，不得重排原有 Markdown/HTML 格式结构；标题层级、列表层级、表格、引用、代码块、链接行、动态区块和目录树展示需与中文源保持同版式，并用 `dayu-harness i18n-drift --json` 或 `npm run i18n:check` 检查。
 - Skill 运行时的提问和选项必须中英双语展示，中文在前、英文在后；默认项、确认、取消、跳过、保留、替换、合并等选择都要写成 `中文 / English`，避免英文用户无法判断选项含义。
 
 ## 理解 Skill
@@ -286,10 +284,10 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 - Phase 1c 架构契约：[docs/phase1c-architecture.md](docs/phase1c-architecture.md)
 - Phase 1d CLI 垂直切片：[docs/phase1d-cli.md](docs/phase1d-cli.md)
 - Phase 1e CLI 公开范围：[docs/phase1e-cli-scope.md](docs/phase1e-cli-scope.md)
-- scaffold.sh 内部逻辑 spike：[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)
+- 历史 scaffold.sh 行为 spike：[docs/scaffold-sh-spike.md](docs/scaffold-sh-spike.md)
 - Q&A 参考模板：[Q&A-TEMPLATE.md](Q&A-TEMPLATE.md)
 - 执行完成报告模板：[docs/completion-report-template.md](docs/completion-report-template.md)
-- README 贡献者与 Star 数量更新脚本：[scripts/update-readme-contributors.mjs](scripts/update-readme-contributors.mjs)
+- README 贡献者与 Star 数量更新入口：[src/maintenance/update-readme-contributors.ts](src/maintenance/update-readme-contributors.ts)
 
 ## Skill 产物
 
@@ -297,31 +295,23 @@ scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved c
 
 - 中文文档模板：[templates/](templates/)
 - 英文模板镜像：[templates.en/](templates.en/)
-- 脚本与配置资产：[assets/](assets/)
-- 内部环境前置、初始化与安装脚本：[scripts/](scripts/)
+- hook、CI 与配置资产：[assets/](assets/)
+- CLI、installer、sensor、远端和环境检查实现：[src/](src/)
 - Skill 自身文档：[docs/AGENTS.md](docs/AGENTS.md)
 
-## 测试
+## 归档测试与验证
 
-> 触发时机：修改 Skill 后需要验证时读取
+> 触发时机：理解历史测试资料或修改 Skill 后需要非测试验证时读取
 
-- 测试目录：[tests/](tests/)
-- 执行测试基线：[tests/README.md](tests/README.md)
+- 历史测试、fixture 和 smoke 资料已归档到 [archive/tests/](archive/tests/)，当前不执行、不新增，也不作为 CI 或维护入口。
+- 当前维护验证只使用非测试命令，确认 TypeScript 编译、发布构建和镜像漂移检查没有破坏。
 
-维护本 Skill 后，建议按以下顺序执行：
+维护本 Skill 后，可按以下顺序执行非测试验证：
 
 ```bash
-npm run test:phase1b -- --test-reporter=spec
-npm run test:phase1c -- --test-reporter=spec
-npm run test:phase1d -- --test-reporter=spec
-npm run test:phase1e -- --test-reporter=spec
-npm run test:unit -- --test-reporter=spec
-npm run test:governance
-npx tsc --noEmit
-bats tests/unit/test-architecture-contracts.bats
-bats tests/unit/test-audit.bats
-bats tests/unit/test-skill-interaction-e2e.bats
-bats tests/unit
+npm run lint
+npm run i18n:check
+npm run build
 ```
 
 验证重点：

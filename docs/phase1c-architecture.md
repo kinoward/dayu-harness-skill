@@ -2,7 +2,7 @@
 
 本文把 CEO Plan 中的 Phase 1c 落成可执行契约，供 Phase 1d/1e TypeScript CLI 垂直切片直接引用。Phase 1c 不实现完整 CLI 写入流程；它先固定命令树、依赖图和三层边界，避免执行层重新解释架构。Phase 1e 按最终关卡决议将公开命令收敛为 4 个。
 
-Phase 2 后，当前 CLI 已扩展为 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`，全量 20 个 manifest 均已迁移到 v2 字段。本文件保留 Phase 1 架构契约和历史边界；当前产品入口见 [phase2-product.md](phase2-product.md)。
+Phase 2 后，当前 CLI 已扩展为 `init`、`apply`、`merge`、`generate`、`repair`、`status`、`diagnose`、`validate`、`finalize`、`environment`、`i18n-drift` 和 `sensor`，全量 20 个 manifest 均已迁移到 v2 字段。本文件保留 Phase 1 架构契约和历史边界；当前产品入口见 [phase2-product.md](phase2-product.md)。
 
 ## 目标
 
@@ -14,7 +14,7 @@ Phase 2 后，当前 CLI 已扩展为 `init`、`apply`、`merge`、`generate`、
 ## 非目标
 
 - 不提供 `npx dayu-harness` 的最终可执行入口。
-- 不重写 `scripts/scaffold.sh`。
+- 不在 Phase 1c 重写历史 Bash 脚手架。
 - 不批量迁移全部 legacy manifest 到 v2。
 - 不改变现有脚手架的 `dependencies` 兼容语义。
 - 不实现 `--force` 覆盖、孤儿文件清理、事务回滚或 `repair`。
@@ -49,7 +49,7 @@ Phase 1c 明确两类依赖：
 - 缺失部署依赖和环依赖是 fatal error。
 - 当多个能力的依赖都已满足时，排序按 `infra`、`hard`、`soft` 的能力类型优先级执行，同类型再按能力 ID 字典序排序，保证 dry-run/apply 输出不依赖文件系统读取顺序。
 - 概念依赖可以影响展示顺序，但不得扩大部署闭包。
-- Phase 1 迁移期内，v2 试点 manifest 的旧 `dependencies` 必须继续镜像 `deployment_deps`，因为 legacy `scaffold.sh` 兼容入口仍读取 `dependencies`。
+- v2 manifest 的旧 `dependencies` 必须继续镜像 `deployment_deps`，作为历史兼容字段和人工审阅线索。
 
 Phase 1d 选定能力的部署 DAG：
 
@@ -84,7 +84,7 @@ Phase 1d 当时 4 个 v2 试点能力的 `conceptual_deps` 为空。Phase 2 已�
 
 - Frontend 不直接读取模板或写入 Product 文件，只生成/修改 `dayu.config.yaml` 并调用 CLI。
 - Tool 不依赖 Skill 会话状态；CLI 必须能在没有 Agent 客户端的环境中运行。
-- Product 不 import Skill 的 `src/`，不读取 `capabilities/`，不依赖 `templates/` 或 `assets/`。
+- Product 不 import Skill 的 `src/`，不读取 `capabilities/`，不依赖 `templates/` 或 `assets/`；目标项目内传感器入口只能依赖已安装的 CLI 或自身部署内容。
 - Tool 可以生成 Product，但 Product 的长期权威是目标项目内的 `AGENTS.md` 与 `docs/`。
 
 对应 TypeScript 契约位于 [src/architecture/layers.ts](../src/architecture/layers.ts)。
@@ -93,9 +93,9 @@ Phase 1d 当时 4 个 v2 试点能力的 `conceptual_deps` 为空。Phase 2 已�
 
 进入 Phase 1d 前应满足：
 
-- `phase1b-schema.test.ts` 继续通过，保证 manifest/config schema 契约未回退。
-- `phase1c-architecture.test.ts` 通过，保证命令树、依赖图和层级边界可被代码引用。
-- `scaffold.sh` spike 已记录现有 Bash 逻辑，TypeScript port 不重新猜测旧行为。
+- manifest/config schema 契约必须能通过 TypeScript 编译和构建引用。
+- 命令树、依赖图和层级边界必须能被代码引用。
+- 历史 `scaffold.sh` spike 已记录旧 Bash 逻辑，TypeScript port 不重新猜测旧行为。
 - Phase 1d 只面向 4 个 v2 试点能力读取 `ManifestV2Schema`；legacy manifest 全量迁移留到 Phase 2。
 - Phase 1e 公开 CLI 只暴露 4 个命令；`init` 默认 dry-run，`apply --only` 可部署单能力闭包。
-- Phase 2 已完成全量 20 个 manifest v2 迁移，并在保留上述命令语义的基础上公开 `merge`、`generate`、`repair`、`status`。
+- Phase 2 已完成全量 20 个 manifest v2 迁移，并在保留上述命令语义的基础上公开 `merge`、`generate`、`repair`、`status`、`finalize`、`environment`、`i18n-drift` 和 `sensor`。

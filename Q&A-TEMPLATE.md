@@ -6,7 +6,7 @@
 
 - 项目已有 `commitlint.config.cjs` → 不直接问「是否启用提交校验」，而是确认「检测到已有 commitlint，是否保留/增强/跳过」
 - 项目已有 `docs/` 但结构不同 → 进入融合模式，逐项确认
-- 项目已有 `.husky/`、`.github/workflows/`、ESLint/Prettier/lint-staged 等配置 → 先按能力清单的联动组件逐项判断：有 manifest installer 的组件（如 husky snippet、`.gitignore`）先用 `bash "$SKILL_ROOT/scripts/<installer>" "$TARGET_ROOT" --check` 获取结构化 plan；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置、`.github/workflows/*.yml`、ruleset JSON）优先用 `$CLI merge --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 输出融合预览，或用 `$CLI generate --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 输出待写内容预览；若有现有文件与目标文件对可用，再补充 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/diff-helper.sh" merge-plan <existing> <incoming>`；否则按 CLI 预览输出人工审阅确认
+- 项目已有 `.husky/`、`.github/workflows/`、ESLint/Prettier/lint-staged 等配置 → 先按能力清单的联动组件逐项判断：有 manifest installer 的组件（如 husky snippet、`.gitignore`）使用 `$CLI merge --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 获取结构化 plan；静态模板/资产文件组件（如 `commitlint.config.cjs`、ESLint/Prettier/lint-staged 配置、`.github/workflows/*.yml`、ruleset JSON）优先用 `$CLI merge --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 输出融合预览，或用 `$CLI generate --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 输出待写内容预览；若有现有文件与目标文件对可用，再补充 `node "$TARGET_ROOT/docs/harness/sensors/scripts/diff-helper.mjs" merge-plan <existing> <incoming>`；否则按 CLI 预览输出人工审阅确认
 - `replace` 只能由用户显式选择；`merge` 只表示脚本能证明安全的确定性合并，否则返回 `manual_required`
 
 ## 双语提问总规则
@@ -56,13 +56,13 @@ Please choose the documentation language to deploy to the target project. Chines
 部署语言确认后，先完成本地初始化与项目基线检查：
 After confirming the documentation language, complete local initialization and baseline checks first:
 
-契约锚点是 `ensure-environment.sh --check`；实际执行必须使用 `SKILL_ROOT` 和 `TARGET_ROOT` 的显式路径：
-The contract anchor is `ensure-environment.sh --check`; the actual command must use explicit `SKILL_ROOT` and `TARGET_ROOT` paths:
+契约锚点是 `$CLI environment --check`；实际执行必须使用 `TARGET_ROOT` 的显式路径：
+The contract anchor is `$CLI environment --check`; the actual command must use the explicit `TARGET_ROOT` path:
 
 ```bash
-bash "$SKILL_ROOT/scripts/ensure-environment.sh" "$TARGET_ROOT" --check
+$CLI environment "$TARGET_ROOT" --check --json
 # 或在可选能力已确定后：
-bash "$SKILL_ROOT/scripts/ensure-environment.sh" "$TARGET_ROOT" --check --capabilities "<resolved capability ids>"
+$CLI environment "$TARGET_ROOT" --check --capabilities "<resolved capability ids>" --json
 ```
 
 - `status == "ok"`：继续问题收集与能力选配。
@@ -72,9 +72,9 @@ bash "$SKILL_ROOT/scripts/ensure-environment.sh" "$TARGET_ROOT" --check --capabi
 - New Git repositories must use `git init -b main`; older Git falls back to `git init && git branch -M main`. Existing repositories keep their current default branch, and that branch becomes the default for later GitHub workflows, rulesets, and documented commands.
 - 初始化时若缺少 `README.md`、`VERSION` 或 `CHANGELOG.md`，apply 阶段会补齐。空项目初始版本为 `0.1.0`；若空项目因 `npm init -y` 已临时生成 `package.json.version=1.0.0`，仍视为 npm 默认值并归一到 `0.1.0`；已有真实项目版本时以结构化问答确认版本源。
 - During initialization, missing `README.md`, `VERSION`, or `CHANGELOG.md` will be created during apply. Empty projects start at `0.1.0`; if an empty project temporarily has `package.json.version=1.0.0` from `npm init -y`, it is treated as the npm default and normalized back to `0.1.0`; real existing project versions require structured confirmation when sources disagree.
-- 需要 Node 生态治理工具链时，提示执行 `bash "$SKILL_ROOT/scripts/ensure-environment.sh" "$TARGET_ROOT" --apply` 统一完成 npm 初始化与版本归一化；不要引导用户裸跑 `npm init -y` 后直接继续 dry-run。若宿主流程已手动生成 package 或 package 缺 version，Skill 必须把空项目初始化版本写回 `0.1.0`。这一步由 Skill 根据治理工具链需要和项目内容判断，不询问用户“项目是否为 Node.js”。
+- 需要 Node 生态治理工具链时，提示执行 `$CLI environment "$TARGET_ROOT" --apply --json` 统一完成 npm 初始化与版本归一化；不要引导用户裸跑 `npm init -y` 后直接继续 dry-run。若宿主流程已手动生成 package 或 package 缺 version，Skill 必须把空项目初始化版本写回 `0.1.0`。这一步由 Skill 根据治理工具链需要和项目内容判断，不询问用户“项目是否为 Node.js”。
 - 说明：Node/npm/npx、`package.json`、`devDependencies` 仅用于安装/运行治理工具链（如 husky、commitlint、lint-staged），不是目标项目必须是 Node.js 应用的前提。
-- 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `scaffold` 或能力关联 installer 脚本。
+- 如果用户拒绝初始化，流程必须立刻终止，不应继续执行 `init/apply/finalize` 或能力关联 installer。
 
 需要用户确认环境处理时，选项必须双语：
 
@@ -115,9 +115,9 @@ Please choose the GitHub repository visibility.
 [2] 公开仓库 / Public repository
 ```
 
-3. 运行 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --check` 解析可连接账户、origin、`owner/repo` 与本地/远端分支关系，但不写入远端。
+3. 运行 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --github-remote skip --json` 或 `$CLI environment "$TARGET_ROOT" --check --json` 完成本地前置检查；远端写入统一由 `finalize --github-remote apply` 执行。
 4. 先完成能力问答与 CLI dry-run/merge plan；用户确认后运行 `$CLI init --target "$TARGET_ROOT" --apply --json` 或 `$CLI apply --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 完成本地部署。apply 成功后必须立即进入 `finalize`，不得把本地验证、提交、远端同步或 E2E 命令作为后续建议。
-5. CLI apply 不隐式创建提交、推送分支或修改 GitHub API；这些动作由 `finalize` 在 apply 通过后执行。`finalize` 必须先完成本地 `validate/audit/check-consistency`，再基于 `.dayu-harness/managed-paths.json` 精确 stage/commit；需要远端同步时继续调用 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply` 或对应 smoke profile：远端缺默认分支、远端相同或本地领先则推送默认分支（仅首次创建默认分支时放行本地 pre-push 保护），远端领先或分叉则推送 `dayu-harness/init-*` 初始化分支并创建 PR；全程禁止 force push。
+5. CLI apply 不隐式创建提交、推送分支或修改 GitHub API；这些动作由 `finalize` 在 apply 通过后执行。`finalize` 必须先完成本地 `validate/audit/check-consistency`，再基于 `.dayu-harness/managed-paths.json` 精确 stage/commit；需要远端同步时使用 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --github-remote apply --json`，由 TypeScript remote 模块创建或绑定远端、推送默认分支、同步 repo settings/workflow permissions/rulesets 并回读验证；全程禁止 force push。
 6. 远端写入完成后，`finalize` 必须回读 repo settings、workflow permissions、rulesets 与默认分支状态。启用 Issue/PR 能力时继续运行目标仓库 Issue -> PR E2E；启用 release-please 时默认运行 readiness 检查，只有用户明确授权真实发版验收时才运行真实 release 验证；验证后清理测试 Issue、测试 PR、测试分支和临时产物。
 
 默认治理能力不再作为「是否启用」问题出现。初始化时必须纳入，并在面向用户的确认汇总中使用这些自然语言名称：
@@ -243,8 +243,8 @@ How should protected-branch policy be reconciled with existing rules?
 是否立即启用 GitHub 仓库 PR 设置（PR 自动合并、合并后删除分支）？
 Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)?
 
-选择启用后，CLI 只部署本地策略文件；只有在用户明确进入远端同步流程并选择 apply 时，才调用 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply` 或等价 `gh api` 命令设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`。dry-run、check、verify 和本地 CLI apply 都不会隐式写入远端。
-After you choose Enable, the CLI only deploys local policy files; GitHub API writes happen only when the user explicitly enters the remote sync flow and chooses apply, via `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply` or an equivalent `gh api` command. dry-run, check, verify, and local CLI apply do not write remote settings implicitly.
+选择启用后，CLI 只部署本地策略文件；只有在用户明确进入远端同步流程并选择 apply 时，才通过 `$CLI finalize --github-remote apply` 设置 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`。dry-run、check、verify 和本地 CLI apply 都不会隐式写入远端。
+After you choose Enable, the CLI only deploys local policy files; GitHub API writes happen only when the user explicitly enters the remote sync flow and chooses apply via `$CLI finalize --github-remote apply`. dry-run, check, verify, and local CLI apply do not write remote settings implicitly.
 
 执行前必须已通过 `gh auth status`，且当前账号具备目标仓库 administration 权限。
 Before applying, `gh auth status` must pass and the current account must have administration permission on the target repository.
@@ -327,7 +327,7 @@ TDD checks only run on configured paths; if no paths are configured, no blocking
 
 | 维护者 capability id（运行时不展示） | 提问重点（价值） | 补充说明（技术实现） | 依赖/提示 |
 |---|---|---|---|
-| `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | CLI 部署仓库设置策略模板；只有用户明确进入远端同步 apply 流程时，才会通过 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply` 或等价 `gh api` 写入 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`，dry-run 和 skip 只预览/跳过。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
+| `github.repository-settings` | 是否立即启用 GitHub 仓库 PR 设置（自动合并、合并后删除分支）？<br>Do you want to enable GitHub repository PR settings now (auto-merge and delete branch on merge)? | CLI 部署仓库设置策略模板；只有用户明确进入远端同步 apply 流程时，才会通过 `$CLI finalize --github-remote apply` 写入 `allow_auto_merge=true` 与 `delete_branch_on_merge=true`，dry-run 和 skip 只预览/跳过。 | GitHub 项目；需要 `gh auth status` 通过和仓库 administration 权限 |
 | `github.pr` | 是否希望 PR 在创建或更新时就具备固定结构，减少低质量变更和协作噪音？<br>Do you want PRs to have a fixed structure when created or updated, reducing low-quality changes and collaboration noise? | 通过 GitHub 工作流实现 PR body 结构、signature、troubleshooting index 与 issue closing 位置校验；不限制提交/正文语言。 | GitHub 项目 |
 | `github.issue` | 是否需要 issue 依赖检查，支持 `Depends on: #N` 的顺序组织？<br>Do you need issue dependency checking with `Depends on: #N` ordering support? | 部署 issue lint workflow 与脚本。仅校验依赖顺序标记，不打标签、不评论、不做语言检查。 | GitHub 项目 |
 | `github.branch-protection` | 是否需要把分支保护前置为默认约束，降低误推风险？<br>Do you want branch protection to become a default constraint to reduce accidental pushes? | 通过实际默认分支 ruleset 与本地 pre-push branch snippet 实现；新仓库默认 `main`，已有仓库保留当前默认分支。 | GitHub 项目 |
@@ -386,14 +386,14 @@ Merge plan:
 
 ## 执行规则
 
-1. `bash "$SKILL_ROOT/scripts/ensure-environment.sh" "$TARGET_ROOT" --check --capabilities "<local/default capability ids>"`：先处理本地工具、Git 初始化、Node 初始化和 README/VERSION/CHANGELOG 基线；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行动作并等待用户确认；用户若拒绝则终止流程。
+1. `$CLI environment "$TARGET_ROOT" --check --capabilities "<local/default capability ids>" --json`：先处理本地工具、Git 初始化、Node 初始化和 README/VERSION/CHANGELOG 基线；若为 `needs_install`、`needs_initialization` 或 `needs_user_action`，先说明可执行动作并等待用户确认；用户若拒绝则终止流程。
 2. 用户选择 GitHub remote/sync 后，先运行 `gh auth status`；未登录则给出重试登录、暂不创建远端、跳过 GitHub 能力三类选项。
-3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，再运行 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --check` 解析远端、权限和分支关系，不写入远端。
+3. 登录可用后询问 `私有仓库 / Private` 或 `公开仓库 / Public`，远端创建、绑定和权限同步统一推迟到 `$CLI finalize --github-remote apply --json`。
 4. 继续询问 GitHub/GitHub Rulesets、release、quality/TDD 等可选能力；更新或生成 `dayu.config.yaml` 后，用 `$CLI init --target "$TARGET_ROOT" --json`、`$CLI apply --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --dry-run --json` 或 `$CLI merge --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 输出 JSON plan。CLI 会自动包含 `default=true` 的必选能力，并按 manifest 部署 DAG 展示本地写入计划。
 5. 用户确认可选治理能力和已有配置策略后，才执行 `$CLI init --target "$TARGET_ROOT" --apply --json`、`$CLI apply --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 或 `$CLI merge --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --apply --strategy <keep|replace|skip> --json`。写入成功后必须立即调用 `finalize`：先本地验证，再精确 stage/commit；需要远端同步时继续完成 remote apply/verify；启用 GitHub Issue/PR 能力时创建目标仓库测试 Issue/PR 并等待 workflow 成功；启用 release-please 时默认执行 readiness 检查，用户明确授权真实发版验收时才执行真实 release 验证；最后清理测试产物。不得把这些动作作为后续建议。
-6. 有 installer-backed 的组件在执行前先用 `--check` 获取结构化 merge plan，不写 tracked files；无 installer 的组件改用 CLI `merge` 产出融合预览，或用 `generate` 产出待写内容预览，再结合 diff-helper/manual review 说明差异。
+6. 有 installer-backed 的组件在执行前先用 CLI `merge` 获取结构化 merge plan，不写 tracked files；无 installer 的组件同样使用 CLI `merge` 产出融合预览，或用 `generate` 产出待写内容预览，再结合 diff-helper/manual review 说明差异。
 7. 复杂 YAML/JS/CJS/workflow/config 文件默认 `manual_required`。
-8. `finalize` 中执行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/validate.sh" --json "$TARGET_ROOT"`、`bash "$TARGET_ROOT/docs/harness/sensors/scripts/audit.sh" --json "$TARGET_ROOT"` 和 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/check-consistency.sh" --json "$TARGET_ROOT"`；GitHub 能力启用时再执行 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --verify`。这些只属于结构/配置验证，不能替代 GitHub 端到端测试。
+8. `finalize` 中执行 `node "$TARGET_ROOT/docs/harness/sensors/scripts/validate.mjs" --json "$TARGET_ROOT"`、`node "$TARGET_ROOT/docs/harness/sensors/scripts/audit.mjs" --json "$TARGET_ROOT"` 和 `node "$TARGET_ROOT/docs/harness/sensors/scripts/check-consistency.mjs" --json "$TARGET_ROOT"`；GitHub 能力启用时由 TypeScript remote 模块执行 verify。这些只属于结构/配置验证，不能替代 GitHub 端到端测试。
 9. 部署后测试按 profile 选择：`local-fast` 只跑本地生成/校验；目标仓库启用 Issue workflow + PR 协作治理且用户已确认远端同步 apply 时，Skill 必须创建测试 Issue、测试分支和测试 PR，等待 `issue-lint.yml` 与 `pr-lint.yml` 成功，随后关闭测试 PR、关闭测试 Issue 并删除测试分支；`remote-smoke` 使用 disposable GitHub repo 测 Issue -> PR 合并和自动关闭；`remote-release` 只在用户明确授权真实发版验收或维护者 profile 中运行，用于验证 release-please 的负向边界和正向触发；不得用 `workflow_dispatch` 作为远端成功标准。
 10. 部署、融合或维护完成后，按 [docs/completion-report-template.md](docs/completion-report-template.md) 生成自然语言完成报告，向用户说明已启用能力、检查结果、未启用内容和剩余注意事项。完成报告之后，仅当本次 `SKILL_ROOT` 是目标项目内临时一次性副本时，才结构化询问是否删除该目录，并展示绝对路径；持久安装目录不默认询问删除。
 

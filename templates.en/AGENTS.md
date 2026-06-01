@@ -28,9 +28,9 @@ The directory index for this level must be kept in sync when directories, files,
 
 ## Mechanized Checks
 
-- Documentation governance integrity diagnosis: `docs/harness/sensors/scripts/audit.sh`
-- Post-change health check: `docs/harness/sensors/scripts/validate.sh`
-- AGENTS index consistency check: `docs/harness/sensors/scripts/check-consistency.sh`
+- Documentation governance integrity diagnosis: `docs/harness/sensors/scripts/audit.mjs`
+- Post-change health check: `docs/harness/sensors/scripts/validate.mjs`
+- AGENTS index consistency check: `docs/harness/sensors/scripts/check-consistency.mjs`
 
 ## Reading Order
 

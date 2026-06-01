@@ -1,6 +1,6 @@
 # scaffold.sh 内部逻辑 spike
 
-本文记录 Phase 1d TypeScript CLI port 前必须理解的 `scripts/scaffold.sh` 行为。目标是识别可复用语义，不是把 Bash 代码机械翻译成 TypeScript。
+本文记录 Phase 1d TypeScript CLI port 前必须理解的历史 Bash 脚手架行为。当前实现已收缩到 `src/` 内 TypeScript CLI；本文只作为旧行为追溯和风险清单，不再描述当前执行入口。
 
 ## 1. Manifest 解析与依赖展开
 
@@ -12,7 +12,7 @@
 - `resolve_request_ids` 合并默认能力、`--enable` 和 `--only`。
 - `resolve_recursive` 展开依赖。
 
-> 说明：本文以函数名和语义为主，不把行号当成契约。`scaffold.sh` 仍在快速变化，行号会随 QA 修复和测试扩展漂移。
+> 说明：本文以函数名和语义为主，不把行号当成契约。原 Bash 入口已迁移，旧行号和文件路径只保留历史参考价值。
 
 当前语义：
 
@@ -24,7 +24,7 @@
 TypeScript port 启示：
 
 - Phase 1d 应读取 `deployment_deps`，但只针对 v2 试点 manifest。
-- 迁移期间不能删除 legacy `dependencies`，否则 legacy `scaffold.sh` 行为会断。
+- 当前仍保留 legacy `dependencies` 作为兼容字段和人工审阅线索，必须与 `deployment_deps` 同步。
 - 依赖解析要返回结构化错误：unknown capability、missing dependency、cycle。
 
 ## 2. 文件收集

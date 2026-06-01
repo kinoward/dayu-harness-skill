@@ -2,7 +2,7 @@
 
 本文记录 Phase 1d 的本地 TypeScript CLI 实现边界。它把 Phase 1b schema 与 Phase 1c 架构契约接成可运行的最小执行层，用于验证 Skill -> `dayu.config.yaml` -> CLI apply 的 handoff 契约。Phase 1e 后，公开 CLI 范围收敛为 `init`、`apply`、`diagnose`、`validate`；`merge` 和 `generate` 仅保留为 Phase 2 源码原型。
 
-Phase 2 后，当前 CLI 已公开 `merge`、`generate`、`repair`、`status`，并支持当前仓库全部 20 个 manifest。本文件保留 Phase 1d 垂直切片的历史边界；当前产品入口见 [phase2-product.md](phase2-product.md)。
+Phase 2 后，当前 CLI 已公开 `merge`、`generate`、`repair`、`status`、`finalize`、`environment`、`i18n-drift` 和 `sensor`，并支持当前仓库全部 20 个 manifest。本文件保留 Phase 1d 垂直切片的历史边界；当前产品入口见 [phase2-product.md](phase2-product.md)。
 
 ## 目标
 
@@ -13,7 +13,7 @@ Phase 2 后，当前 CLI 已公开 `merge`、`generate`、`repair`、`status`，
 - `init` 默认 dry-run；`--apply` 才创建配置并部署。
 - `apply --only <capability>` 只部署一个已启用能力及其部署依赖闭包。
 - 对已有不同内容的目标文件报告 conflict，不覆盖；对已部署且内容一致的文件报告 no-op。
-- 复用 `scripts/install-husky.sh` 为 `git.commit-format` 安装 `commit-msg` hook 片段。
+- 当时复用历史 Husky installer；当前实现已迁移到 `src/cli/installers/husky.ts`，并生成 Node hook 片段。
 
 ## 命令语义
 
@@ -40,11 +40,11 @@ npm run dayu -- diagnose --config <target>/dayu.config.yaml --target <target> --
 - Phase 1d 不迁移全量 capability；Phase 2 当前仓库的 20 个 manifest 已迁移到 v2 字段。
 - Phase 1d 不发布 npm 包，不保证全局 `npx dayu-harness` 分发体验；Phase 2 已补齐 npm 发布配置。
 - Phase 1d 不实现 `--force` 覆盖、孤儿文件清理、完整事务回滚、remote 操作或 Git finalization。
-- Phase 1d 当时不替换现有 `scripts/scaffold.sh`；Phase 2 后，本地确定性执行主路径已切换到 TypeScript CLI，`scaffold.sh` 仅保留 legacy 兼容和远端 E2E 辅助职责。
+- Phase 1d 当时不替换历史 Bash 脚手架；当前本地确定性执行、环境检查、installer、sensor 和远端动作已收缩到 TypeScript CLI。
 
 ## 验证
 
-Phase 1d 入口测试位于 [tests/unit/phase1d-cli.test.ts](../tests/unit/phase1d-cli.test.ts)，覆盖：
+历史 Phase 1d 入口测试已归档到 `archive/tests/`。当时覆盖：
 
 - CLI `apply --dry-run --json` 确定性输出。
 - 真实 apply 写入 3 个用户可见默认能力，并带上内部 `git.hooks` 依赖。
@@ -55,8 +55,9 @@ Phase 1d 入口测试位于 [tests/unit/phase1d-cli.test.ts](../tests/unit/phase
 - 部分已存在 managed file 的可重试恢复。
 - executable managed file 缺失执行位时，`diagnose` / `validate` 报告不健康，`apply` 修复执行位。
 
-运行：
+当前不执行也不新增测试。修改 Phase 1d 相关 CLI 语义后，至少执行非测试验证：
 
 ```bash
-npm run test:phase1d -- --test-reporter=spec
+npm run lint
+npm run build
 ```

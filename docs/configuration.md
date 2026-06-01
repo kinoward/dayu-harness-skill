@@ -43,7 +43,7 @@ capabilities:
 
 - `deployment_deps`：部署 DAG 使用，阻塞实际写入顺序。
 - `conceptual_deps`：解释和展示使用，不阻塞部署。
-- `dependencies`：兼容 legacy `scaffold.sh` 的桥接字段，必须与 `deployment_deps` 保持一致；当前 CLI 主路径读取 `deployment_deps`。
+- `dependencies`：历史兼容字段，必须与 `deployment_deps` 保持一致；当前 TypeScript CLI 主路径读取 `deployment_deps`。
 
 `apply --only <capability>` 会部署指定能力及其 `deployment_deps` 闭包。
 

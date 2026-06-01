@@ -94,8 +94,8 @@ Before writing to long-lived directories, summarize:
 2. Edit documentation content.
 3. If scripts change, update corresponding scripts too.
 4. If index changes (file add/remove), update affected `AGENTS.md` and synchronize the related `## Directory Index` sections (and `README.md` `## Structure`).
-5. Use `docs/harness/sensors/scripts/diff-helper.sh` to generate a change description: use `docs/harness/sensors/scripts/diff-helper.sh merge-plan <existing> <incoming>` when a source file exists. If there is no matching file, prefer `dayu-harness generate --target <project-root> --json` or `dayu-harness merge --target <project-root> --json` for a preview; if the CLI is unavailable, perform a manual review.
-6. Run `docs/harness/sensors/scripts/validate.sh` if available.
+5. Use `docs/harness/sensors/scripts/diff-helper.mjs` to generate a change description: use `docs/harness/sensors/scripts/diff-helper.mjs merge-plan <existing> <incoming>` when a source file exists. If there is no matching file, prefer `dayu-harness generate --target <project-root> --json` or `dayu-harness merge --target <project-root> --json` for a preview; if the CLI is unavailable, perform a manual review.
+6. Run `docs/harness/sensors/scripts/validate.mjs` if available.
 
 ### Remove Constraint
 
@@ -112,7 +112,7 @@ Before writing to long-lived directories, summarize:
 
 ### Automated Diagnostics
 
-Prefer `docs/harness/sensors/scripts/audit.sh` when present. If unavailable, perform checks manually using the list below.
+Prefer `docs/harness/sensors/scripts/audit.mjs` when present. If unavailable, perform checks manually using the list below.
 
 ### Check List
 
@@ -171,7 +171,7 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 
 | capability | Constraint | Implementation | Coupled components | Applicable when |
 |---|------|---------|---------|---------|
-| `quality.practices` | Development environment discipline | Documentation guidance + validate.sh | — | Code projects |
+| `quality.practices` | Development environment discipline | Documentation guidance + validate.mjs | — | Code projects |
 | `ai.execution` | AI execution style | Documentation rules | — | Always on |
 | `ai.memory` | AI memory boundaries | Documentation rules | — | Always on |
 
@@ -200,16 +200,16 @@ Actual enabled items, dependencies, templates, assets, and acceptance checks fol
 | `project.gitignore` | .gitignore installer | Select Node/Python/Go/Rust/Java/Dotnet templates from the `github/gitignore` snapshot by project contents, then append Dayu local exclusions |
 | `github.release-please` | `release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` + `docs/harness/guides/release-please.md` + `.github/release-please-policy.json` + `.github/scripts/release_please_policy.py` | GitHub-only; depends on `git.commit-format` + `github.pr` + `github.repository-settings` + `release.versioning`; uses `GITHUB_TOKEN` and workflow permissions |
 | Fixed-format content | `dayu-format.mjs` | Deterministically renders PR bodies, issue bodies, and commit messages; use with GitHub CLI, commitlint, and PR/Issue validators |
-| `diagnostics` | audit.sh + check-consistency.sh + validate.sh | Automated documentation integrity and post-deployment status checks |
+| `diagnostics` | audit.mjs + check-consistency.mjs + validate.mjs | Automated documentation integrity and post-deployment status checks |
 
 > Document-only capabilities (`ai.execution`, `ai.memory`, knowledge directories) are enforced with `default=true` and are not asked in capability questions. Optional capabilities remain under manifest control.
 
 ## Compatibility Handling Workflow
 
-When modifying existing configuration, use this flow (AI may drive this manually or with `diff-helper.sh`):
+When modifying existing configuration, use this flow (AI may drive this manually or with `diff-helper.mjs`):
 
 1. **Detect**: Check whether target config already exists (for example, `.husky/commit-msg`, `commitlint.config.cjs`).
-2. **Analyze differences**: Evaluate coupled components one by one: for installer-backed components (for example, husky snippets and `.gitignore`), use the corresponding `--check` to get a structured merge plan; for static template/assets without an installer (for example, `commitlint.config.cjs`, `eslint.config.cjs`, `.prettierrc`, `.lintstagedrc.json`, GitHub workflows, and ruleset JSON), prefer `dayu-harness merge --target <project-root> --json` for a merge preview, or `dayu-harness generate --target <project-root> --json` for a rendered-content preview; if an existing file can be paired with incoming config, add `diff-helper.sh merge-plan <existing> <incoming>`, otherwise continue from the CLI preview or a manual review.
+2. **Analyze differences**: Evaluate coupled components one by one: for installer-backed components (for example, husky snippets and `.gitignore`), use the corresponding `--check` to get a structured merge plan; for static template/assets without an installer (for example, `commitlint.config.cjs`, `eslint.config.cjs`, `.prettierrc`, `.lintstagedrc.json`, GitHub workflows, and ruleset JSON), prefer `dayu-harness merge --target <project-root> --json` for a merge preview, or `dayu-harness generate --target <project-root> --json` for a rendered-content preview; if an existing file can be paired with incoming config, add `diff-helper.mjs merge-plan <existing> <incoming>`, otherwise continue from the CLI preview or a manual review.
 3. **Describe changes**: Provide human-readable change text. Example: “Your project already has `.husky/commit-msg` with Conventional Commits checks. New content can co-exist and does not alter existing behavior.”
 4. **User confirmation**: For existing config handling only offer [1] Keep existing [2] Replace [3] Merge [4] Skip. Default capabilities should not offer skip.
 5. **Execute**: Apply based on user choice.
@@ -223,7 +223,7 @@ When modifying existing configuration, use this flow (AI may drive this manually
 
 Before asking questions, assess the current project state:
 
-1. Run `scripts/ensure-environment.sh <project-root> --check --capabilities "<resolved capability ids>"` to confirm environment and initialization state. If optional capabilities are not determined, omit `--capabilities` and check defaults.
+1. Run `dayu-harness environment <project-root> --check --capabilities "<resolved capability ids>"` to confirm environment and initialization state. If optional capabilities are not determined, omit `--capabilities` and check defaults.
 2. Check whether `CLAUDE.md`, `AGENTS.md`, and `docs/` exist.
 3. Check existing `.husky/`, `commitlint.config.cjs`, `.github/workflows/`.
 4. Tailor questions based on detected state: default capabilities are not asked to enable/disable; existing files only ask whether to keep/extend/skip.

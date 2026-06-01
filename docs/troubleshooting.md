@@ -117,7 +117,7 @@ npx dayu-harness finalize --target . --json
 npx dayu-harness finalize --target . --github-remote apply --json
 ```
 
-不要用 `gh repo create --push`、手写 `git push origin main`、API 手工创建默认分支或直接调用 `scripts/github-remote.sh --apply` 替代 `finalize --github-remote apply`。这些手工路径不会传递受控的远端动作，也容易被本地 pre-push 或远端保护规则拦截。`.github/rulesets/*.json` 只是本地 payload；没有 GitHub Rulesets API 写入和回读时，完成报告必须保持 partial，不能宣称远端 rulesets 已应用。默认 Release Please readiness 不能汇报为真实 tag/release 通过。
+不要用 `gh repo create --push`、手写 `git push origin main` 或 API 手工创建默认分支替代 `finalize --github-remote apply`。这些手工路径不会传递受控的远端动作，也容易被本地 pre-push 或远端保护规则拦截。`.github/rulesets/*.json` 只是本地 payload；没有 GitHub Rulesets API 写入和回读时，完成报告必须保持 partial，不能宣称远端 rulesets 已应用。默认 Release Please readiness 不能汇报为真实 tag/release 通过。
 
 如果当前构建没有该子命令，`/dayu-harness` Skill 必须按完成报告模板调用等价脚本和 Git/GitHub 流程完成同等收尾。
 

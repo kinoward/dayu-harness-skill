@@ -15,18 +15,18 @@ CLI `apply`、`init --apply`、`merge --apply` 或任何手工写入完成后，
 
 ## Finalize 流程
 
-向用户汇报前，AI 需要先执行 `finalize`。默认使用 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --json`；已启用 GitHub 远端同步或用户明确选择远端治理时，追加 `--github-remote apply`。Release Please 默认使用 `--release-validation readiness`；只有用户明确要求真实发版验收时，才追加 `--release-validation real`。`npx dayu-harness ...` 只作为已发布包 fallback，不作为源码或本地 Skill 安装目录的默认路径。CLI `finalize` 可用时，不得手工执行 `scripts/github-remote.sh --apply` 替代远端 apply。
+向用户汇报前，AI 需要先执行 `finalize`。默认使用 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --json`；已启用 GitHub 远端同步或用户明确选择远端治理时，追加 `--github-remote apply`。Release Please 默认使用 `--release-validation readiness`；只有用户明确要求真实发版验收时，才追加 `--release-validation real`。`npx dayu-harness ...` 只作为已发布包 fallback，不作为源码或本地 Skill 安装目录的默认路径。CLI `finalize` 可用时，不得手工执行 GitHub 远端同步替代远端 apply。
 
 当前环境没有 `finalize` 入口时，先说明 CLI 不可用和影响，再按以下清单做降级检查；降级路径不能汇报为完整成功，除非能证明与 CLI finalize 覆盖范围等价。
 
 推荐顺序：
 
-1. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/validate.sh" --json "$TARGET_ROOT"`，确认已启用的自动检查、配置和协作流程能正常工作。
-2. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/audit.sh" --json "$TARGET_ROOT"`，确认项目入口、文档索引和维护说明完整。
-3. 运行 `bash "$TARGET_ROOT/docs/harness/sensors/scripts/check-consistency.sh" --json "$TARGET_ROOT"`，确认文档之间能互相找到，旧文档没有被遗漏。
+1. 运行 `node "$TARGET_ROOT/docs/harness/sensors/scripts/validate.mjs" --json "$TARGET_ROOT"`，确认已启用的自动检查、配置和协作流程能正常工作。
+2. 运行 `node "$TARGET_ROOT/docs/harness/sensors/scripts/audit.mjs" --json "$TARGET_ROOT"`，确认项目入口、文档索引和维护说明完整。
+3. 运行 `node "$TARGET_ROOT/docs/harness/sensors/scripts/check-consistency.mjs" --json "$TARGET_ROOT"`，确认文档之间能互相找到，旧文档没有被遗漏。
 4. 运行 `$CLI diagnose --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json`、`$CLI validate --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json` 和 `$CLI status --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --json`，确认所有已部署能力都被覆盖：manifest 文件存在性、漂移、执行位、依赖图、`.gitignore`、commitlint CLI、Git commit hook、pre-commit lint-staged hook、pre-push 保护、Node linter/formatter CLI、PR/Issue body validators、TDD policy、release-please policy 等。CLI 或传感器没有直接覆盖的硬能力必须手动抽查对应命令或脚本；不要只抽查 GitHub 能力。
 5. 基于 `.dayu-harness/managed-paths.json` 精确 stage 托管路径和长期状态，并创建初始化或维护提交。`.dayu-harness/managed-paths.json` 是长期状态，必须提交；`.dayu-harness/apply.lock`、`.dayu-harness/journal.jsonl` 和 `.dayu-harness/tmp/` 是临时/恢复用产物，必须忽略，不得提交。
-6. 如果启用了 GitHub/release 远端能力，CLI `finalize` 可用时必须通过 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --github-remote apply --json` 应用远端动作；只有当前环境没有 `finalize` 入口时，降级路径才允许调用 `bash "$SKILL_ROOT/scripts/github-remote.sh" "$TARGET_ROOT" --apply`。远端动作完成后再回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。`.github/rulesets/*.json` 只是本地 payload，只有 GitHub Rulesets API 写入并回读后才能汇报为远端 ruleset 已应用。
+6. 如果启用了 GitHub/release 远端能力，CLI `finalize` 可用时必须通过 `$CLI finalize --target "$TARGET_ROOT" --config "$TARGET_ROOT/dayu.config.yaml" --skill-root "$SKILL_ROOT" --github-remote apply --json` 应用远端动作。远端动作完成后再回读远端仓库设置、workflow permissions、rulesets 和默认分支状态；这一步只说明远端配置是否存在，不等同于 GitHub Actions 端到端成功。`.github/rulesets/*.json` 只是本地 payload，只有 GitHub Rulesets API 写入并回读后才能汇报为远端 ruleset 已应用。
 7. 如果 CLI finalize 已执行 GitHub Issue/PR E2E，转述其结果和清理状态。降级路径只有在用户明确授权远端 E2E 时，才创建测试 Issue、测试分支和测试 PR；验证通过后必须清理测试 PR、测试 Issue 和测试分支。只有 disposable `remote-smoke` profile 才验证合并后自动关闭 Issue。
 8. 如果启用了自动化版本发布流程，默认汇报 Release Please readiness 结果。真实 release 验证只在用户明确授权时执行：在目标仓库或 disposable `remote-release` 仓库中验证策略要求的触发路径和触发类型。文件存在性、语法检查、策略检查或 `workflow_dispatch` 不能替代真实验证；如果没有做真实验证，报告中必须写明未做真实发版。
 9. PR body、Issue body、commit message 等固定格式内容，优先用 `node "$TARGET_ROOT/docs/harness/sensors/scripts/dayu-format.mjs"`、GitHub CLI `--body-file`、Commitizen/cz-git、commitlint、release-please、changesets 或项目内同类确定性工具生成/校验；模型只提供结构化字段和错误解释。

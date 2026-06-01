@@ -108,9 +108,9 @@ Phase 2 CLI `apply` 是本地确定性写入层，不隐式执行以下远端或
 
 - Git stage、commit、push 或创建初始化 PR。
 - GitHub API 写入仓库设置、ruleset 或 workflow permissions。
-- 创建测试 Issue、测试分支、测试 PR，或等待远端 GitHub Actions 完成。
+- 创建验证 Issue、验证分支、验证 PR，或等待远端 GitHub Actions 完成。
 - release-please 远端发布验证。
 
-这些操作不是 `apply` 的副作用，但必须由 `/dayu-harness` 的 `finalize` 阶段在 apply 成功后继续完成，不能作为后续建议。`finalize` 根据用户已确认的能力范围，通过独立辅助脚本、GitHub CLI 或 smoke profile 完成本地验证、精确 stage/commit、远端创建/绑定、远端配置回读、Issue/PR E2E、release-please 真实验证，并在完成后清理测试产物。
+这些操作不是 `apply` 的副作用，但必须由 `/dayu-harness` 的 `finalize` 阶段在 apply 成功后继续完成，不能作为后续建议。`finalize` 根据用户已确认的能力范围，通过 `src/` 内 TypeScript 远端模块、GitHub CLI 或显式 smoke profile 完成本地验证、精确 stage/commit、远端创建/绑定、远端配置回读、Issue/PR E2E、release-please 真实验证，并在完成后清理验证产物。
 
 `finalize` 最后还必须结构化询问是否删除一次性 Skill 安装目录，默认删除，并展示该目录的绝对路径。该删除只作用于 Skill 安装目录，不影响目标项目中的治理体系。
